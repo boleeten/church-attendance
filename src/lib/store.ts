@@ -48,6 +48,20 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+// 데모 모드: 같은 브라우저의 다른 탭(예: 관리자 탭)에서 바꾼 내용을 바로 받아온다.
+// 이것이 없으면 열려 있던 탭이 옛 데이터를 들고 있다가 다음 저장 때 다른 탭의 변경(답변 등)을 덮어쓴다.
+if (!remoteEnabled && typeof window !== "undefined")
+  window.addEventListener("storage", (e) => {
+    if (e.key !== DATA_KEY || !e.newValue) return;
+    try {
+      data = JSON.parse(e.newValue) as Data;
+      version++;
+      listeners.forEach((l) => l());
+    } catch {
+      /* 손상된 값은 무시 */
+    }
+  });
+
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);

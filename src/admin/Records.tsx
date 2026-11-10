@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
-import { toast } from "../lib/remote";
+import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
 import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
@@ -355,6 +355,7 @@ function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; in
           <label className="sb" htmlFor="reply-text">심방 답변</label>
           <textarea id="reply-text" className="area" autoFocus placeholder={`${by} 선생님에게 보낼 답변을 적어 주세요. 격려, 심방 계획, 기도 제목 등`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
           <span className="t-xs muted">보내면 {by} 선생님의 알림 목록에 표시되고, 학생 상세의 심방노트 아래에서 볼 수 있습니다.</span>
+          {!remoteEnabled && <Note icon="info">데모 모드에서는 데이터가 이 브라우저에만 저장됩니다. 답변은 같은 기기·같은 브라우저·같은 주소에서 {by} 선생님 계정으로 로그인해야 보입니다. 휴대폰이나 다른 주소(관리자 주소와 교사 주소)에서는 전달되지 않습니다.</Note>}
         </div>
       ) : note.reply ? (
         <div className="reply">
