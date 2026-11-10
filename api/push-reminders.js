@@ -3,8 +3,11 @@
 // - 관리자가 앱에서 "알림 보내기"를 누르면 같은 함수를 호출해 기기 푸시만 추가로 보낸다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CRON_SECRET
 // 주의: 실제 Supabase·푸시 키로 아직 실행해 보지 않은 코드다.
-import webpush from "web-push";
+import * as webpushModule from "web-push";
 import { createClient } from "@supabase/supabase-js";
+
+// 번들 방식에 따라 default 내보내기가 없을 수 있어 둘 다 받는다
+const webpush = webpushModule.default ?? webpushModule;
 
 const uid = () => Math.random().toString(36).slice(2, 12);
 
