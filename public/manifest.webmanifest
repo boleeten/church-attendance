@@ -1,0 +1,10 @@
+{
+  "name": "주님의교회 초등부 출석관리",
+  "short_name": "초등부 출석",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#041c46",
+  "lang": "ko",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

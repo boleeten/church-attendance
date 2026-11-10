@@ -1,0 +1,336 @@
+import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
+import { remoteEnabled, toast } from "../lib/remote";
+import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, toCSV, yearSundays } from "../lib/stats";
+import { canManageAccount, canResetPassword, classLabel, exportBackup, graduateSixth, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
+import type { Data, Mark, Role, User } from "../lib/types";
+import { Avatar, Badge, Button, Icon, Modal, Note, Switch } from "../ui";
+import { Page, useAdminDate } from "./AdminApp";
+import { classOf, Kpi, SelectBox, TempPasswordModal } from "./Manage";
+
+const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
+
+// ───────── A08 Google Sheets 관리 ─────────
+type SheetDef = { name: string; rows: (d: Data) => (string | number | null | undefined)[][] };
+
+function monthlyRates(marks: Record<string, Mark>, id: string, dates: string[]) {
+  return Array.from({ length: 12 }, (_, i) => pctText(personRate(marks, id, dates.filter((x) => ym(x).m === i + 1)).rate));
+}
+const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
+
+const SHARED: SheetDef[] = [
+  { name: "전체 학생 명부", rows: (d) => [["이름", "그룹", "학년", "반", "담임교사", "재적 상태"], ...d.students.map((s) => { const c = classOf(d, s); return [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.status]; })] },
+  { name: "학생 주일 출석 원본", rows: (d) => [["주일", "학생", "반", "출석 상태"], ...yearSundays(d).flatMap((dt) => activeStudents(d).map((s) => { const c = classOf(d, s); return [dt, s.name, c ? classLabel(c) : "", markText(d.studentMarks[`${dt}|${s.id}`])]; }))] },
+  { name: "반별 출석현황", rows: (d) => [["주일", "반", "전체", "출석", "결석", "미확인", "출석률", "완료"], ...yearSundays(d).flatMap((dt) => d.classes.map((c) => { const s = classSummary(d, dt, c.id); return [dt, classLabel(c), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; }))] },
+  { name: "학생 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["학생", "반", ...MONTHS, "연간"], ...activeStudents(d).map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", ...monthlyRates(d.studentMarks, s.id, dates), pctText(personRate(d.studentMarks, s.id, dates).rate)]; })]; } },
+  { name: "전체 교사 명부", rows: (d) => [["이름", "아이디", "소속", "담당"], ...allStaff(d).map((u) => [u.name, u.loginId, `${u.group}부`, teacherDuty(d, u, false)])] },
+  { name: "교사 주일 출석 원본", rows: (d) => [["주일", "교사", "소속", "출석 상태"], ...yearSundays(d).flatMap((dt) => allStaff(d).map((u) => [dt, u.name, `${u.group}부`, markText(d.teacherMarks[`${dt}|${u.id}`])]))] },
+  { name: "교사 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["교사", "소속", ...MONTHS, "연간"], ...allStaff(d).map((u) => [u.name, `${u.group}부`, ...monthlyRates(d.teacherMarks, u.id, dates), pctText(personRate(d.teacherMarks, u.id, dates).rate)])]; } },
+];
+const PRIVATE: SheetDef[] = [
+  { name: "학생·보호자 연락처", rows: (d) => [["이름", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ...d.students.map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", s.phone, s.guardianPhone, s.guardianRel]; })] },
+  { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt)]; })] },
+];
+
+export function Sheets() {
+  const d = useData();
+  const s = d.settings;
+  const y = s.year;
+  const sync = () => {
+    updateSettings({ sheetLastSuccess: new Date().toISOString(), sheetSyncCount: s.sheetSyncCount + 1 });
+    toast("동기화 기록을 남겼습니다. 실제 Google Sheets 전송은 서버 연동 후 동작합니다.");
+  };
+  const group = (title: string, badge: boolean, defs: SheetDef[]) => (
+    <>
+      <tr className="group">
+        <td colSpan={2}><span className="row g8">{title}{badge && <Badge tone="warning">관리자 전용</Badge>}</span></td>
+        <td colSpan={2} className="muted t-xs" style={{ fontWeight: 400 }}>Google Sheets 연결 후 열 수 있습니다</td>
+      </tr>
+      {defs.map((def, i) => (
+        <tr key={def.name}>
+          <td>{i + 1}. {def.name}</td>
+          <td className="num">{(def.rows(d).length - 1).toLocaleString()}</td>
+          <td className="muted">{fmtRelDay(s.sheetLastSuccess)}</td>
+          <td><Button variant="outline" size="s" onClick={() => download(`${def.name}.csv`, toCSV(def.rows(d)))}>CSV 받기</Button></td>
+        </tr>
+      ))}
+    </>
+  );
+  return (
+    <Page title="Google Sheets" sub="교사 공유용 출석대장과 관리자 전용 파일의 동기화·공유 권한을 관리합니다">
+      <section className="panel" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+        <span className="kpi" style={{ padding: 0, boxShadow: "none" }}><span className="ico warm" style={{ width: 56, height: 56, borderRadius: 28 }}><Icon name="cloud" size={28} /></span></span>
+        <div className="col g4 grow">
+          <div className="row g8"><strong className="t-lg b">{y} 초등부 Google Sheets</strong><Badge tone="warning">연결 필요</Badge></div>
+          <span className="muted">파일 2개(교사 공유용 출석대장 · 관리자 전용 관리자료) · 마지막 동기화 {fmtRelDay(s.sheetLastSuccess)}</span>
+        </div>
+        <Button variant="outline" onClick={() => [...SHARED, ...PRIVATE].forEach((def, i) => setTimeout(() => download(`${def.name}.csv`, toCSV(def.rows(d))), i * 250))}><Icon name="download" size={16} />Excel 다운로드 (전체)</Button>
+        <Button onClick={sync}>수동 동기화</Button>
+      </section>
+      <Note warm icon="warning">아직 Google Sheets와 연결되지 않았습니다. 자동 동기화는 Google 서비스 계정과 서버 함수 설정이 끝난 뒤 동작하며, 그 전에는 아래에서 각 시트를 CSV(Excel에서 열림)로 내려받을 수 있습니다.</Note>
+      <div className="grid cols-3">
+        <Kpi label="마지막 동기화 성공" value={fmtRelDay(s.sheetLastSuccess)} sub={`시트 ${SHARED.length + PRIVATE.length}개`} icon="cloud" tone="success" />
+        <Kpi label="마지막 동기화 실패" value={fmtRelDay(s.sheetLastFail)} sub="실패 시 자동으로 다시 시도합니다" icon="warning" tone="error" />
+        <Kpi label="누적 동기화" value={`${s.sheetSyncCount}회`} sub={`성공 ${s.sheetSyncCount - s.sheetFailCount} · 실패 ${s.sheetFailCount}`} icon="refresh" />
+      </div>
+      <div className="grid split">
+        <section className="panel">
+          <div className="row between"><h2>시트 구성</h2><span className="muted">파일 2개 · 시트 {SHARED.length + PRIVATE.length}개</span></div>
+          <div className="tablewrap">
+            <table className="tbl">
+              <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th><th /></tr></thead>
+              <tbody>
+                {group(`교사 공유용 · ${y} 초등부 출석대장`, false, SHARED)}
+                {group(`관리자 전용 · ${y} 초등부 관리자료`, true, PRIVATE)}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="panel">
+          <h2>공유 권한</h2>
+          {[
+            ["목사님", "소유자", "warning"],
+            ["최고 관리자", "편집자", "info"],
+            ["일반 관리자", "보기 전용", "neutral"],
+            ["교사 전체 (링크)", "출석대장만", "neutral"],
+          ].map(([who, perm, tone]) => (
+            <div key={who} className="row g10"><Avatar name={who} size={32} /><strong className="sb grow">{who}</strong><Badge tone={tone as "warning" | "info" | "neutral"}>{perm}</Badge></div>
+          ))}
+          <Note>앱 데이터베이스가 원본이며, 시트에서 직접 수정한 내용은 앱에 반영되지 않습니다. 전화번호·심방노트는 관리자 전용 파일에만 동기화되고, 교사 공유 링크로는 볼 수 없습니다.</Note>
+        </section>
+      </div>
+    </Page>
+  );
+}
+
+// ───────── A09 알림 설정 ─────────
+export function NotifySettings() {
+  const d = useData();
+  const { date } = useAdminDate();
+  const s = d.settings;
+  const [st, setSt] = useState(s.studentNotifyTime);
+  const [tt, setTt] = useState(s.teacherNotifyTime);
+  const logs = d.notifLogs.filter((l) => l.at.slice(0, 10) >= date).slice(0, 30);
+  const noPush = d.users.filter((u) => (u.roles.includes("teacher") || u.roles.includes("head")) && u.active && !u.pushAllowed);
+  const card = (title: string, on: boolean, setOn: (v: boolean) => void, time: string, setTime: (v: string) => void, target: string, pvTitle: string, pvBody: string, save: () => void, resend: () => void) => (
+    <section className="panel">
+      <div className="row between"><h2>{title}</h2><Switch on={on} onChange={setOn} label={`${title} 사용`} /></div>
+      <div className="grid cols-2" style={{ gap: 12 }}>
+        <div className="field"><label>발송 요일</label><div className="input m"><input value="매주 일요일" readOnly aria-label="발송 요일" /></div></div>
+        <div className="field"><label>발송 시간</label><div className="input m"><input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="발송 시간" /></div></div>
+      </div>
+      <div className="field"><label>발송 대상</label><p className="muted">{target}</p></div>
+      <div className="card pad col g4" style={{ background: "var(--canvas)" }}>
+        <span className="t-xs muted">미리보기</span>
+        <strong className="sb">{pvTitle}</strong>
+        <span>{pvBody}</span>
+      </div>
+      <div className="row g8" style={{ justifyContent: "flex-end" }}>
+        <Button variant="outline" onClick={resend}>지금 수동 재발송</Button>
+        <Button onClick={save}>저장</Button>
+      </div>
+    </section>
+  );
+  return (
+    <Page title="알림 설정" sub="출석 미완료 푸시 알림의 발송 시간과 결과를 관리합니다">
+      <Note warm icon="warning">예약 발송과 기기 푸시는 서버 스케줄러·웹 푸시 키 설정 후 동작합니다. 지금은 수동 재발송으로 앱 안의 알림 목록에 알림을 보낼 수 있습니다.</Note>
+      <div className="grid cols-2">
+        {card("학생 출석 미완료 알림 (담당 교사)", s.studentNotifyOn, (v) => updateSettings({ studentNotifyOn: v }), st, setSt, "해당 주일 출석이 완료되지 않은 반의 담당 교사", "주일 출석체크 안내", "1부 4학년 1반의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.", () => { updateSettings({ studentNotifyTime: st }); toast(`발송 시간을 ${fmtTime12(st)}로 저장했습니다.`); }, () => toast(`${fmtDot(date)} 미완료 반 담임 ${sendStudentReminders(date)}명에게 알림을 보냈습니다.`))}
+        {card("교사 출석 미완료 알림 (부장교사)", s.teacherNotifyOn, (v) => updateSettings({ teacherNotifyOn: v }), tt, setTt, "교사 출석부가 완료되지 않은 부서의 부장교사", "교사 출석체크 안내", "2부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.", () => { updateSettings({ teacherNotifyTime: tt }); toast(`발송 시간을 ${fmtTime12(tt)}로 저장했습니다.`); }, () => toast(`부장교사 ${sendTeacherReminders(date)}명에게 알림을 보냈습니다.`))}
+      </div>
+      <div className="grid split">
+        <section className="panel">
+          <div className="row between"><h2>알림 발송 결과</h2><span className="muted">{fmtDot(date)} 이후</span></div>
+          <div className="tablewrap">
+            <table className="tbl">
+              <thead><tr><th>발송 시각</th><th>유형</th><th>수신자</th><th>대상</th><th>결과</th></tr></thead>
+              <tbody>
+                {logs.map((l) => (
+                  <tr key={l.id}>
+                    <td className="num">{fmtStamp(l.at)}</td>
+                    <td><Badge tone={l.mode === "자동" ? "info" : "neutral"}>{l.mode}</Badge></td>
+                    <td className="sb">{d.users.find((u) => u.id === l.userId)?.name ?? "-"}</td>
+                    <td>{l.target}</td>
+                    <td><Badge tone={l.result === "성공" ? "success" : l.result === "실패" ? "error" : "warning"}>{l.result}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!logs.length && <p className="empty">이 기간에 발송된 알림이 없습니다.</p>}
+          </div>
+        </section>
+        <section className="panel">
+          <div className="row between"><h2>알림 권한 미설정 교사</h2><Badge tone="warning">{noPush.length}명</Badge></div>
+          {noPush.map((u) => (
+            <div key={u.id} className="row g10"><Avatar name={u.name} size={32} /><div className="col g2 grow"><strong className="sb">{u.name}</strong><span className="t-xs muted">{u.group}부 · {teacherDuty(d, u)}</span></div><Badge>미허용</Badge></div>
+          ))}
+          <Note>푸시가 전달되지 않는 교사도 앱 홈의 종 아이콘(빨간 점)과 알림 목록에서 같은 내용을 확인할 수 있습니다.</Note>
+        </section>
+      </div>
+    </Page>
+  );
+}
+
+// ───────── A10 학년도·운영 설정 ─────────
+export function YearSettings() {
+  const d = useData();
+  const file = useRef<HTMLInputElement>(null);
+  const [q, setQ] = useState("");
+  const [type, setType] = useState("");
+  const dates = yearSundays(d);
+  const sixth = activeStudents(d).filter((s) => classOf(d, s)?.grade === 6).length;
+  const lower = activeStudents(d).filter((s) => (classOf(d, s)?.grade ?? 6) < 6).length;
+  const types = [...new Set(d.audits.map((a) => a.type))];
+  const name = (id: string) => d.users.find((u) => u.id === id)?.name ?? "시스템";
+  const logs = d.audits.filter((a) => (!type || a.type === type) && (!q.trim() || a.target.includes(q.trim()) || name(a.actorId).includes(q.trim()))).slice(0, 100);
+  const action = (icon: string, title: string, desc: string, btn: React.ReactNode) => (
+    <div className="class-card"><span className="kpi" style={{ padding: 0, boxShadow: "none" }}><span className="ico"><Icon name={icon} size={18} /></span></span><strong className="b">{title}</strong><span className="t-xs muted grow" style={{ lineHeight: 1.4 }}>{desc}</span>{btn}</div>
+  );
+  return (
+    <Page title="학년도·운영 설정" sub="학년도 전환, 진급·졸업 처리, 기록 보존을 관리합니다">
+      <section className="panel">
+        <span className="muted">현재 학년도</span>
+        <div className="row g12 wrap"><strong className="t-3xl b">{d.settings.year}학년도</strong><Badge tone="success">운영 중</Badge><span className="muted">{d.settings.year}.01.01 ~ {d.settings.year}.12.31 · 주일 {dates.length} / 52주 진행</span></div>
+        <h2 className="mt8">{d.settings.year + 1}학년도 전환 절차</h2>
+        <div className="steps">
+          {["새 학년도 생성", "졸업 처리", "진급 처리", "반 재배정", "전환 완료"].map((t, i) => <span key={t}><b>{i + 1}</b>{t}{i < 4 && <Icon name="right" size={14} />}</span>)}
+        </div>
+        <Note>졸업·진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다.</Note>
+        <div className="grid cols-4" style={{ gap: 16 }}>
+          {action("users", "졸업 처리", `6학년 ${sixth}명을 졸업 상태로 변경합니다. 출석 기록은 보존됩니다.`, <Button variant="outline" size="s" disabled={!sixth} onClick={() => window.confirm(`6학년 ${sixth}명을 졸업 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${graduateSixth()}명을 졸업 처리했습니다.`)}>졸업 처리 시작</Button>)}
+          {action("chart", "학생 진급 처리", `4·5학년 ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower || sixth > 0} onClick={() => window.confirm(`4·5학년 ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>{sixth > 0 ? "졸업 처리 후 가능" : "진급 처리"}</Button>)}
+          {action("grid", "학생 반 재배정", "새 학년도 반 편성에 맞춰 학생과 교사를 배정합니다.", <Link to="/admin/classes" className="btn outline s">반 재배정</Link>)}
+          {action("download", "백업 및 복구", `마지막 백업 ${fmtRelDay(d.settings.lastBackup)}. 전체 데이터를 파일로 내려받거나 복구합니다.`, <div className="row g6"><Button variant="outline" size="s" onClick={() => download(`출석관리_백업_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(), "application/json")}>백업 받기</Button><Button variant="outline" size="s" disabled={remoteEnabled} onClick={() => file.current?.click()}>복구</Button></div>)}
+        </div>
+        <input ref={file} type="file" accept="application/json,.json" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f || !window.confirm("현재 데이터를 백업 파일의 내용으로 덮어쓸까요?")) return; const err = importBackup(await f.text()); toast(err ?? "백업 파일로 복구했습니다.", err ? "error" : "info"); }} />
+      </section>
+      <section className="panel">
+        <div className="row between wrap g8">
+          <h2>변경 이력 (감사 로그)</h2>
+          <div className="filters">
+            <div className="input m" style={{ minWidth: 200 }}><Icon name="search" size={18} /><input placeholder="수정자, 대상 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="감사 로그 검색" /></div>
+            <SelectBox label="유형" value={type} onChange={setType}><option value="">유형: 전체</option>{types.map((t) => <option key={t}>{t}</option>)}</SelectBox>
+          </div>
+        </div>
+        <div className="tablewrap">
+          <table className="tbl">
+            <thead><tr><th>시각</th><th>수정자</th><th style={{ width: 140 }}>유형</th><th>대상</th><th>변경 전</th><th>변경 후</th></tr></thead>
+            <tbody>
+              {logs.map((a) => (
+                <tr key={a.id}><td className="num muted">{fmtStamp(a.at)}</td><td className="sb">{name(a.actorId)}</td><td><Badge tone="info">{a.type}</Badge></td><td>{a.target}</td><td className="muted">{a.before}</td><td>{a.after}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          {!logs.length && <p className="empty">조건에 맞는 변경 이력이 없습니다.</p>}
+        </div>
+        <span className="t-xs muted">최근 100건까지 표시합니다.</span>
+      </section>
+    </Page>
+  );
+}
+
+// ───────── A12 관리자 계정 관리 ─────────
+export function Accounts() {
+  const d = useData();
+  const me = useMe()!;
+  const [temp, setTemp] = useState<{ id: string; pw: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [pick, setPick] = useState("");
+  const [scope, setScope] = useState("학생·교사 데이터, 출결 운영");
+  const supers = d.users.filter((u) => u.roles.includes("super")).sort((a, b) => Number(b.roles.includes("owner")) - Number(a.roles.includes("owner")));
+  const admins = d.users.filter((u) => u.roles.includes("admin") && !u.roles.includes("super"));
+  const candidates = d.users.filter((u) => !u.roles.includes("admin") && !u.roles.includes("super") && u.active);
+  const isSuper = me.roles.includes("super");
+  const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화"].includes(a.type)).slice(0, 30);
+  const doReset = (u: User) => {
+    if (!window.confirm(`${u.name}(${u.loginId}) 계정의 비밀번호를 초기화할까요?`)) return;
+    const r = resetPassword(u.id);
+    if (typeof r === "string") toast(r, "error");
+    else setTemp({ id: u.loginId, pw: r.tempPassword });
+  };
+  const setRoles = (u: User, roles: Role[], extra: Partial<User> = {}) => {
+    const r = upsertUser({ ...u, ...extra, roles });
+    if (typeof r === "string") toast(r, "error");
+  };
+  return (
+    <Page title="관리자 계정 관리" sub="최고 관리자·일반 관리자 계정과 권한을 관리합니다">
+      <Note warm icon="shield">최고 관리자 계정의 생성·정보 수정·권한 변경·비활성화는 목사님(계정 총괄)만 할 수 있습니다. 다른 최고 관리자는 비밀번호 초기화만 가능하며, 목사님 계정은 초기화할 수 없습니다.</Note>
+      <section className="panel">
+        <div className="row between"><h2>최고 관리자</h2><Badge tone="info">{supers.length}명</Badge></div>
+        <div className="tablewrap">
+          <table className="tbl">
+            <thead><tr><th>이름</th><th>직분</th><th>아이디</th><th>권한</th><th>상태</th><th>관리</th></tr></thead>
+            <tbody>
+              {supers.map((u) => (
+                <tr key={u.id}>
+                  <td><span className="row g8"><Avatar name={u.name} size={28} /><strong className="sb">{u.name}</strong>{u.id === me.id && <Badge tone="info">나</Badge>}</span></td>
+                  <td>{u.title ?? "-"}</td><td className="muted">{u.loginId}</td>
+                  <td><span className="row g6">{u.roles.includes("owner") && <Badge tone="warning">계정 총괄</Badge>}<Badge tone="warning">최고 관리자</Badge>{u.roles.includes("head") && <Badge tone="info">부장교사</Badge>}</span></td>
+                  <td><Badge tone={u.active ? "success" : "neutral"}>{u.active ? "활성" : "비활성"}</Badge></td>
+                  <td>
+                    {u.roles.includes("owner") ? <span className="muted t-xs">초기화 불가</span> : u.id === me.id ? <span className="muted t-xs">내 정보에서 변경</span> : (
+                      <span className="row g6">
+                        <Button variant="danger" size="s" disabled={!canResetPassword(me, u)} onClick={() => doReset(u)}>비밀번호 초기화</Button>
+                        {canManageAccount(me, u) && <Button variant="outline" size="s" onClick={() => { const e = setUserActive(u.id, !u.active); if (e) toast(e, "error"); }}>{u.active ? "비활성화" : "활성화"}</Button>}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="row between"><h2>일반 관리자</h2><Button size="s" disabled={!isSuper} onClick={() => { setPick(""); setAdding(true); }}><Icon name="plus" size={14} />일반 관리자 등록</Button></div>
+        <div className="tablewrap">
+          <table className="tbl">
+            <thead><tr><th>이름</th><th>아이디</th><th>권한 범위</th><th>상태</th><th>관리</th></tr></thead>
+            <tbody>
+              {admins.map((u) => (
+                <tr key={u.id}>
+                  <td><span className="row g8"><Avatar name={u.name} size={28} /><strong className="sb">{u.name}</strong></span></td>
+                  <td className="muted">{u.loginId}</td><td>{u.adminScope ?? "학생·교사 데이터, 출결 운영"}</td>
+                  <td><Badge tone={u.active ? "success" : "neutral"}>{u.active ? "활성" : "비활성"}</Badge></td>
+                  <td><span className="row g6">
+                    <Button variant="danger" size="s" disabled={!canResetPassword(me, u)} onClick={() => doReset(u)}>비밀번호 초기화</Button>
+                    <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => { const e = setUserActive(u.id, !u.active); if (e) toast(e, "error"); }}>{u.active ? "비활성화" : "활성화"}</Button>
+                    <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => window.confirm(`${u.name}의 일반 관리자 권한을 해제할까요?`) && setRoles(u, u.roles.filter((r) => r !== "admin"))}>권한 해제</Button>
+                  </span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!admins.length && <p className="empty">등록된 일반 관리자가 없습니다.</p>}
+        </div>
+      </section>
+      <section className="panel">
+        <h2>관리자 계정 변경 이력</h2>
+        <div className="tablewrap">
+          <table className="tbl">
+            <thead><tr><th>시각</th><th>수행자</th><th>유형</th><th>대상</th><th>내용</th></tr></thead>
+            <tbody>
+              {history.map((a) => (
+                <tr key={a.id}><td className="num muted">{fmtStamp(a.at)}</td><td className="sb">{d.users.find((u) => u.id === a.actorId)?.name ?? "시스템"}</td><td><Badge tone="info">{a.type}</Badge></td><td>{a.target}</td><td>{a.after}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          {!history.length && <p className="empty">변경 이력이 없습니다.</p>}
+        </div>
+      </section>
+      {adding && (
+        <Modal title="일반 관리자 등록" onClose={() => setAdding(false)} footer={<><Button variant="outline" onClick={() => setAdding(false)}>취소</Button><Button disabled={!pick} onClick={() => { const u = d.users.find((x) => x.id === pick)!; setRoles(u, [...u.roles, "admin"], { adminScope: scope }); toast(`${u.name}을(를) 일반 관리자로 등록했습니다.`); setAdding(false); }}>등록</Button></>}>
+          <div className="field"><label>대상 계정</label>
+            <SelectBox label="대상 계정" value={pick} onChange={setPick}><option value="">계정 선택</option>{candidates.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.loginId})</option>)}</SelectBox>
+          </div>
+          <div className="field"><label>권한 범위</label>
+            <SelectBox label="권한 범위" value={scope} onChange={setScope}><option>학생·교사 데이터, 출결 운영</option><option>학생 데이터 조회</option></SelectBox>
+          </div>
+          <Note>일반 관리자는 학생·교사 데이터와 출결을 운영할 수 있지만, 관리자 계정을 추가하거나 변경할 수 없습니다. 새 계정이 필요하면 먼저 교사·계정 관리에서 교사로 등록해 주세요.</Note>
+        </Modal>
+      )}
+      {temp && <TempPasswordModal loginId={temp.id} password={temp.pw} onClose={() => setTemp(null)} />}
+    </Page>
+  );
+}
