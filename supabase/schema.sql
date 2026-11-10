@@ -1,6 +1,6 @@
 -- 주님의교회 초등부 출석관리 — Supabase 스키마와 권한 정책(RLS)
 -- 사용법: Supabase 대시보드 → SQL Editor 에 전체를 붙여넣고 실행한다.
--- 주의: 이 파일은 실제 Supabase 프로젝트에서 아직 실행·검증되지 않았다. 처음 적용할 때 README의 점검 항목을 확인할 것.
+-- 여러 번 실행해도 된다. 로컬 Postgres(PGlite)에서 문법과 역할별 권한을 시험했고, 실제 Supabase 프로젝트 적용은 README의 점검 항목을 확인할 것.
 
 -- ───────── 테이블 ─────────
 create table if not exists public.profiles (
@@ -204,53 +204,81 @@ alter table public.settings enable row level security;
 alter table public.push_subscriptions enable row level security;
 
 -- 이름·담당 표시를 위해 로그인한 사용자는 프로필·반·배정을 읽을 수 있다.
+drop policy if exists profiles_read on public.profiles;
 create policy profiles_read on public.profiles for select to authenticated using (true);
+drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update to authenticated using (id = auth.uid() or is_admin()) with check (id = auth.uid() or is_admin());
 
+drop policy if exists classes_read on public.classes;
 create policy classes_read on public.classes for select to authenticated using (true);
+drop policy if exists classes_write on public.classes;
 create policy classes_write on public.classes for all to authenticated using (is_admin()) with check (is_admin());
 
+drop policy if exists assign_read on public.teacher_assignments;
 create policy assign_read on public.teacher_assignments for select to authenticated using (true);
+drop policy if exists assign_write on public.teacher_assignments;
 create policy assign_write on public.teacher_assignments for all to authenticated using (is_admin()) with check (is_admin());
 
 -- 일반 교사는 담당 반 학생만 볼 수 있다.
+drop policy if exists students_read on public.students;
 create policy students_read on public.students for select to authenticated using (is_admin() or teaches(class_id));
+drop policy if exists students_insert on public.students;
 create policy students_insert on public.students for insert to authenticated with check (is_admin());
+drop policy if exists students_update on public.students;
 create policy students_update on public.students for update to authenticated using (is_admin() or teaches(class_id)) with check (is_admin() or teaches(class_id));
+drop policy if exists students_delete on public.students;
 create policy students_delete on public.students for delete to authenticated using (is_admin());
 
+drop policy if exists smarks_all on public.student_marks;
 create policy smarks_all on public.student_marks for all to authenticated
   using (is_admin() or teaches_student(student_id)) with check (is_admin() or teaches_student(student_id));
 
 -- 부장교사는 자기 부서 교사만, 교사는 본인 기록만 읽는다.
+drop policy if exists tmarks_read on public.teacher_marks;
 create policy tmarks_read on public.teacher_marks for select to authenticated
   using (is_admin() or teacher_id = auth.uid() or (has_role('head') and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
+drop policy if exists tmarks_write on public.teacher_marks;
 create policy tmarks_write on public.teacher_marks for all to authenticated
   using (is_admin() or (has_role('head') and teacher_id <> auth.uid() and (select "group" from public.profiles p where p.id = teacher_id) = my_group()))
   with check (is_admin() or (has_role('head') and teacher_id <> auth.uid() and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
 
+drop policy if exists sessions_read on public.sessions;
 create policy sessions_read on public.sessions for select to authenticated using (true);
+drop policy if exists sessions_write on public.sessions;
 create policy sessions_write on public.sessions for all to authenticated
   using (is_admin() or (target like 'class:%' and teaches(substr(target, 7))) or (has_role('head') and target = 'group:' || my_group()))
   with check (is_admin() or (target like 'class:%' and teaches(substr(target, 7))) or (has_role('head') and target = 'group:' || my_group()));
 
+drop policy if exists notes_read on public.visit_notes;
 create policy notes_read on public.visit_notes for select to authenticated using (is_admin() or teaches_student(student_id));
+drop policy if exists notes_insert on public.visit_notes;
 create policy notes_insert on public.visit_notes for insert to authenticated with check (author_id = auth.uid() and (is_admin() or teaches_student(student_id)));
+drop policy if exists notes_update on public.visit_notes;
 create policy notes_update on public.visit_notes for update to authenticated using (author_id = auth.uid() or is_admin()) with check (author_id = auth.uid() or is_admin());
 
+drop policy if exists notif_read on public.notifications;
 create policy notif_read on public.notifications for select to authenticated using (user_id = auth.uid() or is_admin());
+drop policy if exists notif_update on public.notifications;
 create policy notif_update on public.notifications for update to authenticated using (user_id = auth.uid() or is_admin()) with check (user_id = auth.uid() or is_admin());
+drop policy if exists notif_insert on public.notifications;
 create policy notif_insert on public.notifications for insert to authenticated with check (is_admin());
 
+drop policy if exists nlogs_all on public.notification_logs;
 create policy nlogs_all on public.notification_logs for all to authenticated using (is_admin()) with check (is_admin());
 
+drop policy if exists audit_read on public.audit_logs;
 create policy audit_read on public.audit_logs for select to authenticated using (is_admin());
+drop policy if exists audit_insert on public.audit_logs;
 create policy audit_insert on public.audit_logs for insert to authenticated with check (actor_id = auth.uid()::text);
+drop policy if exists audit_update on public.audit_logs;
 create policy audit_update on public.audit_logs for update to authenticated using (false);
 
+drop policy if exists settings_read on public.settings;
 create policy settings_read on public.settings for select to authenticated using (true);
+drop policy if exists settings_write on public.settings;
 create policy settings_write on public.settings for all to authenticated using (is_admin()) with check (is_admin());
 
+drop policy if exists push_own on public.push_subscriptions;
 create policy push_own on public.push_subscriptions for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ───────── 기본 반 편성 (1부 12개 반, 2부 9개 반) ─────────

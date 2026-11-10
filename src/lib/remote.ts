@@ -72,6 +72,21 @@ export const remote = {
       .upsert(mapKeys(row as Record<string, unknown>, snake))
       .then(({ error }) => error && fail(table, error.message));
   },
+  /** 새 줄만 추가한다. 본인이 읽을 권한이 없는 테이블(감사 로그)은 upsert 대신 이것을 쓴다. */
+  insert(table: string, row: object) {
+    if (!sb) return;
+    sb.from(table)
+      .insert(mapKeys(row as Record<string, unknown>, snake))
+      .then(({ error }) => error && fail(table, error.message));
+  },
+  /** 이미 있는 줄을 고친다. 추가 권한이 없는 사용자(교사의 프로필·알림·학생 사진)는 upsert 대신 이것을 쓴다. */
+  update(table: string, match: Record<string, unknown>, row: object) {
+    if (!sb) return;
+    sb.from(table)
+      .update(mapKeys(row as Record<string, unknown>, snake))
+      .match(mapKeys(match, snake))
+      .then(({ error }) => error && fail(table, error.message));
+  },
   remove(table: string, match: Record<string, unknown>) {
     if (!sb) return;
     sb.from(table)

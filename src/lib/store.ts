@@ -127,7 +127,7 @@ export async function changePassword(current: string, next: string): Promise<str
   } else if (u.password !== current) return "현재 비밀번호가 올바르지 않습니다.";
   u.password = remoteEnabled ? "" : next;
   u.mustChangePassword = false;
-  remote.upsert("profiles", stripPw(u));
+  remote.update("profiles", { id: u.id }, stripPw(u));
   audit("비밀번호 변경", u.loginId, "-", "본인 변경");
   emit();
   return null;
@@ -139,7 +139,7 @@ const stripPw = (u: User) => ({ ...u, password: undefined });
 export function audit(type: string, target: string, before: string, after: string) {
   const row = { id: uid(), at: now(), actorId: userId ?? "system", type, target, before, after };
   data.audits.unshift(row);
-  remote.upsert("audit_logs", row);
+  remote.insert("audit_logs", row);
 }
 
 // ───────── 출석 ─────────
@@ -201,7 +201,7 @@ export function markRead(id: string) {
   const n = data.notifications.find((x) => x.id === id);
   if (!n || n.read) return;
   n.read = true;
-  remote.upsert("notifications", n);
+  remote.update("notifications", { id: n.id }, { read: true });
   emit();
 }
 
@@ -209,7 +209,7 @@ export function markAllRead() {
   const mine = data.notifications.filter((n) => n.userId === userId && !n.read);
   mine.forEach((n) => {
     n.read = true;
-    remote.upsert("notifications", n);
+    remote.update("notifications", { id: n.id }, { read: true });
   });
   if (mine.length) emit();
 }
@@ -309,7 +309,7 @@ export function setStudentPhoto(id: string, photo: string) {
   const s = data.students.find((x) => x.id === id);
   if (!s) return;
   s.photo = photo;
-  remote.upsert("students", s);
+  remote.update("students", { id: s.id }, { photo });
   emit();
 }
 
@@ -348,7 +348,7 @@ export function upsertUser(u: Partial<User> & { name: string; loginId: string; r
     const before = cur.roles.join(",");
     Object.assign(cur, u);
     if (before !== cur.roles.join(",")) audit("권한 변경", cur.name, before, cur.roles.join(","));
-    remote.upsert("profiles", stripPw(cur));
+    remote.update("profiles", { id: cur.id }, stripPw(cur));
     emit();
     return null;
   }
@@ -397,7 +397,7 @@ export function setUserActive(targetId: string, active: boolean): string | null 
   if (!actor || !t) return "대상을 찾을 수 없습니다.";
   if (!canManageAccount(actor, t)) return "이 계정을 변경할 권한이 없습니다.";
   t.active = active;
-  remote.upsert("profiles", stripPw(t));
+  remote.update("profiles", { id: t.id }, stripPw(t));
   audit(active ? "계정 활성화" : "계정 비활성화", `${t.name} (${t.loginId})`, active ? "비활성" : "활성", active ? "활성" : "비활성");
   emit();
   return null;
@@ -407,7 +407,7 @@ export function setPushAllowed(allowed: boolean) {
   const u = me();
   if (!u || u.pushAllowed === allowed) return;
   u.pushAllowed = allowed;
-  remote.upsert("profiles", stripPw(u));
+  remote.update("profiles", { id: u.id }, stripPw(u));
   emit();
 }
 
