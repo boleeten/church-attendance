@@ -6,10 +6,11 @@ import { changePassword, login, logout, me, passwordRules, resetDemo, useMe } fr
 import { Button, Icon, Note } from "../ui";
 import { homePath, Phone } from "./Shell";
 
+// [아이디, 버튼 이름, 설명, 로그인 후 열 화면]
 const DEMO_ACCOUNTS = [
-  ["teacher_kim01", "교사", "1부 4학년 1반 담임"],
-  ["head_park01", "부장교사", "1부 · 관리자 모드 전환 가능"],
-  ["pastor_han", "관리자", "목사님 · 계정 총괄"],
+  ["teacher_kim01", "교사", "1부 4학년 1반 담임", "/t"],
+  ["head_park01", "부장교사", "1부 교사 출석관리 · 관리자 모드 전환 가능", "/h"],
+  ["pastor_han", "관리자", "목사님 · 계정 총괄", "/admin"],
 ] as const;
 
 export function Login() {
@@ -19,13 +20,13 @@ export function Login() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (loginId: string, password: string) => {
+  const submit = async (loginId: string, password: string, target?: string) => {
     setBusy(true);
     const e = await login(loginId, password);
     setBusy(false);
     if (e) return setErr(e);
     const u = me()!;
-    nav(u.mustChangePassword ? "/password" : homePath(u), { replace: true });
+    nav(u.mustChangePassword ? "/password" : target ?? homePath(u), { replace: true });
   };
 
   return (
@@ -67,8 +68,8 @@ export function Login() {
           <div className="card pad col g10">
             <p className="t-xs sb">데모 계정으로 둘러보기</p>
             <p className="t-xs muted">예시 데이터로 동작하며, 입력한 내용은 이 브라우저에만 저장됩니다.</p>
-            {DEMO_ACCOUNTS.map(([loginId, role, desc]) => (
-              <button key={loginId} type="button" className="row g12" style={{ textAlign: "left" }} disabled={busy} onClick={() => void submit(loginId, DEMO_PASSWORD)}>
+            {DEMO_ACCOUNTS.map(([loginId, role, desc, target]) => (
+              <button key={loginId} type="button" className="row g12" style={{ textAlign: "left" }} disabled={busy} onClick={() => void submit(loginId, DEMO_PASSWORD, target)}>
                 <span className="badge info" style={{ width: 72, justifyContent: "center" }}>{role}</span>
                 <span className="grow t-xs muted">{desc}</span>
                 <Icon name="right" size={16} />
