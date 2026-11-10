@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
@@ -263,6 +263,7 @@ export function Notes() {
   const [group, setGroup] = useState("");
   const [reason, setReason] = useState("");
   const [author, setAuthor] = useState("");
+  const [classId, setClassId] = useState("");
   const [from, setFrom] = useState(`${d.settings.year}-01-01`);
   const [to, setTo] = useState(`${d.settings.year}-12-31`);
   const [replied, setReplied] = useState("");
@@ -278,19 +279,20 @@ export function Notes() {
   };
   const rows = d.notes
     .map((n) => ({ n, ...info(n) }))
-    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && (!replied || (replied === "done" ? !!n.reply : !n.reply)) && n.date >= from && n.date <= to);
+    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!classId || c?.id === classId) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && (!replied || (replied === "done" ? !!n.reply : !n.reply)) && n.date >= from && n.date <= to);
   const authors = [...new Set(d.notes.map((n) => n.authorId))].map((id) => d.users.find((u) => u.id === id)).filter(Boolean) as User[];
   const exportCsv = () => download(`심방노트_${from}_${to}.csv`, toCSV([["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...rows.map(({ n, s, c, by }) => [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, by, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""])]));
   return (
     <Page title="심방노트 관리" sub="결석 사유와 심방 이력을 검색·조회합니다">
-      <section className="panel">
-        <div className="filters">
-          <div className="input m" style={{ minWidth: 200 }}><Icon name="search" size={18} /><input placeholder="학생 이름으로 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 이름 검색" /></div>
-          <label className="row g6 sb">기간 <input className="sel" type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="시작일" /> ~ <input className="sel" type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="종료일" /></label>
-          <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
-          <SelectBox label="결석 사유" value={reason} onChange={setReason}><option value="">결석 사유: 전체</option>{REASONS.map((r) => <option key={r}>{r}</option>)}<option value="없음">사유 없음 (일반 노트)</option></SelectBox>
-          <SelectBox label="작성자" value={author} onChange={setAuthor}><option value="">작성자: 전체</option>{authors.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</SelectBox>
-          <SelectBox label="답변" value={replied} onChange={setReplied}><option value="">답변: 전체</option><option value="wait">답변 대기 ({waiting})</option><option value="done">답변 완료</option></SelectBox>
+      <section className="panel filter-panel">
+        <div className="filter-row">
+          <div className="input m w280"><Icon name="search" size={16} /><input placeholder="학생 이름으로 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 이름 검색" /></div>
+          <PeriodBox from={from} to={to} year={d.settings.year} onChange={(f, t) => { setFrom(f); setTo(t); }} />
+          <SelectBox label="그룹" value={group} onChange={(v) => { setGroup(v); setClassId(""); }}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
+          <SelectBox label="반" value={classId} onChange={setClassId}><option value="">반: 전체</option>{d.classes.filter((c) => !group || String(c.group) === group).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}</SelectBox>
+          <SelectBox label="결석 사유" value={reason} onChange={setReason}><option value="">결석 사유: 전체</option>{REASONS.map((r) => <option key={r} value={r}>결석 사유: {r}</option>)}<option value="없음">결석 사유: 없음 (일반 노트)</option></SelectBox>
+          <SelectBox label="작성자" value={author} onChange={setAuthor}><option value="">작성자: 전체</option>{authors.map((u) => <option key={u.id} value={u.id}>작성자: {u.name}</option>)}</SelectBox>
+          <SelectBox label="답변" value={replied} onChange={setReplied}><option value="">답변: 전체</option><option value="wait">답변: 대기 ({waiting})</option><option value="done">답변: 완료</option></SelectBox>
         </div>
       </section>
       <section className="panel">
@@ -318,6 +320,58 @@ export function Notes() {
       </section>
       {view && <NoteReplyModal note={view} info={info(view)} canReply={canReply} onClose={() => setViewId(null)} />}
     </Page>
+  );
+}
+
+const dotDate = (iso: string) => iso.replace(/-/g, ".");
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** 기간 선택: 디자인의 "기간: 2026.11.01 ~ 11.15" 상자. 누르면 시작·종료일과 빠른 선택이 열린다. */
+function PeriodBox({ from, to, year, onChange }: { from: string; to: string; year: number; onChange: (from: string, to: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const label = from.slice(0, 4) === to.slice(0, 4) ? `${dotDate(from)} ~ ${dotDate(to).slice(5)}` : `${dotDate(from)} ~ ${dotDate(to)}`;
+  const today = new Date();
+  const ty = today.getFullYear();
+  const tm = today.getMonth() + 1;
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
+  const month = (y: number, m: number) => [`${y}-${pad2(m)}-01`, `${y}-${pad2(m)}-${pad2(lastDay(y, m))}`] as const;
+  const prev = tm === 1 ? { y: ty - 1, m: 12 } : { y: ty, m: tm - 1 };
+  const presets: [string, readonly [string, string]][] = [
+    ["이번 달", month(ty, tm)],
+    ["지난달", month(prev.y, prev.m)],
+    ["최근 3개월", [`${tm > 2 ? ty : ty - 1}-${pad2(((tm + 9) % 12) + 1)}-01`, month(ty, tm)[1]]],
+    [`${year}년 전체`, [`${year}-01-01`, `${year}-12-31`]],
+  ];
+  return (
+    <div className="period" ref={box}>
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="calendarPlain" size={16} />기간: {label}<Icon name="down" size={14} />
+      </button>
+      {open && (
+        <div className="period-pop" role="dialog" aria-label="기간 선택">
+          <div className="presets">
+            {presets.map(([name, [f, t]]) => (
+              <button key={name} type="button" onClick={() => { onChange(f, t); setOpen(false); }}>{name}</button>
+            ))}
+          </div>
+          <label className="col g4 t-xs muted">시작일<input type="date" value={from} max={to} onChange={(e) => e.target.value && onChange(e.target.value, to)} /></label>
+          <label className="col g4 t-xs muted">종료일<input type="date" value={to} min={from} onChange={(e) => e.target.value && onChange(from, e.target.value)} /></label>
+        </div>
+      )}
+    </div>
   );
 }
 

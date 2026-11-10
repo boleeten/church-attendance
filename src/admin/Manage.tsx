@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
@@ -49,9 +49,20 @@ export const groupStudents = (d: Data, g: 1 | 2) => {
 };
 export const incompleteClasses = (d: Data, date: string, g?: 1 | 2) => d.classes.filter((c) => (!g || c.group === g) && !d.sessions[`${date}|class:${c.id}`]?.completed);
 export const classOf = (d: Data, s: Student) => d.classes.find((c) => c.id === s.classId);
-const SelectBox = ({ value, onChange, children, label }: { value: string; onChange: (v: string) => void; children: ReactNode; label: string }) => (
-  <select className="sel" value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>{children}</select>
-);
+/** 필터 선택 상자: 높이 40, 테두리, 오른쪽 꺾쇠(14px) */
+/** 필터 선택 상자: 높이 40, 테두리, 오른쪽 꺾쇠(14px). 폭은 선택된 글자에 맞춘다(디자인의 hug). */
+function SelectBox({ value, onChange, children, label }: { value: string; onChange: (v: string) => void; children: ReactNode; label: string }) {
+  const ref = useRef<HTMLSelectElement>(null);
+  const [text, setText] = useState("");
+  useLayoutEffect(() => setText(ref.current?.selectedOptions[0]?.text ?? ""));
+  return (
+    <label className="selbox">
+      <span className="selbox-text" aria-hidden="true">{text}</span>
+      <Icon name="down" size={14} />
+      <select ref={ref} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>{children}</select>
+    </label>
+  );
+}
 export { SelectBox };
 
 // ───────── A01 통합 대시보드 ─────────
@@ -269,6 +280,7 @@ export function Students() {
   const [status, setStatus] = useState("");
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
+  const [teacherId, setTeacherId] = useState("");
   const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Student | null | "new">(null);
@@ -287,6 +299,7 @@ export function Students() {
         if (group && String(c?.group) !== group) return false;
         if (grade && String(c?.grade) !== grade) return false;
         if (classId && s.classId !== classId) return false;
+        if (teacherId && !d.assignments.some((a) => a.userId === teacherId && a.classId === s.classId)) return false;
         if (status && s.status !== status) return false;
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
@@ -294,12 +307,13 @@ export function Students() {
         return true;
       })
       .sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
-  }, [d, q, group, grade, classId, status, mark, streakOnly, date, dates]);
+  }, [d, q, group, grade, classId, teacherId, status, mark, streakOnly, date, dates]);
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const cur = Math.min(page, pages - 1);
   const view = rows.slice(cur * PAGE, cur * PAGE + PAGE);
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setPage(0); };
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setTeacherId(""); setPage(0); };
+  const teacherOptions = d.users.filter((u) => d.assignments.some((a) => a.userId === u.id)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const upd = (f: (v: string) => void) => (v: string) => { f(v); setPage(0); };
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
@@ -321,19 +335,21 @@ export function Students() {
 
   return (
     <Page title="학생 관리" sub="학생 등록·검색·반 이동·상태를 관리합니다">
-      <section className="panel">
+      <section className="panel filter-panel">
         <div className="input m">
-          <Icon name="search" size={18} />
+          <Icon name="search" size={16} />
           <input placeholder="이름, 학생·보호자 전화번호, 담당 교사로 검색" value={q} onChange={(e) => upd(setQ)(e.target.value)} aria-label="학생 검색" />
         </div>
-        <div className="filters">
-          <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
-          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
-          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</SelectBox>
-          <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectBox>
-          <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석</option><option value="A">결석</option><option value="U">미확인</option></SelectBox>
-          <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
-          <button type="button" className="link" onClick={reset}>필터 초기화</button>
+        <div className="filter-row">
+          <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
+          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
+          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}</SelectBox>
+          <SelectBox label="담당 교사" value={teacherId} onChange={upd(setTeacherId)}><option value="">담당 교사: 전체</option>{teacherOptions.map((u) => <option key={u.id} value={u.id}>담당 교사: {u.name}</option>)}</SelectBox>
+          <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
+          <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
+          <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
+          <span className="spacer" />
+          <button type="button" className="filter-reset" onClick={reset}>필터 초기화</button>
         </div>
       </section>
       <section className="panel">
