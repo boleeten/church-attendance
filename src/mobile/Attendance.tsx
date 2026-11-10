@@ -146,7 +146,7 @@ export function AttendanceCheck({ mode }: { mode: "student" | "teacher" }) {
                   <Toggle fixed value={d.teacherMarks[`${date}|${t.id}`]} onChange={(m) => setTeacherMark(date, t.id, m)} />
                 </div>
               ))}
-          {sum.total === 0 && <p className="empty">{isStudent ? "이 반에 재적 학생이 없습니다." : "소속 교사가 없습니다."}</p>}
+          {sum.total === 0 && <p className="empty">{isStudent ? "이 반에 등록된 학생이 없습니다." : "소속 교사가 없습니다."}</p>}
         </div>
       </div>
       <div className="bottom-actions">

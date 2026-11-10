@@ -7,9 +7,9 @@ export const pctText = (v: number | null) => (v === null ? "-" : `${v}%`);
 /** 올해 1월 첫 주일부터 이번 주일까지 */
 export const yearSundays = (d: Data) => sundaysOfYear(d.settings.year, currentSunday());
 
-export const roster = (d: Data, classId: string): Student[] => d.students.filter((s) => s.classId === classId && s.status === "재적").sort((a, b) => a.name.localeCompare(b.name, "ko"));
+export const roster = (d: Data, classId: string): Student[] => d.students.filter((s) => s.classId === classId && s.status === "등록").sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
-export const activeStudents = (d: Data) => d.students.filter((s) => s.status === "재적");
+export const activeStudents = (d: Data) => d.students.filter((s) => s.status === "등록");
 
 export interface Summary {
   total: number;

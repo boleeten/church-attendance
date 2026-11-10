@@ -100,7 +100,7 @@ export function buildSeed(): Data {
         id: `s${sid++}`,
         name,
         classId: c.id,
-        status: "재적",
+        status: "등록",
         phone: r() < 0.15 ? "" : phone("2345"),
         guardianPhone: phone("9876"),
         guardianRel: r() < 0.7 ? "모" : "부",
@@ -108,6 +108,10 @@ export function buildSeed(): Data {
     }
   }
   const find = (name: string) => students.find((s) => s.name === name)!;
+  // 상태 예시: 장결자 2명, 교회이동 1명 (출석 명단에서는 빠진다)
+  students.filter((s) => s.classId === "g1-6-1").slice(-1).forEach((s) => (s.status = "장결자"));
+  students.filter((s) => s.classId === "g2-5-2").slice(-1).forEach((s) => (s.status = "장결자"));
+  students.filter((s) => s.classId === "g2-6-3").slice(-1).forEach((s) => (s.status = "교회이동"));
   find("박지호").phone = "010-2345-6789";
   find("박지호").guardianPhone = "010-9876-5432";
   find("박지호").guardianRel = "모";

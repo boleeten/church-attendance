@@ -206,7 +206,7 @@ export function StudentList() {
           <input placeholder="이름으로 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="학생 이름 검색" />
         </div>
         <div className="card list">
-          {list.length === 0 && <p className="empty">{q ? "검색 결과가 없습니다." : "재적 학생이 없습니다."}</p>}
+          {list.length === 0 && <p className="empty">{q ? "검색 결과가 없습니다." : "등록된 학생이 없습니다."}</p>}
           {list.map((s) => {
             const m = d.studentMarks[`${date}|${s.id}`];
             return (
@@ -294,7 +294,7 @@ export function StudentDetail() {
           <strong className="t-xl b">{s.name}</strong>
           <div className="row g6">
             <Badge tone="info">{cls.group}부 · {cls.grade}학년 {cls.no}반</Badge>
-            <Badge tone={s.status === "재적" ? "success" : "neutral"}>{s.status}</Badge>
+            <Badge tone={s.status === "등록" ? "success" : s.status === "장결자" ? "warning" : "neutral"}>{s.status}</Badge>
           </div>
           <Button variant="outline" size="s" onClick={() => file.current?.click()}><Icon name="camera" size={14} />사진 변경</Button>
           <input

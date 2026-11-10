@@ -36,7 +36,7 @@ create table if not exists public.students (
   id text primary key,
   name text not null,
   class_id text not null references public.classes (id),
-  status text not null default '재적' check (status in ('재적', '휴적', '전출', '졸업')),
+  status text not null default '등록' check (status in ('등록', '장결자', '교회이동')),
   phone text not null default '',
   guardian_phone text not null default '',
   guardian_rel text not null default '모',

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, toCSV, yearSundays } from "../lib/stats";
-import { canManageAccount, canResetPassword, classLabel, exportBackup, graduateSixth, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
+import { canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
 import type { Data, Mark, Role, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, Modal, Note, Switch } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -20,7 +20,7 @@ function monthlyRates(marks: Record<string, Mark>, id: string, dates: string[]) 
 const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 
 const SHARED: SheetDef[] = [
-  { name: "전체 학생 명부", rows: (d) => [["이름", "그룹", "학년", "반", "담임교사", "재적 상태"], ...d.students.map((s) => { const c = classOf(d, s); return [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.status]; })] },
+  { name: "전체 학생 명부", rows: (d) => [["이름", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.map((s) => { const c = classOf(d, s); return [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.status]; })] },
   { name: "학생 주일 출석 원본", rows: (d) => [["주일", "학생", "반", "출석 상태"], ...yearSundays(d).flatMap((dt) => activeStudents(d).map((s) => { const c = classOf(d, s); return [dt, s.name, c ? classLabel(c) : "", markText(d.studentMarks[`${dt}|${s.id}`])]; }))] },
   { name: "반별 출석현황", rows: (d) => [["주일", "반", "전체", "출석", "결석", "미확인", "출석률", "완료"], ...yearSundays(d).flatMap((dt) => d.classes.map((c) => { const s = classSummary(d, dt, c.id); return [dt, classLabel(c), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; }))] },
   { name: "학생 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["학생", "반", ...MONTHS, "연간"], ...activeStudents(d).map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", ...monthlyRates(d.studentMarks, s.id, dates), pctText(personRate(d.studentMarks, s.id, dates).rate)]; })]; } },
@@ -179,7 +179,6 @@ export function YearSettings() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const dates = yearSundays(d);
-  const sixth = activeStudents(d).filter((s) => classOf(d, s)?.grade === 6).length;
   const lower = activeStudents(d).filter((s) => (classOf(d, s)?.grade ?? 6) < 6).length;
   const types = [...new Set(d.audits.map((a) => a.type))];
   const name = (id: string) => d.users.find((u) => u.id === id)?.name ?? "시스템";
@@ -188,18 +187,17 @@ export function YearSettings() {
     <div className="class-card"><span className="kpi" style={{ padding: 0, boxShadow: "none" }}><span className="ico"><Icon name={icon} size={18} /></span></span><strong className="b">{title}</strong><span className="t-xs muted grow" style={{ lineHeight: 1.4 }}>{desc}</span>{btn}</div>
   );
   return (
-    <Page title="학년도·운영 설정" sub="학년도 전환, 진급·졸업 처리, 기록 보존을 관리합니다">
+    <Page title="학년도·운영 설정" sub="학년도 전환, 진급 처리, 기록 보존을 관리합니다">
       <section className="panel">
         <span className="muted">현재 학년도</span>
         <div className="row g12 wrap"><strong className="t-3xl b">{d.settings.year}학년도</strong><Badge tone="success">운영 중</Badge><span className="muted">{d.settings.year}.01.01 ~ {d.settings.year}.12.31 · 주일 {dates.length} / 52주 진행</span></div>
         <h2 className="mt8">{d.settings.year + 1}학년도 전환 절차</h2>
         <div className="steps">
-          {["새 학년도 생성", "졸업 처리", "진급 처리", "반 재배정", "전환 완료"].map((t, i) => <span key={t}><b>{i + 1}</b>{t}{i < 4 && <Icon name="right" size={14} />}</span>)}
+          {["새 학년도 생성", "진급 처리", "반 재배정", "전환 완료"].map((t, i, all) => <span key={t}><b>{i + 1}</b>{t}{i < all.length - 1 && <Icon name="right" size={14} />}</span>)}
         </div>
-        <Note>졸업·진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다.</Note>
-        <div className="grid cols-4" style={{ gap: 16 }}>
-          {action("users", "졸업 처리", `6학년 ${sixth}명을 졸업 상태로 변경합니다. 출석 기록은 보존됩니다.`, <Button variant="outline" size="s" disabled={!sixth} onClick={() => window.confirm(`6학년 ${sixth}명을 졸업 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${graduateSixth()}명을 졸업 처리했습니다.`)}>졸업 처리 시작</Button>)}
-          {action("chart", "학생 진급 처리", `4·5학년 ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower || sixth > 0} onClick={() => window.confirm(`4·5학년 ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>{sixth > 0 ? "졸업 처리 후 가능" : "진급 처리"}</Button>)}
+        <Note>진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다. 6학년 학생은 학생 관리에서 직접 정리해 주세요.</Note>
+        <div className="grid cols-3" style={{ gap: 16 }}>
+          {action("chart", "학생 진급 처리", `4·5학년 ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower} onClick={() => window.confirm(`4·5학년 ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>진급 처리</Button>)}
           {action("grid", "학생 반 재배정", "새 학년도 반 편성에 맞춰 학생과 교사를 배정합니다.", <Link to="/admin/classes" className="btn outline s">반 재배정</Link>)}
           {action("download", "백업 및 복구", `마지막 백업 ${fmtRelDay(d.settings.lastBackup)}. 전체 데이터를 파일로 내려받거나 복구합니다.`, <div className="row g6"><Button variant="outline" size="s" onClick={() => download(`출석관리_백업_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(), "application/json")}>백업 받기</Button><Button variant="outline" size="s" disabled={remoteEnabled} onClick={() => file.current?.click()}>복구</Button></div>)}
         </div>

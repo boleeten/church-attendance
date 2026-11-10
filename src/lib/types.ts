@@ -1,6 +1,6 @@
 export type Role = "teacher" | "head" | "admin" | "super" | "owner";
 export type Mark = "P" | "A"; // 출석 / 결석 (값이 없으면 미확인)
-export type StudentStatus = "재적" | "휴적" | "전출" | "졸업";
+export type StudentStatus = "등록" | "장결자" | "교회이동";
 export type AssignKind = "담임" | "보조";
 
 export interface User {

@@ -3,7 +3,7 @@ import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled } from "./remote";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v2";
+const DATA_KEY = "ca-demo-v3";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -268,7 +268,7 @@ export function upsertStudent(s: Omit<Student, "id"> & { id?: string }) {
   if (s.id) {
     const cur = data.students.find((x) => x.id === s.id)!;
     if (cur.classId !== s.classId) audit("반 이동", s.name, cls(cur.classId), cls(s.classId));
-    if (cur.status !== s.status) audit("재적 상태", s.name, cur.status, s.status);
+    if (cur.status !== s.status) audit("학생 상태", s.name, cur.status, s.status);
     Object.assign(cur, s);
     remote.upsert("students", cur);
   } else {
@@ -281,14 +281,14 @@ export function upsertStudent(s: Omit<Student, "id"> & { id?: string }) {
 }
 
 export function classCount(classId: string) {
-  return data.students.filter((s) => s.classId === classId && s.status === "재적").length;
+  return data.students.filter((s) => s.classId === classId && s.status === "등록").length;
 }
 
 export function moveStudents(ids: string[], classId: string): string | null {
   const c = data.classes.find((x) => x.id === classId);
   if (!c) return "반을 선택해 주세요.";
   const moving = data.students.filter((s) => ids.includes(s.id) && s.classId !== classId);
-  if (classCount(classId) + moving.filter((s) => s.status === "재적").length > c.capacity) return `${classLabel(c)}의 정원(${c.capacity}명)을 초과합니다.`;
+  if (classCount(classId) + moving.filter((s) => s.status === "등록").length > c.capacity) return `${classLabel(c)}의 정원(${c.capacity}명)을 초과합니다.`;
   for (const s of moving) {
     const from = data.classes.find((x) => x.id === s.classId);
     audit("반 이동", s.name, from ? classLabel(from) : "-", classLabel(c));
@@ -412,22 +412,10 @@ export function updateSettings(patch: Partial<Data["settings"]>) {
   emit();
 }
 
-export function graduateSixth(): number {
-  const ids = new Set(data.classes.filter((c) => c.grade === 6).map((c) => c.id));
-  const list = data.students.filter((s) => ids.has(s.classId) && s.status === "재적");
-  list.forEach((s) => {
-    s.status = "졸업";
-    remote.upsert("students", s);
-  });
-  audit("졸업 처리", `6학년 ${list.length}명`, "재적", "졸업");
-  emit();
-  return list.length;
-}
-
 export function promoteGrades(): number {
   let n = 0;
   for (const s of data.students) {
-    if (s.status !== "재적") continue;
+    if (s.status !== "등록") continue;
     const c = data.classes.find((x) => x.id === s.classId);
     if (!c || c.grade >= 6) continue;
     const next = data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1 && x.no === c.no) ?? data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1);

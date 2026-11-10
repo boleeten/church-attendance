@@ -78,7 +78,7 @@ export function Dashboard() {
   return (
     <Page title="통합 대시보드" sub={`${d.settings.year}학년도 · ${fmtDot(date)} 주일 기준`}>
       <div className="grid cols-4">
-        <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (재적 기준)`} icon="users" />
+        <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록 기준)`} icon="users" />
         <Kpi label="전체 교사" value={`${staff.length}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명`} icon="badge" />
         <Kpi label="학생 출석 완료" value={`${d.classes.length - pending.length} / ${d.classes.length}반`} sub={pending.length ? `미완료 ${pending.length}개 반` : "모든 반 완료"} icon="calendar" tone={pending.length ? "warm" : "success"} />
         <Kpi label="교사 출석 완료" value={`${teacherDone.length} / 2부서`} sub={teacherDone.length === 2 ? "모든 부서 완료" : `${[1, 2].filter((g) => !teacherDone.includes(g as 1 | 2)).join("·")}부 교사 출석 미완료`} icon="user" tone={teacherDone.length === 2 ? "success" : "warm"} />
@@ -166,19 +166,19 @@ export function Dashboard() {
 }
 
 // ───────── A02 학생 목록 및 관리 ─────────
-const STATUSES: StudentStatus[] = ["재적", "휴적", "전출", "졸업"];
-const statusTone = (s: StudentStatus) => (s === "재적" ? "success" : s === "휴적" ? "warning" : "neutral");
+const STATUSES: StudentStatus[] = ["등록", "장결자", "교회이동"];
+const statusTone = (s: StudentStatus) => (s === "등록" ? "success" : s === "장결자" ? "warning" : "neutral");
 
 function StudentForm({ student, onClose }: { student: Student | null; onClose: () => void }) {
   const d = useData();
-  const [f, setF] = useState<Omit<Student, "id">>(student ?? { name: "", classId: d.classes[0]?.id ?? "", status: "재적", phone: "", guardianPhone: "", guardianRel: "모" });
+  const [f, setF] = useState<Omit<Student, "id">>(student ?? { name: "", classId: d.classes[0]?.id ?? "", status: "등록", phone: "", guardianPhone: "", guardianRel: "모" });
   const [err, setErr] = useState("");
   const set = (k: keyof typeof f, v: string) => setF({ ...f, [k]: v });
   const save = () => {
     if (!f.name.trim()) return setErr("이름을 입력해 주세요.");
     const c = d.classes.find((x) => x.id === f.classId);
     if (!c) return setErr("반을 선택해 주세요.");
-    const joining = f.status === "재적" && (!student || student.classId !== f.classId || student.status !== "재적");
+    const joining = f.status === "등록" && (!student || student.classId !== f.classId || student.status !== "등록");
     if (joining && classCount(c.id) >= c.capacity) return setErr(`${classLabel(c)}은 정원(${c.capacity}명)이 찼습니다. 다른 반을 선택해 주세요.`);
     upsertStudent({ ...f, name: f.name.trim(), id: student?.id });
     toast(student ? "학생 정보를 수정했습니다." : "학생을 등록했습니다.");
@@ -196,8 +196,8 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
           </SelectBox>
         </div>
-        <div className="field"><label>재적 상태</label>
-          <SelectBox label="재적 상태" value={f.status} onChange={(v) => set("status", v)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectBox>
+        <div className="field"><label>상태</label>
+          <SelectBox label="상태" value={f.status} onChange={(v) => set("status", v)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectBox>
         </div>
         {inp("학생 연락처", "phone", "010-0000-0000")}
         {inp("보호자 연락처", "guardianPhone", "010-0000-0000")}
@@ -304,7 +304,7 @@ export function Students() {
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
   const exportCsv = () =>
-    download(`학생명부_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "재적 상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
+    download(`학생명부_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
 
   const importCsv = async (file: File) => {
     const lines = parseCSV(await file.text()).slice(1);
@@ -313,14 +313,14 @@ export function Students() {
     for (const [name, g, gr, no, phone, guardian, rel] of lines) {
       const c = d.classes.find((x) => String(x.group) === String(g).replace("부", "") && String(x.grade) === String(gr) && String(x.no) === String(no));
       if (!name || !c || classCount(c.id) >= c.capacity) { skipped.push(name || "(이름 없음)"); continue; }
-      upsertStudent({ name, classId: c.id, status: "재적", phone: phone ?? "", guardianPhone: guardian ?? "", guardianRel: rel || "모" });
+      upsertStudent({ name, classId: c.id, status: "등록", phone: phone ?? "", guardianPhone: guardian ?? "", guardianRel: rel || "모" });
       ok++;
     }
     toast(`${ok}명 등록${skipped.length ? `, ${skipped.length}명 제외(반 없음·정원 초과): ${skipped.slice(0, 3).join(", ")}` : ""}`, skipped.length ? "error" : "info");
   };
 
   return (
-    <Page title="학생 관리" sub="학생 등록·검색·반 이동·재적 상태를 관리합니다">
+    <Page title="학생 관리" sub="학생 등록·검색·반 이동·상태를 관리합니다">
       <section className="panel">
         <div className="input m">
           <Icon name="search" size={18} />
@@ -330,7 +330,7 @@ export function Students() {
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
           <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)}</option>)}</SelectBox>
-          <SelectBox label="재적 상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectBox>
+          <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석</option><option value="A">결석</option><option value="U">미확인</option></SelectBox>
           <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
           <button type="button" className="link" onClick={reset}>필터 초기화</button>
@@ -350,7 +350,7 @@ export function Students() {
         </div>
         <div className="tablewrap">
           <table className="tbl">
-            <thead><tr><th style={{ width: 36 }} /><th>학생</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>재적 상태</th><th>출석률</th><th>관리</th></tr></thead>
+            <thead><tr><th style={{ width: 36 }} /><th>학생</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
             <tbody>
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>
@@ -431,7 +431,7 @@ export function Classes() {
       <div className="row between wrap g12">
         <div className="row g16 wrap">
           <Seg value={g} options={[["1", `1부 · ${count(1)}개 반`], ["2", `2부 · ${count(2)}개 반`]] as const} onChange={setG} />
-          <span className="muted sb">{g}부 재적 {total}명 / 정원 {list.reduce((n, c) => n + c.capacity, 0)}명</span>
+          <span className="muted sb">{g}부 등록 {total}명 / 정원 {list.reduce((n, c) => n + c.capacity, 0)}명</span>
         </div>
         <Button onClick={() => setAdding(true)}><Icon name="plus" size={16} />반 추가</Button>
       </div>
