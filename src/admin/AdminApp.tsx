@@ -42,11 +42,18 @@ export function Page({ title, sub, children }: { title: string; sub: string; chi
           <h1 className="ellipsis">{title}</h1>
           <span className="t-xs muted sub ellipsis">{sub}</span>
         </div>
-        <select className="sel sb" value={date} onChange={(e) => setDate(e.target.value)} aria-label="기준 주일 선택">
-          {[...yearSundays(d)].reverse().map((dt) => (
-            <option key={dt} value={dt}>{fmtDot(dt)} 주일</option>
-          ))}
-        </select>
+        <label className="date-select">
+          <Icon name="calendarPlain" size={16} />
+          <select value={date} onChange={(e) => setDate(e.target.value)} aria-label="기준 주일 선택">
+            {[...yearSundays(d)].reverse().map((dt) => (
+              <option key={dt} value={dt}>{fmtDot(dt)} 주일</option>
+            ))}
+          </select>
+          <Icon name="down" size={14} />
+        </label>
+        <Link to="/admin/notify" className="icon-btn top-bell" aria-label="알림 설정">
+          <Icon name="bell" size={20} />
+        </Link>
         <div className="row g8 who">
           <Avatar name={u.name} size={36} />
           <div className="col">
