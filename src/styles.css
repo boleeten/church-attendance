@@ -262,3 +262,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .kpi .ico svg { width: 14px; height: 14px; }
   .kpi > span.t-xs { font-size: 11px; }
 }
+
+/* 심방 답변 */
+.reply { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--soft); border-left: 3px solid var(--primary); }
+.card.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 30% { box-shadow: inset 0 0 0 2px var(--info); } 100% { box-shadow: inset 0 0 0 1px var(--border); } }

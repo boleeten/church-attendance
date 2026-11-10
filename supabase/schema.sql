@@ -80,6 +80,10 @@ create table if not exists public.visit_notes (
   author_id uuid not null references public.profiles (id),
   created_at timestamptz not null default now()
 );
+-- 최고 관리자의 심방 답변 (이미 만든 DB에도 다시 실행하면 열이 추가된다)
+alter table public.visit_notes add column if not exists reply text;
+alter table public.visit_notes add column if not exists reply_by uuid references public.profiles (id);
+alter table public.visit_notes add column if not exists reply_at timestamptz;
 
 create table if not exists public.notifications (
   id text primary key,
@@ -91,6 +95,7 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now(),
   read boolean not null default false
 );
+alter table public.notifications add column if not exists link text;
 
 create table if not exists public.notification_logs (
   id text primary key,
@@ -190,6 +195,31 @@ end $$;
 
 drop trigger if exists guard_student on public.students;
 create trigger guard_student before update on public.students for each row execute function public.guard_student();
+
+-- 심방 답변은 최고 관리자만 쓰고 고친다. 노트 본문·사유는 작성자(또는 관리자)만 바꾼다.
+create or replace function public.guard_note() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then return new; end if;
+  if tg_op = 'INSERT' then
+    if not has_role('super') then new.reply := null; new.reply_by := null; new.reply_at := null; end if;
+    return new;
+  end if;
+  if not has_role('super') then
+    new.reply := old.reply; new.reply_by := old.reply_by; new.reply_at := old.reply_at;
+  elsif new.reply is distinct from old.reply then
+    new.reply_by := case when new.reply is null then null else auth.uid() end;
+    new.reply_at := case when new.reply is null then null else now() end;
+  end if;
+  if old.author_id <> auth.uid() and not is_admin() then
+    new.content := old.content; new.reason := old.reason;
+  end if;
+  new.author_id := old.author_id; new.student_id := old.student_id;
+  return new;
+end $$;
+
+drop trigger if exists guard_note on public.visit_notes;
+create trigger guard_note before insert or update on public.visit_notes for each row execute function public.guard_note();
 
 -- ───────── RLS ─────────
 alter table public.profiles enable row level security;

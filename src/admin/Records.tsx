@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
-import { classLabel, classShort, saveSession, setStudentMark, setTeacherMark, useData } from "../lib/store";
+import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg, Toggle } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -265,7 +265,12 @@ export function Notes() {
   const [author, setAuthor] = useState("");
   const [from, setFrom] = useState(`${d.settings.year}-01-01`);
   const [to, setTo] = useState(`${d.settings.year}-12-31`);
-  const [view, setView] = useState<VisitNote | null>(null);
+  const [replied, setReplied] = useState("");
+  const [viewId, setViewId] = useState<string | null>(null);
+  const view = d.notes.find((n) => n.id === viewId) ?? null;
+  const me = useMe()!;
+  const canReply = me.roles.includes("super");
+  const waiting = d.notes.filter((n) => !n.reply).length;
   const info = (n: VisitNote) => {
     const s = d.students.find((x) => x.id === n.studentId);
     const c = s ? classOf(d, s) : undefined;
@@ -273,9 +278,9 @@ export function Notes() {
   };
   const rows = d.notes
     .map((n) => ({ n, ...info(n) }))
-    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && n.date >= from && n.date <= to);
+    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && (!replied || (replied === "done" ? !!n.reply : !n.reply)) && n.date >= from && n.date <= to);
   const authors = [...new Set(d.notes.map((n) => n.authorId))].map((id) => d.users.find((u) => u.id === id)).filter(Boolean) as User[];
-  const exportCsv = () => download(`심방노트_${from}_${to}.csv`, toCSV([["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각"], ...rows.map(({ n, s, c, by }) => [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, by, fmtStamp(n.createdAt)])]));
+  const exportCsv = () => download(`심방노트_${from}_${to}.csv`, toCSV([["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...rows.map(({ n, s, c, by }) => [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, by, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""])]));
   return (
     <Page title="심방노트 관리" sub="결석 사유와 심방 이력을 검색·조회합니다">
       <section className="panel">
@@ -285,13 +290,14 @@ export function Notes() {
           <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
           <SelectBox label="결석 사유" value={reason} onChange={setReason}><option value="">결석 사유: 전체</option>{REASONS.map((r) => <option key={r}>{r}</option>)}<option value="없음">사유 없음 (일반 노트)</option></SelectBox>
           <SelectBox label="작성자" value={author} onChange={setAuthor}><option value="">작성자: 전체</option>{authors.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</SelectBox>
+          <SelectBox label="답변" value={replied} onChange={setReplied}><option value="">답변: 전체</option><option value="wait">답변 대기 ({waiting})</option><option value="done">답변 완료</option></SelectBox>
         </div>
       </section>
       <section className="panel">
         <div className="row between"><h2>심방노트 {rows.length}건</h2><Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button></div>
         <div className="tablewrap">
           <table className="tbl">
-            <thead><tr><th>주일</th><th>학생</th><th>결석 사유</th><th>내용</th><th>작성자</th><th>작성 시각</th><th /></tr></thead>
+            <thead><tr><th>주일</th><th>학생</th><th>결석 사유</th><th>내용</th><th>작성자</th><th>작성 시각</th><th>답변</th><th /></tr></thead>
             <tbody>
               {rows.map(({ n, s, c, by }) => (
                 <tr key={n.id}>
@@ -300,7 +306,8 @@ export function Notes() {
                   <td>{n.reason ? <Badge tone="error">{n.reason}</Badge> : <span className="muted">-</span>}</td>
                   <td className="wraptext">{n.content || "(내용 없음)"}</td>
                   <td>{by}</td><td className="muted num">{fmtStamp(n.createdAt)}</td>
-                  <td><Button variant="outline" size="s" onClick={() => setView(n)}>보기</Button></td>
+                  <td>{n.reply ? <Badge tone="info">답변 완료</Badge> : <Badge>대기</Badge>}</td>
+                  <td><Button variant={canReply && !n.reply ? "primary" : "outline"} size="s" onClick={() => setViewId(n.id)}>{canReply && !n.reply ? "답변" : "보기"}</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -309,17 +316,64 @@ export function Notes() {
         </div>
         <Note icon="lock">심방노트와 연락처는 민감 정보입니다. 일반 교사는 담당 학생만 조회할 수 있으며, Google Sheets에서는 교사 공유용 출석대장이 아닌 관리자 전용 파일에만 동기화됩니다.</Note>
       </section>
-      {view && (() => {
-        const { s, c, by } = info(view);
-        return (
-          <Modal title="심방노트" onClose={() => setView(null)}>
-            <div className="row g12"><Avatar name={s?.name ?? "?"} photo={s?.photo} /><div className="col g2 grow"><strong className="t-lg b">{s?.name}</strong><span className="muted">{c ? classLabel(c) : ""} · {fmtDot(view.date)}</span></div>{view.reason && <Badge tone="error">{view.reason}</Badge>}</div>
-            <p className="card pad" style={{ lineHeight: 1.6, background: "var(--canvas)" }}>{view.content || "(내용 없음)"}</p>
-            <span className="t-xs muted">{by} · {fmtStamp(view.createdAt)}</span>
-          </Modal>
-        );
-      })()}
+      {view && <NoteReplyModal note={view} info={info(view)} canReply={canReply} onClose={() => setViewId(null)} />}
     </Page>
+  );
+}
+
+function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; info: { s?: Student; c?: ClassRoom; by: string }; canReply: boolean; onClose: () => void }) {
+  const d = useData();
+  const { s, c, by } = info;
+  const [editing, setEditing] = useState(canReply && !note.reply);
+  const [text, setText] = useState(note.reply ?? "");
+  const replier = d.users.find((u) => u.id === note.replyBy);
+  const save = (value: string | null) => {
+    const err = replyNote(note.id, value);
+    if (err) return toast(err, "error");
+    toast(value ? `${by} 선생님에게 답변을 보냈습니다.` : "답변을 삭제했습니다.");
+    setEditing(false);
+    if (!value) setText("");
+  };
+  return (
+    <Modal
+      title="심방노트"
+      onClose={onClose}
+      footer={
+        editing ? (
+          <>
+            <Button variant="outline" onClick={() => (note.reply ? (setEditing(false), setText(note.reply)) : onClose())}>취소</Button>
+            <Button disabled={!text.trim()} onClick={() => save(text)}>{note.reply ? "수정해서 보내기" : "답변 보내기"}</Button>
+          </>
+        ) : undefined
+      }
+    >
+      <div className="row g12"><Avatar name={s?.name ?? "?"} photo={s?.photo} /><div className="col g2 grow"><strong className="t-lg b">{s?.name}</strong><span className="muted">{c ? classLabel(c) : ""} · {fmtDot(note.date)}</span></div>{note.reason && <Badge tone="error">{note.reason}</Badge>}</div>
+      <p className="card pad" style={{ lineHeight: 1.6, background: "var(--canvas)" }}>{note.content || "(내용 없음)"}</p>
+      <span className="t-xs muted">{by} · {fmtStamp(note.createdAt)}</span>
+      {editing ? (
+        <div className="col g8">
+          <label className="sb" htmlFor="reply-text">심방 답변</label>
+          <textarea id="reply-text" className="area" autoFocus placeholder={`${by} 선생님에게 보낼 답변을 적어 주세요. 격려, 심방 계획, 기도 제목 등`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
+          <span className="t-xs muted">보내면 {by} 선생님의 알림 목록에 표시되고, 학생 상세의 심방노트 아래에서 볼 수 있습니다.</span>
+        </div>
+      ) : note.reply ? (
+        <div className="reply">
+          <div className="row g8">
+            <span className="row g6 t-xs sb c-primary grow"><Icon name="note" size={14} />{replier ? `${replier.title ?? ""} ${replier.name}`.trim() : "관리자"}의 답변</span>
+            {canReply && (
+              <>
+                <Button variant="outline" size="s" onClick={() => setEditing(true)}>수정</Button>
+                <Button variant="outline" size="s" onClick={() => window.confirm("보낸 답변을 삭제할까요? 교사 화면에서도 사라집니다.") && save(null)}>삭제</Button>
+              </>
+            )}
+          </div>
+          <p style={{ lineHeight: 1.6 }}>{note.reply}</p>
+          {note.replyAt && <span className="t-xs muted">{fmtStamp(note.replyAt)}</span>}
+        </div>
+      ) : (
+        <Note icon="lock">아직 답변이 없습니다. 심방 답변은 최고 관리자만 작성할 수 있습니다.</Note>
+      )}
+    </Modal>
   );
 }
 

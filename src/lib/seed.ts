@@ -173,10 +173,16 @@ export function buildSeed(): Data {
   const jangStudent = students.find((s) => s.classId === "g2-4-2")!;
   notes.push({ id: "n5", studentId: jangStudent.id, date: addWeeks(cur, -1), reason: "늦잠", content: "늦잠으로 결석. 다음 주 함께 오기로 약속.", authorId: jang.id, createdAt: at(addWeeks(cur, -1), "12:52") });
 
+  // 최고 관리자의 심방 답변 예시
+  const pastor = users.find((u) => u.roles.includes("owner"))!;
+  Object.assign(notes[1], { reply: "할머니 댁 다녀온 이야기 꼭 들어 주세요. 다음 주에 반갑게 맞아 주시면 좋겠습니다. 가정을 위해 함께 기도하겠습니다.", replyBy: pastor.id, replyAt: at(addWeeks(cur, -1), "18:10") });
+  Object.assign(notes[0], { reply: "빨리 낫도록 기도하겠습니다. 다음 주에도 못 나오면 제게 알려 주세요. 함께 심방 가겠습니다.", replyBy: pastor.id, replyAt: at(cur, "16:20") });
+
   // ── 알림 ──
   const body = "1부 4학년 1반의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.";
   const park = users.find((u) => u.loginId === "head_park01")!;
   const notifications: Data["notifications"] = [
+    { id: "nt0", userId: kim.id, kind: "reply", title: "심방노트에 답변이 왔습니다", body: `[박지호] ${pastor.title ?? pastor.name}: 빨리 낫도록 기도하겠습니다. 다음 주에도 못 나오면 제게 알려 주세요. 함께 심방 가…`, date: cur, createdAt: at(cur, "16:20"), read: false, link: `/t/students/${find("박지호").id}#note-n1` },
     { id: "nt1", userId: kim.id, kind: "student", title: "주일 출석체크 안내", body, date: cur, createdAt: at(cur, "15:00"), read: false },
     { id: "nt2", userId: kim.id, kind: "student", title: "주일 출석체크 안내", body, date: addWeeks(cur, -4), createdAt: at(addWeeks(cur, -4), "15:00"), read: true },
     { id: "nt3", userId: park.id, kind: "teacher", title: "교사 출석체크 안내", body: "1부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.", date: cur, createdAt: at(cur, "15:30"), read: false },

@@ -56,17 +56,23 @@ export interface Note {
   content: string;
   authorId: string;
   createdAt: string;
+  /** 최고 관리자의 심방 답변 */
+  reply?: string | null;
+  replyBy?: string | null;
+  replyAt?: string | null;
 }
 
 export interface AppNotification {
   id: string;
   userId: string;
-  kind: "student" | "teacher";
+  kind: "student" | "teacher" | "reply";
   title: string;
   body: string;
   date: string; // 대상 주일
   createdAt: string;
   read: boolean;
+  /** 누르면 이동할 화면. 없으면 해당 주일 출석체크 화면 */
+  link?: string | null;
 }
 
 export interface NotifLog {

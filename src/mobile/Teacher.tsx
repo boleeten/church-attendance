@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { currentSunday, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
@@ -161,11 +161,11 @@ export function Notifications({ base }: { base: "/t" | "/h" }) {
               style={{ padding: 16, alignItems: "flex-start", textAlign: "left", width: "100%" }}
               onClick={() => {
                 markRead(n.id);
-                nav(`${base}/check?date=${n.date}`);
+                nav(n.link ?? `${base}/check?date=${n.date}`);
               }}
             >
-              <span className="icon-btn" style={{ width: 40, height: 40, borderRadius: 20, background: n.read ? "var(--soft)" : "var(--error-soft)", color: n.read ? "var(--text)" : "var(--error)" }}>
-                <Icon name="bell" />
+              <span className="icon-btn" style={{ width: 40, height: 40, borderRadius: 20, background: n.read ? "var(--soft)" : n.kind === "reply" ? "var(--soft)" : "var(--error-soft)", color: n.read ? "var(--text)" : n.kind === "reply" ? "var(--primary)" : "var(--error)" }}>
+                <Icon name={n.kind === "reply" ? "note" : "bell"} />
               </span>
               <span className="col g4 grow">
                 <span className="row g6">
@@ -187,7 +187,7 @@ export function Notifications({ base }: { base: "/t" | "/h" }) {
         {mine.length === 0 && <p className="empty">받은 알림이 없습니다.</p>}
         {group("새 알림", mine.filter((n) => !n.read))}
         {group("지난 알림", mine.filter((n) => n.read))}
-        <p className="row g6 t-xs muted"><Icon name="info" size={14} />알림을 누르면 해당 주일 {base === "/h" ? "교사 " : ""}출석체크 화면으로 이동합니다.</p>
+        <p className="row g6 t-xs muted"><Icon name="info" size={14} />출석 알림은 해당 주일 {base === "/h" ? "교사 " : ""}출석체크 화면으로, 심방 답변 알림은 그 학생의 심방노트로 이동합니다.</p>
       </div>
     </Phone>
   );
@@ -247,6 +247,12 @@ export function StudentDetail() {
   const s = d.students.find((x) => x.id === id);
   const u = useMe()!;
   const allowed = s && (isAdmin(u) || d.assignments.some((a) => a.userId === u.id && a.classId === s.classId));
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith("#note-")) return;
+    const t = window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    return () => window.clearTimeout(t);
+  }, [hash]);
   if (!s || !allowed)
     return (
       <Phone>
@@ -335,16 +341,27 @@ export function StudentDetail() {
           <Button variant="secondary" size="s" onClick={() => setNoteFor(s)}>노트 작성</Button>
         </div>
         {notes.length === 0 && <p className="card pad muted" style={{ textAlign: "center" }}>작성된 심방노트가 없습니다.</p>}
-        {notes.map((n) => (
-          <div key={n.id} className="card pad col g8">
-            <div className="row g8">
-              {n.reason && <Badge tone="error">{n.reason}</Badge>}
-              <span className="t-xs muted">{fmtDot(n.date)}</span>
+        {notes.map((n) => {
+          const by = n.replyBy ? d.users.find((x) => x.id === n.replyBy) : undefined;
+          return (
+            <div key={n.id} id={`note-${n.id}`} className={`card pad col g8 ${hash === `#note-${n.id}` ? "flash" : ""}`}>
+              <div className="row g8">
+                {n.reason && <Badge tone="error">{n.reason}</Badge>}
+                <span className="t-xs muted grow">{fmtDot(n.date)}</span>
+                {n.reply && <Badge tone="info">답변 완료</Badge>}
+              </div>
+              <p style={{ lineHeight: 1.5 }}>{n.content || "(내용 없음)"}</p>
+              <span className="t-xs muted">{d.users.find((x) => x.id === n.authorId)?.name ?? "-"} · {fmtStamp(n.createdAt)}</span>
+              {n.reply && (
+                <div className="reply">
+                  <span className="row g6 t-xs sb c-primary"><Icon name="note" size={14} />{by ? `${by.title ?? ""} ${by.name}`.trim() : "관리자"}의 답변</span>
+                  <p style={{ lineHeight: 1.5 }}>{n.reply}</p>
+                  {n.replyAt && <span className="t-xs muted">{fmtStamp(n.replyAt)}</span>}
+                </div>
+              )}
             </div>
-            <p style={{ lineHeight: 1.5 }}>{n.content || "(내용 없음)"}</p>
-            <span className="t-xs muted">{d.users.find((x) => x.id === n.authorId)?.name ?? "-"} · {fmtStamp(n.createdAt)}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {noteFor && <NoteSheet student={noteFor} date={cur} onClose={() => setNoteFor(null)} />}
       {cropFile && (

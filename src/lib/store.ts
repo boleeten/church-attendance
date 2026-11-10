@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled } from "./remote";
+import { fmtDot } from "./date";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v3";
+const DATA_KEY = "ca-demo-v4";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -194,6 +195,40 @@ export function updateNote(id: string, reason: string | null, content: string) {
   n.content = content.trim();
   remote.upsert("visit_notes", n);
   emit();
+}
+
+/** 최고 관리자가 심방노트에 답변을 달거나 고친다. 빈 값이면 답변을 지운다. 작성 교사에게 앱 알림이 간다. */
+export function replyNote(id: string, text: string | null): string | null {
+  const me = data.users.find((u) => u.id === userId);
+  if (!me?.roles.includes("super")) return "심방 답변은 최고 관리자만 작성할 수 있습니다.";
+  const n = data.notes.find((x) => x.id === id);
+  if (!n) return "심방노트를 찾을 수 없습니다.";
+  const body = text?.trim() || null;
+  const edited = !!n.reply;
+  n.reply = body;
+  n.replyBy = body ? me.id : null;
+  n.replyAt = body ? now() : null;
+  remote.update("visit_notes", { id: n.id }, { reply: n.reply, replyBy: n.replyBy, replyAt: n.replyAt });
+  const author = data.users.find((u) => u.id === n.authorId);
+  const s = data.students.find((x) => x.id === n.studentId);
+  if (body && author && author.active && author.id !== me.id) {
+    const row: AppNotification = {
+      id: uid(),
+      userId: author.id,
+      kind: "reply",
+      title: edited ? "심방 답변이 수정되었습니다" : "심방노트에 답변이 왔습니다",
+      body: `[${s?.name ?? "학생"}] ${me.title ?? me.name}: ${body.length > 60 ? body.slice(0, 60) + "…" : body}`,
+      date: n.date,
+      createdAt: now(),
+      read: false,
+      link: `/t/students/${n.studentId}#note-${n.id}`,
+    };
+    data.notifications.unshift(row);
+    remote.insert("notifications", row);
+  }
+  audit(body ? (edited ? "심방 답변 수정" : "심방 답변") : "심방 답변 삭제", `${s?.name ?? "-"} · ${fmtDot(n.date)} 심방노트`, edited ? "답변 있음" : "-", body ? "답변 등록" : "삭제");
+  emit();
+  return null;
 }
 
 // ───────── 알림 ─────────
