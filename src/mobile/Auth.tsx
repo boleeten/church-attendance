@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { remoteEnabled, toast } from "../lib/remote";
 import { DEMO_PASSWORD } from "../lib/seed";
 import { changePassword, login, logout, me, passwordRules, resetDemo, useMe } from "../lib/store";
-import { Button, Icon, Note } from "../ui";
+import { Button, Icon, Note, PasswordInput } from "../ui";
 import { homePath, Phone } from "./Shell";
 
 // [아이디, 버튼 이름, 설명, 로그인 후 열 화면]
@@ -55,10 +55,7 @@ export function Login() {
         </div>
         <div className="field">
           <label htmlFor="login-pw">비밀번호</label>
-          <div className="input">
-            <Icon name="lock" size={18} />
-            <input id="login-pw" type="password" autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={pw} onChange={(e) => setPw(e.target.value)} />
-          </div>
+          <PasswordInput id="login-pw" label="비밀번호" autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={pw} onChange={(e) => setPw(e.target.value)} />
         </div>
         {err && <p className="c-error t-xs sb" role="alert">{err}</p>}
         <Button size="l" block type="submit" disabled={busy || !id || !pw}>{busy ? "로그인 중…" : "로그인"}</Button>
@@ -96,10 +93,7 @@ export function PasswordForm({ forced, onDone }: { forced?: boolean; onDone: () 
   const field = (label: string, value: string, set: (v: string) => void, ac: string, ph: string) => (
     <div className="field">
       <label>{label}</label>
-      <div className="input">
-        <Icon name="lock" size={18} />
-        <input type="password" autoComplete={ac} placeholder={ph} value={value} onChange={(e) => set(e.target.value)} aria-label={label} />
-      </div>
+      <PasswordInput label={label} autoComplete={ac} placeholder={ph} value={value} onChange={(e) => set(e.target.value)} />
     </div>
   );
   return (

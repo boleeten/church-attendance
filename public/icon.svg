@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#041c46"/><path d="M19 33l9 9 17-19" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#a9d6f6"/>
+  <g>
+    <circle cx="256.0" cy="150.0" r="88" fill="#22252b"/><circle cx="353.0" cy="206.0" r="88" fill="#22252b"/><circle cx="353.0" cy="318.0" r="88" fill="#22252b"/><circle cx="256.0" cy="374.0" r="88" fill="#22252b"/><circle cx="159.0" cy="318.0" r="88" fill="#22252b"/><circle cx="159.0" cy="206.0" r="88" fill="#22252b"/><circle cx="256" cy="262" r="120" fill="#22252b"/>
+    <circle cx="256.0" cy="150.0" r="80" fill="#fff3a6"/><circle cx="353.0" cy="206.0" r="80" fill="#fff3a6"/><circle cx="353.0" cy="318.0" r="80" fill="#fff3a6"/><circle cx="256.0" cy="374.0" r="80" fill="#fff3a6"/><circle cx="159.0" cy="318.0" r="80" fill="#fff3a6"/><circle cx="159.0" cy="206.0" r="80" fill="#fff3a6"/><circle cx="256" cy="262" r="112" fill="#fff3a6"/>
+    <circle cx="256" cy="262" r="116" fill="#22252b"/>
+    <circle cx="256" cy="262" r="108" fill="#f6a8cb"/>
+  </g>
+  <text x="256" y="292" text-anchor="middle" font-family="'Apple SD Gothic Neo', 'Pretendard', sans-serif" font-weight="900" font-size="88" letter-spacing="-2" fill="#22252b">출첵</text>
+</svg>

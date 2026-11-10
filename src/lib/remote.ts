@@ -105,6 +105,18 @@ export const remote = {
       return null;
     }
   },
+  /** 서버 함수로 기기 푸시를 보낸다. 앱 안 알림 목록 기록은 호출하는 쪽에서 이미 남긴다. */
+  async pushReminders(payload: { date: string; classId?: string; teachers?: boolean }) {
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    if (!data.session) return;
+    try {
+      const r = await fetch("/api/push-reminders", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify(payload) });
+      if (!r.ok) toast("기기 푸시 발송에 실패했습니다. 앱 안의 알림 목록에는 표시됩니다.", "error");
+    } catch {
+      toast("기기 푸시 발송에 실패했습니다. 앱 안의 알림 목록에는 표시됩니다.", "error");
+    }
+  },
   async signOut() {
     await sb?.auth.signOut();
   },

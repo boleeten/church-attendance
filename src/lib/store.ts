@@ -242,7 +242,10 @@ export function sendStudentReminders(date: string, classId?: string): number {
       count++;
     }
   }
-  if (count) emit();
+  if (count) {
+    void remote.pushReminders({ date, classId });
+    emit();
+  }
   return count;
 }
 
@@ -255,7 +258,10 @@ export function sendTeacherReminders(date: string): number {
       count++;
     }
   }
-  if (count) emit();
+  if (count) {
+    void remote.pushReminders({ date, classId: "-", teachers: true }); // "-": 학생 반은 건너뛰고 부장교사에게만
+    emit();
+  }
   return count;
 }
 

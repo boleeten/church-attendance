@@ -43,7 +43,7 @@ npm run build
 `supabase/schema.sql`과 `src/lib/remote.ts`는 작성만 되어 있고 **실제 Supabase 프로젝트에서 검증되지 않았습니다.** 처음 연결할 때 로그인, 출석 저장, 교사별 조회 범위를 꼭 확인하세요. 아래 기능은 서버 쪽 작업이 더 필요합니다.
 
 - **계정 생성·비밀번호 초기화**: 다른 사람의 계정을 만들거나 비밀번호를 바꾸려면 service role 키가 필요해서 브라우저에서 할 수 없습니다. Supabase Edge Function으로 구현해야 하며, 그 전에는 대시보드(Authentication → Users)에서 직접 처리합니다.
-- **푸시 알림(일요일 오후 3시)**: 웹 푸시 키(VAPID)와 예약 실행(Supabase Cron 등)이 필요합니다. 지금은 관리자의 수동 재발송이 앱 안의 알림 목록에만 표시됩니다.
+- **푸시 알림(일요일 오후 3시)**: 코드는 들어 있습니다(`public/sw.js`, `src/lib/push.ts`, `api/push-reminders.js`, `vercel.json`의 cron). 전화번호 없이 홈 화면에 설치한 앱으로 알림이 갑니다. 동작하려면 Supabase 연결 후 Vercel 환경 변수에 `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`(`npx web-push generate-vapid-keys`로 생성), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`을 넣어야 합니다. 예약 시각은 `vercel.json`의 cron(일요일 06:00 UTC = 한국 15:00)으로 고정이며, 관리자 화면의 발송 시간 설정과는 아직 연결되지 않았습니다. 실제 키로 발송해 본 적은 없습니다.
 - **Google Sheets 동기화**: Google 서비스 계정과 서버 함수가 필요합니다. 교사 공유용 출석대장(시트 7개)과 관리자 전용 파일(연락처, 심방노트) 두 개로 나눠 동기화하도록 설계되어 있고, 지금은 각 시트를 CSV로 내려받을 수 있습니다.
 
 ## 화면 구성

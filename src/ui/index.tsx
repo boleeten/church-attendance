@@ -4,6 +4,8 @@ import type { Mark } from "../lib/types";
 // ── 아이콘 (24px 격자, 선 아이콘) ──
 const PATHS: Record<string, string> = {
   home: "M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z",
+  eye: "M2.500 12s3.500-6.500 9.500-6.500S21.500 12 21.500 12s-3.500 6.500-9.500 6.500S2.500 12 2.500 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  eyeOff: "M4 4l16 16M9.900 5.800A9.600 9.600 0 0 1 12 5.500c6 0 9.500 6.500 9.500 6.500a17 17 0 0 1-3 3.700M6.300 7.300A16.500 16.500 0 0 0 2.500 12s3.500 6.500 9.500 6.500a9.300 9.300 0 0 0 4.200-1M9.900 9.900a3 3 0 0 0 4.200 4.200",
   calendarPlain: "M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM4 10h16M8 3v4M16 3v4",
   calendar: "M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM4 10h16M8 3v4M16 3v4M9 15l2 2 4-4",
   users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.100 6.500 5.500M16 4.300a3.500 3.500 0 0 1 0 6.400M18.500 14.900c1.700.900 2.800 2.700 3 5.100",
@@ -49,6 +51,20 @@ export function Icon({ name, size = 20, stroke = 1.8 }: { name: string; size?: n
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "outline" | "danger"; size?: "l" | "m" | "s"; block?: boolean };
 export function Button({ variant = "primary", size = "m", block, className = "", ...rest }: BtnProps) {
   return <button type="button" {...rest} className={`btn ${variant} ${size} ${block ? "block" : ""} ${className}`} />;
+}
+
+/** 눈 아이콘으로 입력한 비밀번호를 보이거나 숨길 수 있는 입력란 */
+export function PasswordInput({ label, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="input">
+      <Icon name="lock" size={18} />
+      <input {...rest} type={show ? "text" : "password"} aria-label={label} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+      <button type="button" className="eye" aria-label={show ? `${label} 숨기기` : `${label} 보기`} aria-pressed={show} onClick={() => setShow(!show)}>
+        <Icon name={show ? "eyeOff" : "eye"} size={20} />
+      </button>
+    </div>
+  );
 }
 
 export function Badge({ tone = "neutral", children }: { tone?: "success" | "error" | "neutral" | "warning" | "info"; children: ReactNode }) {

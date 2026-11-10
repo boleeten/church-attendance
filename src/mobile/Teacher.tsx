@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { currentSunday, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
-import { remoteEnabled, toast } from "../lib/remote";
+import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
+import { toast } from "../lib/remote";
 import { classSummary, consecutiveAbsences, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
 import { logout, markAllRead, markRead, setPushAllowed, setStudentPhoto, useData, useMe } from "../lib/store";
 import type { Student } from "../lib/types";
@@ -369,13 +370,16 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
   const u = useMe()!;
   const nav = useNavigate();
   const [sheet, setSheet] = useState<"pw" | "install" | null>(null);
-  const perm = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
-  const pushOn = u.pushAllowed && (perm === "granted" || !remoteEnabled);
+  const perm = pushPermission();
+  const pushOn = u.pushAllowed && perm === "granted";
   const askPush = async () => {
-    if (perm === "unsupported") return toast("이 브라우저는 알림을 지원하지 않습니다. 홈 화면에 앱을 설치해 주세요.", "error");
-    const r = perm === "granted" ? "granted" : await Notification.requestPermission();
-    setPushAllowed(r === "granted");
-    toast(r === "granted" ? "알림을 허용했습니다." : "알림이 차단되어 있습니다. 브라우저 설정에서 허용해 주세요.", r === "granted" ? "info" : "error");
+    const r = await enablePush(u.id);
+    setPushAllowed(r.ok);
+    toast(r.message, r.ok ? "info" : "error");
+  };
+  const testPush = async () => {
+    const ok = await sendTestNotification(`${base}/check`);
+    toast(ok ? "테스트 알림을 보냈습니다. 화면 위쪽이나 알림 센터를 확인해 주세요." : "먼저 푸시 알림을 허용해 주세요.", ok ? "info" : "error");
   };
   const other = base === "/t" && u.roles.includes("head") ? "/h" : base === "/h" && u.roles.includes("teacher") && d.assignments.some((a) => a.userId === u.id) ? "/t" : null;
   return (
@@ -410,6 +414,7 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
           )}
           <button type="button" className="menu-row" onClick={() => setSheet("pw")}><Icon name="lock" /><span className="grow sb">비밀번호 변경</span><Icon name="right" size={16} /></button>
           <button type="button" className="menu-row" onClick={askPush}><Icon name="bell" /><span className="grow sb">푸시 알림</span><Badge tone={pushOn ? "success" : "neutral"}>{pushOn ? "허용됨" : "미허용"}</Badge></button>
+          {pushOn && <button type="button" className="menu-row" onClick={testPush}><Icon name="check" /><span className="grow sb">테스트 알림 받아 보기</span><Icon name="right" size={16} /></button>}
           <button type="button" className="menu-row" onClick={() => setSheet("install")}><Icon name="download" /><span className="grow sb">홈 화면에 앱 설치</span><Icon name="right" size={16} /></button>
           <div className="menu-row"><Icon name="info" /><span className="grow sb">앱 버전</span><span className="muted">1.0.0</span></div>
         </div>
