@@ -150,10 +150,10 @@ export function AttendanceCheck({ mode }: { mode: "student" | "teacher" }) {
         </div>
       </div>
       <div className="bottom-actions">
-        <span className="t-xs muted">{sum.u > 0 ? `미확인 ${sum.u}명을 처리하면 출석을 완료할 수 있어요` : sum.completed ? "수정한 내용은 바로 반영됩니다" : "모두 확인했습니다. 출석을 완료해 주세요"}</span>
+        <span className="t-xs muted">{sum.u > 0 ? `체크하지 않은 ${sum.u}명은 미확인으로 남습니다` : sum.completed ? "수정한 내용은 바로 반영됩니다" : "모두 확인했습니다. 출석을 완료해 주세요"}</span>
         <div className="row g8" style={{ width: "100%" }}>
           <Button variant="outline" size="l" onClick={() => finish(false)} disabled={sum.completed}>임시저장</Button>
-          <Button size="l" className="grow" disabled={sum.u > 0 || sum.total === 0} onClick={() => finish(true)}>{sum.completed ? "수정 완료" : "출석 완료"}</Button>
+          <Button size="l" className="grow" disabled={sum.total === 0} onClick={() => finish(true)}>{sum.completed ? "수정 완료" : "출석 완료"}</Button>
         </div>
       </div>
       {noteFor && <NoteSheet student={noteFor} date={date} onClose={() => setNoteFor(null)} />}

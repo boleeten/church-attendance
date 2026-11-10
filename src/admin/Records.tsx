@@ -32,7 +32,7 @@ function ClassSheetModal({ cls, date, onClose }: { cls: ClassRoom; date: string;
     onClose();
   };
   return (
-    <Modal title={`${classLabel(cls)} · ${fmtDot(date)} 출석부`} onClose={onClose} footer={<><Button variant="outline" onClick={() => finish(false)}>임시저장</Button><Button disabled={sum.u > 0} onClick={() => finish(true)}>출석 완료</Button></>}>
+    <Modal title={`${classLabel(cls)} · ${fmtDot(date)} 출석부`} onClose={onClose} footer={<><Button variant="outline" onClick={() => finish(false)}>임시저장</Button><Button onClick={() => finish(true)}>출석 완료</Button></>}>
       <div className="row g16 sb"><span>전체 {sum.total}</span><span className="c-success">출석 {sum.p}</span><span className="c-error">결석 {sum.a}</span><span className="c-neutral">미확인 {sum.u}</span></div>
       <div className="col g8">
         {roster(d, cls.id).map((s) => (
