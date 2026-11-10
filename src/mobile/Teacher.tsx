@@ -7,6 +7,7 @@ import { classSummary, consecutiveAbsences, groupTeachers, personRate, pctText, 
 import { logout, markAllRead, markRead, setPushAllowed, setStudentPhoto, useData, useMe } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../ui";
+import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
 import { NoteSheet } from "./Attendance";
 import { PasswordForm } from "./Auth";
 import { AppBar, ClassPicker, HEAD_TABS, isAdmin, Phone, TEACHER_TABS, useMyClass } from "./Shell";
@@ -237,27 +238,12 @@ export function StudentList() {
   );
 }
 
-function resizeImage(file: File, max = 320): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-      resolve(c.toDataURL("image/jpeg", 0.82));
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
-  });
-}
-
 export function StudentDetail() {
   const d = useData();
   const { id } = useParams();
   const file = useRef<HTMLInputElement>(null);
   const [noteFor, setNoteFor] = useState<Student | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const s = d.students.find((x) => x.id === id);
   const u = useMe()!;
   const allowed = s && (isAdmin(u) || d.assignments.some((a) => a.userId === u.id && a.classId === s.classId));
@@ -297,21 +283,21 @@ export function StudentDetail() {
             <Badge tone="info">{cls.group}부 · {cls.grade}학년 {cls.no}반</Badge>
             <Badge tone={s.status === "등록" ? "success" : s.status === "장결자" ? "warning" : "neutral"}>{s.status}</Badge>
           </div>
-          <Button variant="outline" size="s" onClick={() => file.current?.click()}><Icon name="camera" size={14} />사진 변경</Button>
+          <div className="row g8">
+            <Button variant="outline" size="s" onClick={() => file.current?.click()}><Icon name="camera" size={14} />{s.photo ? "사진 변경" : "사진 등록"}</Button>
+            {s.photo && <Button variant="outline" size="s" onClick={() => window.confirm("등록된 사진을 삭제할까요?") && (setStudentPhoto(s.id, null), toast("사진을 삭제했습니다."))}>삭제</Button>}
+          </div>
           <input
             ref={file}
             type="file"
             accept="image/*"
             hidden
-            onChange={async (e) => {
+            onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = "";
               if (!f) return;
-              try {
-                setStudentPhoto(s.id, await resizeImage(f));
-                toast("사진을 변경했습니다.");
-              } catch {
-                toast("이미지를 읽을 수 없습니다.", "error");
-              }
+              if (!f.type.startsWith("image/")) return toast("사진 파일만 등록할 수 있습니다.", "error");
+              setCropFile(f);
             }}
           />
         </div>
@@ -361,6 +347,17 @@ export function StudentDetail() {
         ))}
       </div>
       {noteFor && <NoteSheet student={noteFor} date={cur} onClose={() => setNoteFor(null)} />}
+      {cropFile && (
+        <PhotoCropper
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onDone={(photo) => {
+            const err = setStudentPhoto(s.id, photo);
+            toast(err ?? `사진을 저장했습니다. (약 ${photoKB(photo)}KB)`, err ? "error" : "info");
+            setCropFile(null);
+          }}
+        />
+      )}
     </Phone>
   );
 }

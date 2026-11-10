@@ -47,6 +47,15 @@ npm run build
 - **푸시 알림(일요일 오후 3시)**: 코드는 들어 있습니다(`public/sw.js`, `src/lib/push.ts`, `api/push-reminders.js`, `vercel.json`의 cron). 전화번호 없이 홈 화면에 설치한 앱으로 알림이 갑니다. 동작하려면 Supabase 연결 후 Vercel 환경 변수에 `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`(`npx web-push generate-vapid-keys`로 생성), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`을 넣어야 합니다. 예약 시각은 `vercel.json`의 cron(일요일 06:00 UTC = 한국 15:00)으로 고정이며, 관리자 화면의 발송 시간 설정과는 아직 연결되지 않았습니다. 실제 키로 발송해 본 적은 없습니다.
 - **Google Sheets 동기화**: Google 서비스 계정과 서버 함수가 필요합니다. 교사 공유용 출석대장(시트 7개)과 관리자 전용 파일(연락처, 심방노트) 두 개로 나눠 동기화하도록 설계되어 있고, 지금은 각 시트를 CSV로 내려받을 수 있습니다.
 
+## 학생 사진 저장 정책
+
+Supabase 무료 한도(DB 500MB, 파일 저장소 1GB, 전송량 월 5GB) 안에서 쓰도록 사진을 아주 작게 저장합니다.
+
+- 사진을 고르면 자르기 화면에서 위치·확대를 맞춘 뒤, **192×192 WebP(약 12KB 이하)** 로 줄여 저장합니다. 원본 사진은 기기 밖으로 나가지 않습니다.
+- 학생당 1장이며, 바꾸면 이전 사진을 덮어씁니다. 삭제도 가능합니다.
+- 저장 위치는 `students.photo` 열(data URL)이고, DB가 24,000자를 넘는 값과 사진이 아닌 값을 거부합니다.
+- 정원 210명이 모두 등록해도 약 2.5MB로, DB 한도의 0.5% 수준입니다.
+
 ## 화면 구성
 
 | 경로 | 대상 | 화면 |

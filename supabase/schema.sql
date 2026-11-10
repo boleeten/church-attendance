@@ -40,8 +40,11 @@ create table if not exists public.students (
   phone text not null default '',
   guardian_phone text not null default '',
   guardian_rel text not null default '모',
-  photo text
+  photo text  -- 잘라서 줄인 192×192 이미지(data URL). 원본은 저장하지 않는다
 );
+-- 사진 용량 제한(약 18KB 이하): 무료 한도(DB 500MB) 안에서 관리하기 위한 장치
+alter table public.students drop constraint if exists students_photo_size;
+alter table public.students add constraint students_photo_size check (photo is null or (photo like 'data:image/%' and length(photo) <= 24000));
 
 -- 같은 주일·같은 학생의 출석은 한 줄만 존재한다(중복 방지). 줄이 없으면 미확인.
 create table if not exists public.student_marks (

@@ -305,12 +305,17 @@ export function moveStudents(ids: string[], classId: string): string | null {
   return null;
 }
 
-export function setStudentPhoto(id: string, photo: string) {
+/** 사진은 잘라서 줄인 작은 이미지(약 12KB 이하)만 받는다. 학생당 1장이며 바꾸면 이전 사진은 덮어쓴다. */
+export const PHOTO_LIMIT_CHARS = 24000;
+
+export function setStudentPhoto(id: string, photo: string | null): string | null {
   const s = data.students.find((x) => x.id === id);
-  if (!s) return;
-  s.photo = photo;
+  if (!s) return "학생을 찾을 수 없습니다.";
+  if (photo && (!photo.startsWith("data:image/") || photo.length > PHOTO_LIMIT_CHARS)) return "사진 용량이 너무 큽니다. 다시 시도해 주세요.";
+  s.photo = photo ?? undefined;
   remote.update("students", { id: s.id }, { photo });
   emit();
+  return null;
 }
 
 // ───────── 반·교사 ─────────
