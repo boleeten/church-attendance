@@ -38,12 +38,12 @@ export function Login() {
           void submit(id, pw);
         }}
       >
-        <div className="col center g8" style={{ marginBottom: 16 }}>
-          <span style={{ width: 56, height: 56, borderRadius: 16, background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon name="check" size={28} stroke={2.6} />
-          </span>
-          <h1 className="t-xl b mt8">주님의교회 초등부</h1>
-          <p className="muted">출석관리</p>
+        <div className="col center g16" style={{ marginBottom: 16 }}>
+          <img src="/logo.png" alt="" width={96} height={96} style={{ borderRadius: "50%" }} />
+          <div className="col center">
+            <h1 className="t-3xl sb c-primary">주님의교회 초등부</h1>
+            <p className="t-base muted">출석관리</p>
+          </div>
         </div>
         <div className="field">
           <label htmlFor="login-id">아이디</label>

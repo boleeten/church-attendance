@@ -22,13 +22,13 @@ function Bell({ base }: { base: string }) {
   );
 }
 
-function Hero({ label, date, sum, unit, cta, to }: { label: string; date: string; sum: ReturnType<typeof classSummary>; unit: string; cta: string; to: string }) {
+function Hero({ tone, label, date, sum, unit, cta, to }: { tone: "teacher" | "head"; label: string; date: string; sum: ReturnType<typeof classSummary>; unit: string; cta: string; to: string }) {
   const done = sum.total ? Math.round(((sum.p + sum.a) / sum.total) * 100) : 0;
   return (
-    <section className="hero">
+    <section className={`hero ${tone}`}>
       <div className="row between">
         <div className="col g2">
-          <span className="t-sm" style={{ opacity: 0.85 }}>{label}</span>
+          <span className="t-sm hero-label">{label}</span>
           <strong className="t-2xl b">{fmtKo(date)}</strong>
         </div>
         <Badge tone={sum.completed ? "success" : "warning"}>{sum.completed ? "출석 완료" : sum.started ? "출석 진행 중" : "출석 전"}</Badge>
@@ -76,7 +76,7 @@ export function TeacherHome() {
         <Bell base="/t" />
       </header>
       <div className="mbody">
-        <Hero label="이번 주 주일" date={date} sum={classSummary(d, date, cls.id)} unit="전체" cta="출석체크 하기" to="/t/check" />
+        <Hero tone="teacher" label="이번 주 주일" date={date} sum={classSummary(d, date, cls.id)} unit="전체" cta="출석체크 하기" to="/t/check" />
         <div className="row between">
           <h2 className="t-base b">최근 연속 결석 학생</h2>
           <strong className="c-error">{streaks.length}명</strong>
@@ -117,7 +117,7 @@ export function HeadHome() {
         <Bell base="/h" />
       </header>
       <div className="mbody">
-        <Hero label={`${g}부 교사 출석 · 이번 주 주일`} date={date} sum={teacherSummary(d, date, g)} unit="전체 교사" cta="교사 출석체크 하기" to="/h/check" />
+        <Hero tone="head" label={`${g}부 교사 출석 · 이번 주 주일`} date={date} sum={teacherSummary(d, date, g)} unit="전체 교사" cta="교사 출석체크 하기" to="/h/check" />
         <Note>부장교사 본인의 출석은 관리자가 입력합니다. {g}부 소속 교사만 체크할 수 있습니다.</Note>
         <div className="row between">
           <h2 className="t-base b">미확인 교사</h2>
