@@ -57,8 +57,12 @@ export function AppBar({ title, right, back }: { title: string; right?: ReactNod
   );
 }
 
+/** 관리자 전용 주소(lord-admin.vercel.app)로 들어왔는지 */
+export const onAdminHost = () => window.location.hostname.startsWith("lord-admin.");
+
 /** 로그인한 사용자가 첫 화면으로 가야 할 경로 */
 export function homePath(u: User): string {
+  if (onAdminHost() && isAdmin(u)) return "/admin";
   if (u.roles.includes("teacher") && myClasses(getData(), u.id).length) return "/t";
   if (u.roles.includes("head")) return "/h";
   if (u.roles.includes("admin") || u.roles.includes("super")) return "/admin";
