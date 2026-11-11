@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { addClass, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { accountRecords, addClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -670,6 +670,14 @@ export function Teachers() {
   const [edit, setEdit] = useState<User | null | "new">(null);
   const [temp, setTemp] = useState<{ id: string; pw: string } | null>(null);
   const [importRows, setImportRows] = useState<TeacherRow[] | null>(null);
+  const canDelete = canDeleteAccounts(me);
+  const doDelete = async (u: User) => {
+    const recs = accountRecords(u.id);
+    if (recs.length) return toast(`${u.name} 계정에는 기록(${recs.join(", ")})이 있어 삭제할 수 없습니다. 비활성화를 사용해 주세요.`, "error");
+    if (!window.confirm(`${u.name}(${u.loginId}) 계정을 완전히 삭제할까요?\n로그인 계정과 담당 반 배정이 함께 지워지며 되돌릴 수 없습니다.`)) return;
+    const err = await deleteAccount(u.id);
+    toast(err ?? `${u.name} 계정을 삭제했습니다.`, err ? "error" : "info");
+  };
   const teacherFile = useRef<HTMLInputElement>(null);
   const readTeacherCsv = async (f: File) => {
     if (!/\.csv$/i.test(f.name)) return toast("CSV 파일만 올릴 수 있습니다. Excel에서 '다른 이름으로 저장 → CSV UTF-8'로 저장해 주세요.", "error");
@@ -718,6 +726,7 @@ export function Teachers() {
                     <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => setEdit(u)}>수정</Button>
                     <Button variant="danger" size="s" disabled={!canResetPassword(me, u)} onClick={() => doReset(u)}>비밀번호 초기화</Button>
                     <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => { const e = setUserActive(u.id, !u.active); if (e) toast(e, "error"); }}>{u.active ? "비활성화" : "활성화"}</Button>
+                    {canDelete && <Button variant="outline" size="s" className="btn-del" disabled={u.roles.includes("owner") || u.id === me.id} onClick={() => doDelete(u)}>삭제</Button>}
                   </span></td>
                 </tr>
               ))}

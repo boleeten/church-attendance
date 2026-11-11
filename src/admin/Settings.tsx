@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
 import { remote, remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
-import { canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
+import { audit, canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
 import type { Data, Mark, Role, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, Modal, Note, Switch } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -270,6 +270,43 @@ export function YearSettings() {
 }
 
 // ───────── A12 관리자 계정 관리 ─────────
+/** 계정 총괄만 보는 패널: 교사 계정 삭제 권한을 줄 사람을 고른다 */
+function DeletePermissionPanel() {
+  const d = useData();
+  const allowed = d.settings.accountDeleters ?? [];
+  const people = d.users
+    .filter((u) => u.active && !u.roles.includes("owner") && u.roles.some((r) => r === "super" || r === "admin" || r === "head"))
+    .sort((a, b) => Number(b.roles.includes("super")) - Number(a.roles.includes("super")) || a.name.localeCompare(b.name, "ko"));
+  const toggle = (u: User, on: boolean) => {
+    const next = on ? [...allowed, u.id] : allowed.filter((x) => x !== u.id);
+    updateSettings({ accountDeleters: next });
+    audit("삭제 권한 변경", `${u.name} (${u.loginId})`, on ? "없음" : "계정 삭제", on ? "계정 삭제" : "없음");
+    toast(on ? `${u.name}에게 계정 삭제 권한을 주었습니다.` : `${u.name}의 계정 삭제 권한을 해제했습니다.`);
+  };
+  const roleText = (u: User) => [u.roles.includes("super") ? "최고 관리자" : u.roles.includes("admin") ? "일반 관리자" : null, u.roles.includes("head") ? "부장교사" : null].filter(Boolean).join(" · ");
+  return (
+    <section className="panel">
+      <div className="row between"><h2>계정 삭제 권한</h2><Badge tone="info">{allowed.filter((id) => d.users.some((u) => u.id === id)).length}명 지정</Badge></div>
+      <div className="col g8">
+        {people.map((u) => {
+          const on = allowed.includes(u.id);
+          const noAdmin = !u.roles.some((r) => r === "super" || r === "admin");
+          return (
+            <label key={u.id} className="row g10" style={{ padding: "6px 0" }}>
+              <span className="chk"><input type="checkbox" checked={on} onChange={(e) => toggle(u, e.target.checked)} /></span>
+              <Avatar name={u.name} size={28} />
+              <span className="col g2 grow"><strong className="sb">{u.name} {u.title && <span className="muted t-xs">{u.title}</span>}</strong><span className="t-xs muted">{roleText(u)}{noAdmin ? " · 관리자 화면 권한이 없어 삭제 버튼을 볼 수 없습니다" : ""}</span></span>
+              {on && <Badge tone="warning">삭제 가능</Badge>}
+            </label>
+          );
+        })}
+        {!people.length && <p className="empty">지정할 수 있는 관리자·부장교사가 없습니다.</p>}
+      </div>
+      <Note icon="lock">계정 총괄은 항상 삭제할 수 있습니다. 삭제는 출석·심방 기록이 하나도 없는 계정(시험 계정, 잘못 만든 계정)만 가능하며, 기록이 있으면 비활성화를 사용합니다. 최고 관리자 계정은 최고 관리자만 삭제할 수 있습니다.</Note>
+    </section>
+  );
+}
+
 export function Accounts() {
   const d = useData();
   const me = useMe()!;
@@ -281,7 +318,7 @@ export function Accounts() {
   const admins = d.users.filter((u) => u.roles.includes("admin") && !u.roles.includes("super"));
   const candidates = d.users.filter((u) => !u.roles.includes("admin") && !u.roles.includes("super") && u.active);
   const isSuper = me.roles.includes("super");
-  const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화"].includes(a.type)).slice(0, 30);
+  const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화", "계정 삭제", "삭제 권한 변경"].includes(a.type)).slice(0, 30);
   const doReset = async (u: User) => {
     if (!window.confirm(`${u.name}(${u.loginId}) 계정의 비밀번호를 초기화할까요?`)) return;
     const r = await resetPassword(u.id);
@@ -321,6 +358,7 @@ export function Accounts() {
           </table>
         </div>
       </section>
+      {me.roles.includes("owner") && <DeletePermissionPanel />}
       <section className="panel">
         <div className="row between"><h2>일반 관리자</h2><Button size="s" disabled={!isSuper} onClick={() => { setPick(""); setAdding(true); }}><Icon name="plus" size={14} />일반 관리자 등록</Button></div>
         <div className="tablewrap">

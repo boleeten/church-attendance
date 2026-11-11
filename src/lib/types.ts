@@ -107,6 +107,8 @@ export interface Settings {
   /** 동기화할 구글 시트 파일 ID (교사 공유용 출석대장 / 관리자 전용) */
   sheetSharedId?: string | null;
   sheetPrivateId?: string | null;
+  /** 계정 삭제 권한을 받은 사용자 ID (계정 총괄은 항상 가능) */
+  accountDeleters?: string[];
   lastBackup: string | null;
 }
 

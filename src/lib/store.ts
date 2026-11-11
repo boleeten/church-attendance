@@ -448,7 +448,7 @@ export async function upsertUser(u: Partial<User> & { name: string; loginId: str
     emit();
     return { tempPassword: r.tempPassword };
   }
-  const row: User = { id: "u_" + uid(), password: TEMP_PASSWORD, active: true, mustChangePassword: true, pushAllowed: false, ...u } as User;
+  const row: User = { password: TEMP_PASSWORD, active: true, mustChangePassword: true, pushAllowed: false, ...u, id: "u_" + uid() } as User;
   data.users.push(row);
   audit("계정 등록", `${row.name} (${row.loginId})`, "-", "임시 비밀번호 발급");
   emit();
@@ -469,6 +469,47 @@ export function canManageAccount(actor: User, target: User): boolean {
   if (target.roles.includes("super")) return actor.roles.includes("owner");
   if (target.roles.includes("admin")) return actor.roles.includes("super");
   return actor.roles.includes("super") || actor.roles.includes("admin");
+}
+
+/** 계정 삭제 권한: 계정 총괄(owner)이거나, 계정 총괄이 지정한 사람(관리자 계정 관리 → 계정 삭제 권한) */
+export function canDeleteAccounts(actor: User): boolean {
+  return actor.roles.includes("owner") || (data.settings.accountDeleters ?? []).includes(actor.id);
+}
+
+/** 이 계정에 남아 있는 기록. 하나라도 있으면 삭제 대신 비활성화해야 한다. */
+export function accountRecords(userId: string): string[] {
+  const out: string[] = [];
+  if (!userId) return out;
+  const marks = Object.keys(data.teacherMarks).filter((k) => k.endsWith(`|${userId}`)).length;
+  if (marks) out.push(`교사 출석 기록 ${marks}건`);
+  const notes = data.notes.filter((n) => n.authorId === userId || (!!n.replyBy && n.replyBy === userId)).length;
+  if (notes) out.push(`심방노트·답변 ${notes}건`);
+  const saved = Object.values(data.sessions).filter((x) => x.savedBy === userId).length;
+  if (saved) out.push(`출석부 저장 ${saved}건`);
+  return out;
+}
+
+/** 계정 완전 삭제. 기록이 없는 계정(시험·잘못 만든 계정)만 지울 수 있다. */
+export async function deleteAccount(targetId: string): Promise<string | null> {
+  const actor = me();
+  const t = data.users.find((x) => x.id === targetId);
+  if (!actor || !t) return "대상을 찾을 수 없습니다.";
+  if (!canDeleteAccounts(actor)) return "계정 삭제 권한이 없습니다.";
+  if (t.roles.includes("owner") || t.id === actor.id) return "이 계정은 삭제할 수 없습니다.";
+  if (t.roles.includes("super") && !actor.roles.includes("super")) return "최고 관리자 계정은 최고 관리자만 삭제할 수 있습니다.";
+  const recs = accountRecords(t.id);
+  if (recs.length) return `${t.name} 계정에 기록(${recs.join(", ")})이 있어 삭제할 수 없습니다. 비활성화를 사용해 주세요.`;
+  if (remoteEnabled) {
+    const r = await remote.adminUsers<{ ok: boolean }>({ action: "delete", userId: t.id });
+    if (typeof r === "string") return r;
+  }
+  data.users = data.users.filter((x) => x.id !== t.id);
+  data.assignments = data.assignments.filter((a) => a.userId !== t.id);
+  data.notifications = data.notifications.filter((n) => n.userId !== t.id);
+  if (data.settings.accountDeleters?.includes(t.id)) data.settings.accountDeleters = data.settings.accountDeleters.filter((x) => x !== t.id);
+  audit("계정 삭제", `${t.name} (${t.loginId})`, t.roles.join(","), "삭제");
+  emit();
+  return null;
 }
 
 export async function resetPassword(targetId: string): Promise<string | { tempPassword: string }> {

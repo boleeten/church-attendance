@@ -1,4 +1,4 @@
-// 계정 생성·비밀번호 초기화 (Vercel 서버 함수)
+// 계정 생성·비밀번호 초기화·계정 삭제 (Vercel 서버 함수)
 // 다른 사람의 로그인 계정을 만들거나 비밀번호를 바꾸려면 Supabase secret(service_role) 키가 필요해서
 // 브라우저가 아니라 여기서 처리한다. 요청한 사람이 관리자인지, 대상 계정을 다룰 권한이 있는지 먼저 확인한다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -87,6 +87,23 @@ export default async function handler(req, res) {
     if (error) return fail(res, 500, `비밀번호를 바꾸지 못했습니다. (${error.message})`);
     await sb.from("profiles").update({ must_change_password: true }).eq("id", target.id);
     return res.status(200).json({ tempPassword: password });
+  }
+
+  // ── 계정 삭제: 계정 총괄 또는 지정된 사람만, 기록이 없는 계정만 ──
+  if (body.action === "delete") {
+    const { data: settingsRow } = await sb.from("settings").select("data").eq("id", 1).single();
+    const allowed = actor.roles.includes("owner") || (settingsRow?.data?.accountDeleters || []).includes(actor.id);
+    if (!allowed) return fail(res, 403, "계정 삭제 권한이 없습니다.");
+    const { data: target } = await sb.from("profiles").select("id, login_id, roles").eq("id", String(body.userId || "")).single();
+    if (!target) return fail(res, 404, "대상 계정을 찾을 수 없습니다.");
+    if (target.roles.includes("owner") || target.id === actor.id) return fail(res, 403, "이 계정은 삭제할 수 없습니다.");
+    if (target.roles.includes("super") && !actor.roles.includes("super")) return fail(res, 403, "최고 관리자 계정은 최고 관리자만 삭제할 수 있습니다.");
+    const count = async (table, col) => (await sb.from(table).select("*", { count: "exact", head: true }).eq(col, target.id)).count || 0;
+    const records = (await count("teacher_marks", "teacher_id")) + (await count("visit_notes", "author_id")) + (await count("visit_notes", "reply_by")) + (await count("sessions", "saved_by"));
+    if (records) return fail(res, 409, "이 계정에 출석·심방 기록이 있어 삭제할 수 없습니다. 비활성화를 사용해 주세요.");
+    const { error } = await sb.auth.admin.deleteUser(target.id); // 프로필·반 배정·알림·푸시 등록은 함께 지워진다
+    if (error) return fail(res, 500, `계정을 삭제하지 못했습니다. (${error.message})`);
+    return res.status(200).json({ ok: true });
   }
 
   return fail(res, 400, "알 수 없는 요청입니다.");
