@@ -52,15 +52,11 @@ export function Login() {
             <p className="t-base muted">출석관리</p>
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="login-id">아이디</label>
+        <div className="login-box">
           <div className="input">
-            <Icon name="user" size={18} />
-            <input id="login-id" autoComplete="username" autoCapitalize="none" placeholder="아이디를 입력하세요" value={id} onChange={(e) => setId(e.target.value)} />
+            <Icon name="user" size={20} />
+            <input id="login-id" aria-label="아이디" autoComplete="username" autoCapitalize="none" placeholder="아이디를 입력하세요" value={id} onChange={(e) => setId(e.target.value)} />
           </div>
-        </div>
-        <div className="field">
-          <label htmlFor="login-pw">비밀번호</label>
           <PasswordInput id="login-pw" label="비밀번호" autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={pw} onChange={(e) => setPw(e.target.value)} />
         </div>
         <label className="chk" style={{ alignSelf: "flex-start" }}>
