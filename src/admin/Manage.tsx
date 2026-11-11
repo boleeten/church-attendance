@@ -408,24 +408,42 @@ export function Students() {
 // ───────── A03 그룹·반 관리 ─────────
 function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) {
   const d = useData();
-  const pool = d.users.filter((u) => u.roles.includes("teacher") && u.group === cls.group && u.active);
+  // 같은 부 교사를 먼저, 다른 부 교사도 고를 수 있다 (한 교사가 1부·2부 반을 함께 맡는 경우)
+  const all = d.users.filter((u) => u.roles.includes("teacher") && u.active);
+  const same = all.filter((u) => u.group === cls.group);
+  const otherPool = all.filter((u) => u.group !== cls.group);
+  const pool = [...same, ...otherPool];
   const cur = (k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cls.id && a.kind === k).map((a) => a.userId);
   const [main, setMain] = useState(cur("담임")[0] ?? "");
   const [subs, setSubs] = useState<string[]>(cur("보조"));
   return (
     <Modal title={`${classLabel(cls)} 교사 배정`} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={() => { setAssignment(cls.id, "담임", main ? [main] : []); setAssignment(cls.id, "보조", subs.filter((x) => x !== main)); toast("교사 배정을 저장했습니다."); onClose(); }}>저장</Button></>}>
       <div className="field"><label>담임</label>
-        <SelectBox label="담임" value={main} onChange={setMain}><option value="">미배정</option>{pool.map((u) => <option key={u.id} value={u.id}>{u.name} ({teacherDuty(d, u)})</option>)}</SelectBox>
+        <SelectBox label="담임" value={main} onChange={setMain}><option value="">미배정</option>
+          <optgroup label={`${cls.group}부 교사`}>{same.map((u) => <option key={u.id} value={u.id}>{u.name} ({teacherDuty(d, u)})</option>)}</optgroup>
+          {otherPool.length > 0 && <optgroup label={`다른 부 교사`}>{otherPool.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.group}부 · {teacherDuty(d, u)})</option>)}</optgroup>}
+        </SelectBox>
       </div>
       <div className="field"><label>보조 (여러 명 선택 가능)</label>
         <div className="row wrap g8">
-          {pool.filter((u) => u.id !== main).map((u) => {
+          {same.filter((u) => u.id !== main).map((u) => {
             const on = subs.includes(u.id);
             return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name}</button>;
           })}
         </div>
+        {otherPool.length > 0 && (
+          <details className="col g8" open={subs.some((id) => otherPool.some((u) => u.id === id))}>
+            <summary className="t-xs sb muted" style={{ cursor: "pointer" }}>다른 부 교사 ({otherPool.length}명)</summary>
+            <div className="row wrap g8" style={{ marginTop: 8 }}>
+              {otherPool.filter((u) => u.id !== main).map((u) => {
+                const on = subs.includes(u.id);
+                return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name} · {u.group}부</button>;
+              })}
+            </div>
+          </details>
+        )}
       </div>
-      <Note>한 교사가 여러 반을 맡을 수 있습니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
+      <Note>한 교사가 여러 반을 맡을 수 있고, 다른 부 교사도 배정할 수 있습니다. 두 부에 반이 있는 교사는 로그인 후 1부·2부를 골라 들어갑니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
     </Modal>
   );
 }
@@ -551,7 +569,7 @@ type TeacherRow = { line: number; name: string; loginId: string; group: 1 | 2 | 
 const TEACHER_TEMPLATE = [
   ["이름", "아이디", "소속", "구분", "담당 반", "담당 구분"],
   ["홍길동", "hong_gd01", "1부", "교사", "4-1", "담임"],
-  ["김보조", "kim_bj02", "1부", "교사", "4-1", "보조"],
+  ["김보조", "kim_bj02", "1부", "교사", "2부 5-1", "보조"],
   ["박부장", "park_bj03", "2부", "부장교사", "", ""],
 ];
 
@@ -577,8 +595,12 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
       else if (d.users.some((u) => u.loginId === loginId)) error = "이미 사용 중인 아이디입니다";
       else if (!group) error = "소속은 1부 또는 2부로 적어 주세요";
       else if (cls && !head) {
-        const c = nums && nums.length >= 2 ? d.classes.find((x) => x.group === group && x.grade === Number(nums[0]) && x.no === Number(nums[1])) : undefined;
-        if (!c) error = `${group}부에 '${cls}' 반이 없습니다`;
+        // "4-1"이면 소속 부의 반, "2부 4-1"처럼 부를 적으면 그 부의 반
+        const gm = (cls ?? "").match(/([12])\s*부/);
+        const cg = gm ? Number(gm[1]) : group;
+        const rest = gm ? (cls ?? "").replace(gm[0], "").match(/\d+/g) : nums;
+        const c = rest && rest.length >= 2 ? d.classes.find((x) => x.group === cg && x.grade === Number(rest[0]) && x.no === Number(rest[1])) : undefined;
+        if (!c) error = `${cg}부에 '${cls}' 반이 없습니다`;
         else if (kind === "담임" && homeroomTaken.has(c.id)) error = `${classShort(c)}에 이미 담임(${homeroomTaken.get(c.id)})이 있습니다. '보조'로 적어 주세요`;
         else {
           classId = c.id;

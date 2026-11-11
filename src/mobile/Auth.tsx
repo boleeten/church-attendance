@@ -4,7 +4,7 @@ import { remoteEnabled, toast } from "../lib/remote";
 import { DEMO_PASSWORD } from "../lib/seed";
 import { changePassword, login, logout, me, passwordRules, resetDemo, useMe } from "../lib/store";
 import { Button, Icon, Note, PasswordInput } from "../ui";
-import { afterLoginPath, entryOptions, Phone } from "./Shell";
+import { afterLoginPath, entryOptions, Phone, setTeacherGroup } from "./Shell";
 
 // [아이디, 버튼 이름, 설명, 로그인 후 열 화면]
 const DEMO_ACCOUNTS = [
@@ -156,7 +156,7 @@ export function EntrySelect() {
         </div>
         <div className="col g12">
           {options.map((o) => (
-            <button key={o.path} type="button" className="entry-card" onClick={() => nav(o.path, { replace: true })}>
+            <button key={o.path + (o.group ?? "")} type="button" className="entry-card" onClick={() => { if (o.group) setTeacherGroup(o.group); nav(o.path, { replace: true }); }}>
               <span className="entry-ico"><Icon name={o.icon} size={24} /></span>
               <span className="col g4 grow" style={{ textAlign: "left" }}>
                 <strong className="t-lg b">{o.title}</strong>

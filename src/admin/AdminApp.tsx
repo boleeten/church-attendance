@@ -3,7 +3,7 @@ import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { currentSunday, fmtDot } from "../lib/date";
 import { yearSundays } from "../lib/stats";
 import { logout, useData, useMe } from "../lib/store";
-import { entryOptions } from "../mobile/Shell";
+import { entryOptions, setTeacherGroup } from "../mobile/Shell";
 import { Avatar, Icon, Modal } from "../ui";
 import { PasswordForm } from "../mobile/Auth";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
@@ -134,7 +134,7 @@ export default function AdminApp() {
           </nav>
           {others.length > 0 && (
             <div className="col g4" style={{ marginTop: "auto", paddingTop: 16 }}>
-              {others.map((o) => <Link key={o.path} to={o.path}><Icon name="refresh" />{o.title}</Link>)}
+              {others.map((o) => <Link key={o.path + (o.group ?? "")} to={o.path} onClick={() => o.group && setTeacherGroup(o.group)}><Icon name="refresh" />{o.title}</Link>)}
             </div>
           )}
         </aside>

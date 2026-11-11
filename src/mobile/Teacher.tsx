@@ -10,7 +10,7 @@ import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../
 import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
 import { NoteSheet } from "./Attendance";
 import { PasswordForm } from "./Auth";
-import { AppBar, ClassPicker, HEAD_TABS, isAdmin, Phone, TEACHER_TABS, useMyClass } from "./Shell";
+import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
   const d = useData();
@@ -395,6 +395,8 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
     const r = await sendTestNotification(`${base}/check`);
     toast(r.message, r.ok ? "info" : "error");
   };
+  const curGroup = currentTeacherGroup(u.id);
+  const otherGroups = base === "/t" ? teacherGroups(u.id).filter((g) => g !== curGroup) : [];
   const other = base === "/t" && u.roles.includes("head") ? "/h" : base === "/h" && u.roles.includes("teacher") && d.assignments.some((a) => a.userId === u.id) ? "/t" : null;
   return (
     <Phone tabs={base === "/t" ? TEACHER_TABS : HEAD_TABS}>
@@ -426,6 +428,11 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
           {other && (
             <Link to={other} className="menu-row"><Icon name="refresh" /><span className="grow sb">{other === "/h" ? "부장교사 화면으로 전환" : "담당 반 화면으로 전환"}</span><Icon name="right" size={16} /></Link>
           )}
+          {otherGroups.map((g) => (
+            <button key={g} type="button" className="menu-row" onClick={() => { setTeacherGroup(g); toast(`${g}부 담당 반으로 이동했습니다.`); nav("/t", { replace: true }); }}>
+              <Icon name="refresh" /><span className="grow sb">{g}부 담당 반으로 이동</span><Icon name="right" size={16} />
+            </button>
+          ))}
           <button type="button" className="menu-row" onClick={() => setSheet("pw")}><Icon name="lock" /><span className="grow sb">비밀번호 변경</span><Icon name="right" size={16} /></button>
           <button type="button" className="menu-row" onClick={askPush}><Icon name="bell" /><span className="grow sb">푸시 알림</span><Badge tone={pushOn ? "success" : "neutral"}>{pushOn ? "허용됨" : "미허용"}</Badge></button>
           {pushOn && <button type="button" className="menu-row" onClick={testPush}><Icon name="check" /><span className="grow sb">테스트 알림 받아 보기</span><Icon name="right" size={16} /></button>}
