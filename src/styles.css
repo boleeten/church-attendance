@@ -352,7 +352,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 /* 로그인 입력란: 아이디·비밀번호를 한 상자에 위아래로 (Figma 112:444) */
 .login-box { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #fff; transition: border-color 0.15s; }
 .login-box:focus-within { border-color: var(--primary); }
-.login-box .input { height: 64px; border-radius: 0; box-shadow: none; padding: 0 16px; gap: 10px; }
+.login-box .input { height: 60px; border-radius: 0; box-shadow: none; padding: 0 16px; gap: 10px; }
 .login-box .input + .input { border-top: 1px solid #e5e7eb; }
 .login-box .input > svg { width: 20px; height: 20px; }
 .login-box .input input { font-size: 16px; line-height: 1.5; }
