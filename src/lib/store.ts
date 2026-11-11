@@ -489,7 +489,21 @@ export function accountRecords(userId: string): string[] {
   return out;
 }
 
-/** 계정 완전 삭제. 기록이 없는 계정(시험·잘못 만든 계정)만 지울 수 있다. */
+/** 이 교사가 맡은 반 (있으면 삭제 불가 — 먼저 그룹·반 관리에서 배정을 해제해야 한다) */
+export function accountClasses(userId: string): string[] {
+  return data.assignments
+    .filter((a) => a.userId === userId)
+    .map((a) => {
+      const c = data.classes.find((x) => x.id === a.classId);
+      return c ? `${classShort(c)} ${a.kind}` : a.kind;
+    });
+}
+
+/**
+ * 계정 삭제. 반이 배정된 교사는 지울 수 없다.
+ * 출석·심방 기록이 있으면 기록은 작성자 이름과 함께 남기고 계정만 없앤다(로그인 불가, 목록에서 사라짐, 아이디 재사용 가능).
+ * 기록이 없으면 완전히 지운다.
+ */
 export async function deleteAccount(targetId: string): Promise<string | null> {
   const actor = me();
   const t = data.users.find((x) => x.id === targetId);
@@ -497,17 +511,22 @@ export async function deleteAccount(targetId: string): Promise<string | null> {
   if (!canDeleteAccounts(actor)) return "계정 삭제 권한이 없습니다.";
   if (t.roles.includes("owner") || t.id === actor.id) return "이 계정은 삭제할 수 없습니다.";
   if (t.roles.includes("super") && !actor.roles.includes("super")) return "최고 관리자 계정은 최고 관리자만 삭제할 수 있습니다.";
-  const recs = accountRecords(t.id);
-  if (recs.length) return `${t.name} 계정에 기록(${recs.join(", ")})이 있어 삭제할 수 없습니다. 비활성화를 사용해 주세요.`;
+  const cls = accountClasses(t.id);
+  if (cls.length) return `${t.name} 교사는 담당 반(${cls.join(", ")})이 있어 삭제할 수 없습니다. 그룹·반 관리에서 배정을 해제한 뒤 삭제해 주세요.`;
+  const keep = accountRecords(t.id).length > 0;
   if (remoteEnabled) {
-    const r = await remote.adminUsers<{ ok: boolean }>({ action: "delete", userId: t.id });
+    const r = await remote.adminUsers<{ ok: boolean; mode: "hard" | "soft"; loginId?: string }>({ action: "delete", userId: t.id });
     if (typeof r === "string") return r;
+    if (r.mode === "soft") Object.assign(t, { roles: [], active: false, loginId: r.loginId ?? t.loginId });
+    else data.users = data.users.filter((x) => x.id !== t.id);
+  } else if (keep) {
+    Object.assign(t, { roles: [], active: false, loginId: `deleted_${t.id.replace(/^u_/, "").slice(0, 8)}` });
+  } else {
+    data.users = data.users.filter((x) => x.id !== t.id);
   }
-  data.users = data.users.filter((x) => x.id !== t.id);
-  data.assignments = data.assignments.filter((a) => a.userId !== t.id);
   data.notifications = data.notifications.filter((n) => n.userId !== t.id);
   if (data.settings.accountDeleters?.includes(t.id)) data.settings.accountDeleters = data.settings.accountDeleters.filter((x) => x !== t.id);
-  audit("계정 삭제", `${t.name} (${t.loginId})`, t.roles.join(","), "삭제");
+  audit("계정 삭제", `${t.name}`, "-", keep ? "삭제 (지난 기록은 보존)" : "삭제");
   emit();
   return null;
 }

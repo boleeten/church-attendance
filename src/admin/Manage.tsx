@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { accountRecords, addClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { accountClasses, accountRecords, addClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -672,9 +672,10 @@ export function Teachers() {
   const [importRows, setImportRows] = useState<TeacherRow[] | null>(null);
   const canDelete = canDeleteAccounts(me);
   const doDelete = async (u: User) => {
-    const recs = accountRecords(u.id);
-    if (recs.length) return toast(`${u.name} 계정에는 기록(${recs.join(", ")})이 있어 삭제할 수 없습니다. 비활성화를 사용해 주세요.`, "error");
-    if (!window.confirm(`${u.name}(${u.loginId}) 계정을 완전히 삭제할까요?\n로그인 계정과 담당 반 배정이 함께 지워지며 되돌릴 수 없습니다.`)) return;
+    const cls = accountClasses(u.id);
+    if (cls.length) return toast(`${u.name} 교사는 담당 반(${cls.join(", ")})이 있어 삭제할 수 없습니다. 그룹·반 관리에서 배정을 해제한 뒤 삭제해 주세요.`, "error");
+    const keep = accountRecords(u.id).length > 0;
+    if (!window.confirm(`${u.name}(${u.loginId}) 계정을 삭제할까요?\n${keep ? "로그인 계정은 없어지고, 지난 출석·심방노트 기록은 작성자 이름과 함께 남습니다." : "로그인 계정이 완전히 지워집니다."}\n되돌릴 수 없습니다.`)) return;
     const err = await deleteAccount(u.id);
     toast(err ?? `${u.name} 계정을 삭제했습니다.`, err ? "error" : "info");
   };
