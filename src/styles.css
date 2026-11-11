@@ -359,3 +359,11 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .login-box .input input { font-size: 16px; line-height: 1.5; }
 .login-box .input input::placeholder { color: #9ca3af; }
 .login-box .input:focus-within { box-shadow: none; }
+
+/* 장결자반 (부마다 하나, 교사 배정 없음) */
+.class-card.long-card { background: #fffaf0; box-shadow: inset 0 0 0 1px #f6d9a8; border-top: 4px solid var(--warning, #f59e0b); }
+.grp-zone .class-card.long-card { box-shadow: inset 0 0 0 1px #f6d9a8; border-top-color: var(--warning, #f59e0b); }
+.long-card .long-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px #f6d9a8; font-size: 13px; font-weight: 600; }
+.long-card .long-chip .muted { font-weight: 400; }
+.c-warning { color: #b7791f; }
+.grp-zone .class-card.long-card > .row:first-child strong { color: #b7791f; }

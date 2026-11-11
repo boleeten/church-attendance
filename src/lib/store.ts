@@ -353,14 +353,39 @@ export function classCount(classId: string) {
   return data.students.filter((s) => s.classId === classId && s.status === "등록").length;
 }
 
+/** 장결자반: 부마다 하나. 따로 반을 만들지 않고 상태가 '장결자'인 학생을 그 부의 장결자반으로 본다.
+ *  교사 배정·출석체크·정원이 없고, 학생의 원래 반(classId)은 복귀할 반으로 남겨 둔다. */
+export const LONG_PREFIX = "long-";
+export const longClassId = (g: 1 | 2) => `${LONG_PREFIX}${g}`;
+export const longGroupOf = (id: string): 1 | 2 | null => (id === "long-1" ? 1 : id === "long-2" ? 2 : null);
+export const longLabel = (g: 1 | 2) => `${g}부 장결자반`;
+
 export function moveStudents(ids: string[], classId: string): string | null {
+  const lg = longGroupOf(classId);
+  if (lg) {
+    const picked = data.students.filter((s) => ids.includes(s.id));
+    const other = picked.filter((s) => data.classes.find((x) => x.id === s.classId)?.group !== lg);
+    if (other.length) return `${other.map((s) => s.name).slice(0, 3).join(", ")} 학생은 ${lg}부 학생이 아니라 ${longLabel(lg)}으로 옮길 수 없습니다.`;
+    for (const s of picked.filter((x) => x.status !== "장결자")) {
+      audit("장결자반 이동", s.name, s.status, longLabel(lg));
+      s.status = "장결자";
+      remote.upsert("students", s);
+    }
+    emit();
+    return null;
+  }
   const c = data.classes.find((x) => x.id === classId);
   if (!c) return "반을 선택해 주세요.";
-  const moving = data.students.filter((s) => ids.includes(s.id) && s.classId !== classId);
-  if (classCount(classId) + moving.filter((s) => s.status === "등록").length > c.capacity) return `${classLabel(c)}의 정원(${c.capacity}명)을 초과합니다.`;
+  // 장결자반에서 일반 반으로 옮기면 '등록'으로 복귀한다
+  const moving = data.students.filter((s) => ids.includes(s.id) && (s.classId !== classId || s.status === "장결자"));
+  const joining = moving.filter((s) => s.status === "등록" ? s.classId !== classId : s.status === "장결자").length;
+  if (classCount(classId) + joining > c.capacity) return `${classLabel(c)}의 정원(${c.capacity}명)을 초과합니다.`;
   for (const s of moving) {
     const from = data.classes.find((x) => x.id === s.classId);
-    audit("반 이동", s.name, from ? classLabel(from) : "-", classLabel(c));
+    if (s.status === "장결자") {
+      audit("장결자반 복귀", s.name, from ? longLabel(from.group) : "장결자반", classLabel(c));
+      s.status = "등록";
+    } else audit("반 이동", s.name, from ? classLabel(from) : "-", classLabel(c));
     s.classId = classId;
     remote.upsert("students", s);
   }

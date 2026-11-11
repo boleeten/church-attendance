@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -202,7 +202,7 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
     <Modal title={student ? "학생 정보 수정" : "학생 등록"} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={save}>저장</Button></>}>
       {inp("이름", "name", "학생 이름")}
       <div className="grid cols-2" style={{ gap: 12 }}>
-        <div className="field"><label>반</label>
+        <div className="field"><label>{f.status === "장결자" ? "원래 반 (복귀할 반)" : "반"}</label>
           <SelectBox label="반" value={f.classId} onChange={(v) => set("classId", v)}>
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
           </SelectBox>
@@ -297,7 +297,9 @@ export function Students() {
         if (term && !(s.name.includes(term) || s.phone.replace(/-/g, "").includes(term) || s.guardianPhone.replace(/-/g, "").includes(term) || teacher.includes(term))) return false;
         if (group && String(c?.group) !== group) return false;
         if (grade && String(c?.grade) !== grade) return false;
-        if (classId && s.classId !== classId) return false;
+        const lg = longGroupOf(classId);
+        if (lg && (s.status !== "장결자" || c?.group !== lg)) return false;
+        if (classId && !lg && (s.classId !== classId || s.status === "장결자")) return false;
         if (status && s.status !== status) return false;
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
@@ -340,7 +342,7 @@ export function Students() {
         <div className="filter-row">
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
-          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}</SelectBox>
+          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}</SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
@@ -368,8 +370,8 @@ export function Students() {
                 <tr key={s.id}>
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
                   <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
-                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{c ? `${c.no}반` : "-"}</td>
-                  <td>{teacher}</td>
+                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : "-"}</td>
+                  <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
                   <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
@@ -393,8 +395,9 @@ export function Students() {
           <SelectBox label="이동할 반" value={moveTo} onChange={setMoveTo}>
             <option value="">이동할 반 선택</option>
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
+            {([1, 2] as const).map((g) => <option key={g} value={longClassId(g)}>{longLabel(g)} (교사 배정 없음)</option>)}
           </SelectBox>
-          <Note>반을 옮겨도 이전 출석 기록과 심방노트는 보존됩니다. 정원(10명)을 넘는 이동은 할 수 없습니다.</Note>
+          <Note>반을 옮겨도 이전 출석 기록과 심방노트는 보존됩니다. 정원(10명)을 넘는 이동은 할 수 없습니다. 장결자반으로 옮기면 상태가 '장결자'가 되고, 장결자반에서 일반 반으로 옮기면 '등록'으로 돌아옵니다.</Note>
         </Modal>
       )}
     </Page>
@@ -451,6 +454,28 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
       })}
       <Note>배정 원칙: 한 교사는 같은 부에서 반을 하나만 맡을 수 있고(담임·보조 포함), 다른 부의 반은 하나 더 맡을 수 있습니다. 보조 교사도 배정된 반의 출석체크를 할 수 있습니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
     </Modal>
+  );
+}
+
+/** 부마다 하나 있는 장결자반 카드. 교사 배정 없이 상태가 '장결자'인 학생을 모아 보여 준다. */
+function LongClassCard({ g }: { g: 1 | 2 }) {
+  const d = useData();
+  const list = d.students.filter((s) => s.status === "장결자" && d.classes.find((c) => c.id === s.classId)?.group === g).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  return (
+    <section className="col g12">
+      <h2 className="t-base b">장결자반</h2>
+      <div className="class-card long-card">
+        <div className="row between">
+          <strong className="t-base b">{longLabel(g)}</strong>
+          <Badge tone="warning">{list.length}명</Badge>
+        </div>
+        <span className="t-xs muted">교사 배정 없음 · 출석체크·출석률에서 제외 · 학생 상태를 '장결자'로 바꾸면 이 반으로 옮겨집니다</span>
+        {list.length > 0 ? (
+          <div className="row g6 wrap">{list.map((s) => { const c = d.classes.find((x) => x.id === s.classId); return <span key={s.id} className="long-chip">{s.name}{c && <span className="muted"> · 원래 {classShort(c)}</span>}</span>; })}</div>
+        ) : <span className="t-xs muted">장결자 학생이 없습니다.</span>}
+        <div className="row g8"><Link to={`/admin/students?class=${longClassId(g)}`} className="btn secondary s">학생 보기·복귀</Link></div>
+      </div>
+    </section>
   );
 }
 
@@ -515,6 +540,7 @@ export function Classes() {
           </div>
         </section>
       ))}
+      <LongClassCard g={group} />
       </div>
       {assign && <AssignModal cls={assign} onClose={() => setAssign(null)} />}
       {adding && (
