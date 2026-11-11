@@ -2,7 +2,7 @@
 // - 매주 일요일 오후 3시(KST)에 Vercel Cron이 호출한다 (vercel.json).
 // - 관리자가 앱에서 "알림 보내기"를 누르면 같은 함수를 호출해 기기 푸시만 추가로 보낸다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CRON_SECRET
-// body.test 가 있으면 로그인한 본인 기기로 테스트 푸시만 보낸다.
+// body.test 가 있으면 로그인한 본인 기기로 테스트 푸시만, body.reply(노트 ID)가 있으면 심방 답변 푸시만 보낸다.
 import * as webpushModule from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -48,6 +48,38 @@ export default async function handler(req, res) {
     }
     if (!sent) return res.status(502).json({ error: `기기로 보내지 못했습니다. 내 정보에서 '푸시 알림'을 한 번 더 눌러 기기를 다시 등록해 주세요. (${lastError})` });
     return res.status(200).json({ sent, devices: subs.length });
+  }
+
+  // ── 심방 답변: 최고 관리자가 답변을 보내면 노트를 쓴 교사 기기로 푸시 ──
+  if (body.reply) {
+    const { data: me } = token ? await sb.auth.getUser(token) : { data: null };
+    if (!me?.user) return res.status(401).json({ error: "로그인이 필요합니다." });
+    const { data: actor } = await sb.from("profiles").select("name, title, roles, active").eq("id", me.user.id).single();
+    if (!actor?.active || !actor.roles.includes("super")) return res.status(403).json({ error: "최고 관리자만 보낼 수 있습니다." });
+    const { data: note } = await sb.from("visit_notes").select("id, author_id, student_id").eq("id", String(body.reply)).single();
+    if (!note) return res.status(404).json({ error: "심방노트를 찾을 수 없습니다." });
+    if (note.author_id === me.user.id) return res.status(200).json({ sent: 0 });
+    const [{ data: student }, { data: subs }] = await Promise.all([
+      sb.from("students").select("name").eq("id", note.student_id).single(),
+      sb.from("push_subscriptions").select("endpoint, subscription").eq("user_id", note.author_id),
+    ]);
+    const text = String(body.text || "").trim();
+    const payload = JSON.stringify({
+      title: body.edited ? "심방 답변이 수정되었습니다" : "심방노트에 답변이 왔습니다",
+      body: `[${student?.name ?? "학생"}] ${actor.title || actor.name}: ${text.length > 80 ? text.slice(0, 80) + "…" : text}`,
+      url: `/t/students/${note.student_id}#note-${note.id}`,
+      tag: `reply-${note.id}`,
+    });
+    let sent = 0;
+    for (const s of subs || []) {
+      try {
+        await webpush.sendNotification(s.subscription, payload);
+        sent++;
+      } catch (e) {
+        if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: note.author_id, endpoint: s.endpoint });
+      }
+    }
+    return res.status(200).json({ sent, devices: (subs || []).length });
   }
 
   // ── 호출자 확인: Vercel Cron(비밀 값) 또는 로그인한 관리자 ──

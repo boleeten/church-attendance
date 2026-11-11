@@ -239,6 +239,8 @@ export function replyNote(id: string, text: string | null): string | null {
     };
     data.notifications.unshift(row);
     remote.insert("notifications", row);
+    // 노트를 쓴 교사의 휴대폰으로도 푸시 (알림을 허용한 기기만). 실패해도 앱 안 알림 목록에는 남는다.
+    if (remoteEnabled) void remote.api("push-reminders", "POST", { reply: n.id, text: body, edited });
   }
   audit(body ? (edited ? "심방 답변 수정" : "심방 답변") : "심방 답변 삭제", `${s?.name ?? "-"} · ${fmtDot(n.date)} 심방노트`, edited ? "답변 있음" : "-", body ? "답변 등록" : "삭제");
   emit();
