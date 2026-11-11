@@ -2,7 +2,7 @@
 // - 매주 일요일 오후 3시(KST)에 Vercel Cron이 호출한다 (vercel.json).
 // - 관리자가 앱에서 "알림 보내기"를 누르면 같은 함수를 호출해 기기 푸시만 추가로 보낸다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CRON_SECRET
-// 주의: 실제 Supabase·푸시 키로 아직 실행해 보지 않은 코드다.
+// body.test 가 있으면 로그인한 본인 기기로 테스트 푸시만 보낸다.
 import * as webpushModule from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -26,8 +26,31 @@ export default async function handler(req, res) {
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   webpush.setVapidDetails("mailto:admin@attendance.local", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-  // ── 호출자 확인: Vercel Cron(비밀 값) 또는 로그인한 관리자 ──
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+
+  // ── 테스트: 로그인한 본인 기기로만 서버 푸시를 한 번 보낸다 (교사도 가능) ──
+  if (body.test) {
+    const { data: me } = token ? await sb.auth.getUser(token) : { data: null };
+    if (!me?.user) return res.status(401).json({ error: "로그인이 필요합니다." });
+    const { data: subs } = await sb.from("push_subscriptions").select("endpoint, subscription").eq("user_id", me.user.id);
+    if (!subs?.length) return res.status(400).json({ error: "이 계정에 등록된 기기가 없습니다. 내 정보에서 '푸시 알림'을 한 번 더 눌러 이 기기를 등록해 주세요." });
+    let sent = 0;
+    let lastError = "";
+    for (const s of subs) {
+      try {
+        await webpush.sendNotification(s.subscription, JSON.stringify({ title: "주일 출석체크 안내 (테스트)", body: "서버에서 보낸 테스트 알림입니다. 누르면 앱이 열립니다.", url: body.url || "/", tag: "attendance-test" }));
+        sent++;
+      } catch (e) {
+        lastError = e.body || e.message || String(e.statusCode);
+        if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: me.user.id, endpoint: s.endpoint });
+      }
+    }
+    if (!sent) return res.status(502).json({ error: `기기로 보내지 못했습니다. 내 정보에서 '푸시 알림'을 한 번 더 눌러 기기를 다시 등록해 주세요. (${lastError})` });
+    return res.status(200).json({ sent, devices: subs.length });
+  }
+
+  // ── 호출자 확인: Vercel Cron(비밀 값) 또는 로그인한 관리자 ──
   const isCron = Boolean(CRON_SECRET) && token === CRON_SECRET;
   if (!isCron) {
     const { data: auth } = await sb.auth.getUser(token);
@@ -36,7 +59,6 @@ export default async function handler(req, res) {
     if (!ok) return res.status(401).json({ error: "권한이 없습니다." });
   }
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const date = body.date || currentSundayKST();
   const mode = isCron ? "자동" : "수동";
 

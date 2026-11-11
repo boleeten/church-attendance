@@ -392,8 +392,8 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
     toast(r.message, r.ok ? "info" : "error");
   };
   const testPush = async () => {
-    const ok = await sendTestNotification(`${base}/check`);
-    toast(ok ? "테스트 알림을 보냈습니다. 화면 위쪽이나 알림 센터를 확인해 주세요." : "먼저 푸시 알림을 허용해 주세요.", ok ? "info" : "error");
+    const r = await sendTestNotification(`${base}/check`);
+    toast(r.message, r.ok ? "info" : "error");
   };
   const other = base === "/t" && u.roles.includes("head") ? "/h" : base === "/h" && u.roles.includes("teacher") && d.assignments.some((a) => a.userId === u.id) ? "/t" : null;
   return (
