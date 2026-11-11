@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { addClass, canManageAccount, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { addClass, deleteClass, canManageAccount, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -442,6 +442,14 @@ export function Classes() {
   const full = list.filter((c) => classCount(c.id) >= c.capacity);
   const names = (cid: string, k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cid && a.kind === k).map((a) => d.users.find((u) => u.id === a.userId)?.name).filter(Boolean).join(", ") || "미배정";
   const count = (n: 1 | 2) => d.classes.filter((c) => c.group === n).length;
+  const removeClass = (c: ClassRoom) => {
+    const members = d.students.filter((s) => s.classId === c.id).length;
+    if (members) return toast(`${classLabel(c)}에 학생 ${members}명이 있어 삭제할 수 없습니다. 먼저 '학생 이동'으로 다른 반에 옮겨 주세요.`, "error");
+    const teachers = d.assignments.filter((a) => a.classId === c.id).length;
+    if (!window.confirm(`${classLabel(c)}을(를) 삭제할까요?${teachers ? `\n배정된 교사 ${teachers}명의 담당이 해제됩니다.` : ""}\n삭제한 반은 되돌릴 수 없습니다.`)) return;
+    const err = deleteClass(c.id);
+    toast(err ?? `${classLabel(c)}을(를) 삭제했습니다.`, err ? "error" : "info");
+  };
   return (
     <Page title="그룹·반 관리" sub="1부·2부 그룹과 학년별 반, 담당 교사를 관리합니다">
       <div className="row between wrap g12">
@@ -471,6 +479,7 @@ export function Classes() {
                   <div className="row g8">
                     <Button variant="outline" size="s" className="grow" onClick={() => setAssign(c)}>교사 배정</Button>
                     <Link to={`/admin/students?class=${c.id}`} className="btn secondary s grow">학생 이동</Link>
+                    <button type="button" className="icon-btn bordered class-del" aria-label={`${classShort(c)} 삭제`} title="반 삭제" onClick={() => removeClass(c)}><Icon name="trash" size={16} /></button>
                   </div>
                 </div>
               );

@@ -308,3 +308,5 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .user-pop-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .user-pop button { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 8px; font-size: 14px; color: var(--text); text-align: left; }
 .user-pop button:hover, .user-pop button:focus-visible { background: var(--canvas); outline: 0; }
+.class-card .class-del { width: 32px; height: 32px; border-radius: 8px; color: var(--muted); }
+.class-card .class-del:hover { color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }

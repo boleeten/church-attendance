@@ -380,6 +380,24 @@ export function addClass(group: 1 | 2, grade: number): string | null {
   return null;
 }
 
+/** 반 삭제. 이 반에 소속된 학생(장결자·교회이동 포함)이 있으면 지우지 않는다. 담당 교사 배정과 출석부 완료 기록도 함께 지운다. */
+export function deleteClass(classId: string): string | null {
+  const c = data.classes.find((x) => x.id === classId);
+  if (!c) return "반을 찾을 수 없습니다.";
+  const members = data.students.filter((s) => s.classId === classId);
+  if (members.length) return `${classLabel(c)}에 학생 ${members.length}명이 있어 삭제할 수 없습니다. 먼저 학생을 다른 반으로 이동해 주세요.`;
+  const teachers = data.assignments.filter((a) => a.classId === classId).map((a) => data.users.find((u) => u.id === a.userId)?.name).filter(Boolean);
+  data.assignments = data.assignments.filter((a) => a.classId !== classId);
+  for (const key of Object.keys(data.sessions)) if (key.endsWith(`|class:${classId}`)) delete data.sessions[key];
+  data.classes = data.classes.filter((x) => x.id !== classId);
+  remote.remove("teacher_assignments", { classId });
+  remote.remove("sessions", { target: `class:${classId}` });
+  remote.remove("classes", { id: classId });
+  audit("반 삭제", classLabel(c), teachers.length ? `배정 교사: ${teachers.join(", ")}` : "배정 교사 없음", "삭제");
+  emit();
+  return null;
+}
+
 export function setAssignment(classId: string, kind: AssignKind, userIds: string[]) {
   const c = data.classes.find((x) => x.id === classId)!;
   const name = (ids: string[]) => ids.map((i) => data.users.find((u) => u.id === i)?.name).join(", ") || "미배정";
