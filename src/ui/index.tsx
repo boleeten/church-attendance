@@ -83,6 +83,40 @@ export function Avatar({ name, photo, size = 44 }: { name: string; photo?: strin
   );
 }
 
+/** 사진이 있으면 누를 수 있는 아바타. 누르면 사진을 크게 보여 준다. (관리자 화면의 학생 이름 앞) */
+export function PhotoAvatar({ name, photo, size = 44 }: { name: string; photo?: string; size?: number }) {
+  const [open, setOpen] = useState(false);
+  if (!photo) return <Avatar name={name} size={size} />;
+  return (
+    <>
+      <button type="button" className="avatar-btn" aria-label={`${name} 사진 크게 보기`} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        <Avatar name={name} photo={photo} size={size} />
+      </button>
+      {open && <PhotoViewer name={name} photo={photo} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function PhotoViewer({ name, photo, onClose }: { name: string; photo: string; onClose: () => void }) {
+  // 학생 상세 같은 다른 레이어 위에서 열릴 수 있으므로, ESC는 이 사진 레이어만 닫는다
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } };
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
+  }, [onClose]);
+  return (
+    <div className="backdrop mid" style={{ zIndex: 60 }} onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      <div className="photo-view" role="dialog" aria-modal="true" aria-label={`${name} 사진`} onClick={(e) => e.stopPropagation()}>
+        <img src={photo} alt={`${name} 사진`} />
+        <div className="row between">
+          <strong className="t-lg b">{name}</strong>
+          <button type="button" className="icon-btn" aria-label="닫기" autoFocus onClick={onClose}><Icon name="x" /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MarkDot({ mark, future }: { mark: Mark | undefined; future?: boolean }) {
   if (future) return <span className="mark" />;
   if (mark === "P") return <span className="mark p" title="출석"><Icon name="check" size={13} stroke={2.4} /></span>;

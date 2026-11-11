@@ -5,7 +5,7 @@ import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
 import { accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
-import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
+import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 
 // ───────── 공용 조각 ─────────
@@ -229,7 +229,7 @@ export function StudentDetailModal({ student, onClose }: { student: Student; onC
   return (
     <Modal title="학생 상세" onClose={onClose} wide>
       <div className="row g16">
-        <Avatar name={student.name} photo={student.photo} size={64} />
+        <PhotoAvatar name={student.name} photo={student.photo} size={64} />
         <div className="col g6 grow">
           <strong className="t-lg b">{student.name}</strong>
           <div className="row g6 wrap">
@@ -280,7 +280,6 @@ export function Students() {
   const [status, setStatus] = useState("");
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
-  const [teacherId, setTeacherId] = useState("");
   const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Student | null | "new">(null);
@@ -299,7 +298,6 @@ export function Students() {
         if (group && String(c?.group) !== group) return false;
         if (grade && String(c?.grade) !== grade) return false;
         if (classId && s.classId !== classId) return false;
-        if (teacherId && !d.assignments.some((a) => a.userId === teacherId && a.classId === s.classId)) return false;
         if (status && s.status !== status) return false;
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
@@ -307,13 +305,12 @@ export function Students() {
         return true;
       })
       .sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
-  }, [d, q, group, grade, classId, teacherId, status, mark, streakOnly, date, dates]);
+  }, [d, q, group, grade, classId, status, mark, streakOnly, date, dates]);
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const cur = Math.min(page, pages - 1);
   const view = rows.slice(cur * PAGE, cur * PAGE + PAGE);
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setTeacherId(""); setPage(0); };
-  const teacherOptions = d.users.filter((u) => d.assignments.some((a) => a.userId === u.id)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setPage(0); };
   const upd = (f: (v: string) => void) => (v: string) => { f(v); setPage(0); };
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
@@ -344,7 +341,6 @@ export function Students() {
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
           <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}</SelectBox>
-          <SelectBox label="담당 교사" value={teacherId} onChange={upd(setTeacherId)}><option value="">담당 교사: 전체</option>{teacherOptions.map((u) => <option key={u.id} value={u.id}>담당 교사: {u.name}</option>)}</SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
@@ -371,7 +367,7 @@ export function Students() {
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
-                  <td><span className="row g8"><Avatar name={s.name} photo={s.photo} size={28} /><strong className="sb">{s.name}</strong></span></td>
+                  <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
                   <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{c ? `${c.no}반` : "-"}</td>
                   <td>{teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>

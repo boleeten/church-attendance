@@ -342,3 +342,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .user-pop button:disabled { color: var(--muted); opacity: 0.5; cursor: not-allowed; background: none; }
 .user-pop button.danger:not(:disabled) { color: var(--error); }
 .user-pop button.danger:not(:disabled):hover { background: var(--error-soft); }
+
+/* 학생 사진: 누르면 크게 보기 */
+.avatar-btn { display: inline-flex; border-radius: 50%; flex: none; cursor: zoom-in; transition: box-shadow 0.15s; }
+.avatar-btn:hover, .avatar-btn:focus-visible { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--primary); outline: 0; }
+.photo-view { background: #fff; border-radius: 20px; padding: 16px; width: min(352px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-xl); }
+.photo-view img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; background: var(--canvas); }

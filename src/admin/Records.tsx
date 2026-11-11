@@ -4,7 +4,7 @@ import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
 import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
-import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg, Toggle } from "../ui";
+import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg, Toggle } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 import { classOf, GroupBar, groupStudents, incompleteClasses, Kpi, SelectBox, StudentDetailModal } from "./Manage";
 
@@ -37,7 +37,7 @@ function ClassSheetModal({ cls, date, onClose }: { cls: ClassRoom; date: string;
       <div className="col g8">
         {roster(d, cls.id).map((s) => (
           <div key={s.id} className="row g12">
-            <Avatar name={s.name} photo={s.photo} size={32} />
+            <PhotoAvatar name={s.name} photo={s.photo} size={40} />
             <strong className="sb grow">{s.name}</strong>
             <Toggle fixed value={d.studentMarks[`${date}|${s.id}`]} onChange={(m) => setStudentMark(date, s.id, m)} />
           </div>
@@ -247,7 +247,7 @@ export function Stats() {
                 const noted = d.notes.some((n) => n.studentId === s.id && all.slice(-count).includes(n.date));
                 return (
                   <tr key={s.id}>
-                    <td><span className="row g8"><Avatar name={s.name} photo={s.photo} size={28} /><strong className="sb">{s.name}</strong></span></td>
+                    <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
                     <td>{c ? classLabel(c) : "-"}</td><td>{homeroomName(d, s.classId)}</td>
                     <td><Badge tone="error">{count}주 연속</Badge></td>
                     <td>{lastPresent ? fmtMD(lastPresent) : "-"}</td>
@@ -412,7 +412,7 @@ function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; in
         ) : undefined
       }
     >
-      <div className="row g12"><Avatar name={s?.name ?? "?"} photo={s?.photo} /><div className="col g2 grow"><strong className="t-lg b">{s?.name}</strong><span className="muted">{c ? classLabel(c) : ""} · {fmtDot(note.date)}</span></div>{note.reason && <Badge tone="error">{note.reason}</Badge>}</div>
+      <div className="row g12"><PhotoAvatar name={s?.name ?? "?"} photo={s?.photo} /><div className="col g2 grow"><strong className="t-lg b">{s?.name}</strong><span className="muted">{c ? classLabel(c) : ""} · {fmtDot(note.date)}</span></div>{note.reason && <Badge tone="error">{note.reason}</Badge>}</div>
       <p className="card pad" style={{ lineHeight: 1.6, background: "var(--canvas)" }}>{note.content || "(내용 없음)"}</p>
       <span className="t-xs muted">{by} · {fmtStamp(note.createdAt)}</span>
       {editing ? (
