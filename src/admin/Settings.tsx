@@ -60,10 +60,10 @@ export function Sheets() {
   const s = d.settings;
   const y = s.year;
   const [busy, setBusy] = useState(false);
-  const [sa, setSa] = useState<{ configured: boolean; email: string | null } | null>(null);
+  const [sa, setSa] = useState<{ configured: boolean; email: string | null; problem?: string | null } | null>(null);
   useEffect(() => {
     if (!remoteEnabled) return;
-    void remote.api<{ configured: boolean; email: string | null }>("sheets-sync", "GET").then((r) => typeof r !== "string" && setSa(r));
+    void remote.api<{ configured: boolean; email: string | null; problem?: string | null }>("sheets-sync", "GET").then((r) => setSa(typeof r === "string" ? { configured: false, email: null, problem: `서버 확인 실패: ${r}` } : r));
   }, []);
   const ready = remoteEnabled && !!sa?.configured && !!s.sheetSharedId;
   const payload = (defs: SheetDef[]) => defs.map((def) => ({ title: def.name, rows: def.rows(d) }));
@@ -119,7 +119,7 @@ export function Sheets() {
         {remoteEnabled && (sa?.email ? (
           <Note icon="info">각 구글 시트의 <b>공유</b>에서 <b className="num">{sa.email}</b> 을(를) <b>편집자</b>로 추가해야 앱이 시트에 쓸 수 있습니다.</Note>
         ) : (
-          <Note warm icon="warning">서버에 Google 서비스 계정 키(GOOGLE_SERVICE_ACCOUNT_JSON)가 아직 설정되지 않았습니다. 설정이 끝나면 여기에 시트를 공유할 이메일이 표시됩니다.</Note>
+          <Note warm icon="warning">{sa === null ? "서버 설정을 확인하는 중입니다…" : sa.problem ?? "서버에 Google 서비스 계정 키(GOOGLE_SERVICE_ACCOUNT_JSON)가 아직 설정되지 않았습니다."} 설정이 끝나면 여기에 시트를 공유할 이메일이 표시됩니다.</Note>
         ))}
         <Note warm icon="lock">학생 이름·출석이 들어가는 파일입니다. 구글 시트 공유 설정을 <b>"링크가 있는 모든 사용자"가 아니라 "제한됨"</b>으로 두고 필요한 사람만 추가하세요. 관리자 전용 파일은 교사에게 공유하지 마세요.</Note>
       </section>

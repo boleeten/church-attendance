@@ -9,13 +9,22 @@ import { createClient } from "@supabase/supabase-js";
 const fail = (res, status, error) => res.status(status).json({ error });
 const b64url = (v) => Buffer.from(typeof v === "string" ? v : JSON.stringify(v)).toString("base64url");
 
+/** 서비스 계정 키를 읽는다. 문제가 있으면 원인을 problem에 담는다(키 값 자체는 절대 돌려주지 않는다). */
 function serviceAccount() {
+  let raw = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "").trim();
+  if (!raw) return { sa: null, problem: "GOOGLE_SERVICE_ACCOUNT_JSON 환경 변수가 비어 있거나 이 배포에 들어 있지 않습니다. Production에 넣은 뒤 다시 배포해야 합니다." };
+  // 앞뒤를 따옴표로 한 번 더 감싸 붙여 넣은 경우도 받아 준다
+  if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"') && !raw.startsWith('"{'))) raw = raw.slice(1, -1);
+  let sa;
   try {
-    const sa = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "");
-    return sa.client_email && sa.private_key ? sa : null;
+    sa = JSON.parse(raw);
+    if (typeof sa === "string") sa = JSON.parse(sa);
   } catch {
-    return null;
+    return { sa: null, problem: `GOOGLE_SERVICE_ACCOUNT_JSON 값이 올바른 JSON이 아닙니다. 키 파일 내용 전체({ 로 시작해 } 로 끝남)를 그대로 붙여 넣어 주세요. (현재 ${raw.length}자, 시작 문자 '${raw[0]}')` };
   }
+  if (!sa?.client_email || !sa?.private_key) return { sa: null, problem: "JSON에 client_email 또는 private_key가 없습니다. 서비스 계정의 '키 → JSON' 파일인지 확인해 주세요." };
+  sa.private_key = String(sa.private_key).replace(/\\n/g, "\n");
+  return { sa, problem: null };
 }
 
 /** 서비스 계정 키로 Google 접근 토큰을 받는다 (JWT bearer). */
@@ -54,7 +63,8 @@ const cell = (v) => (v === null || v === undefined ? "" : typeof v === "number" 
 export default async function handler(req, res) {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return fail(res, 503, "서버에 Supabase 키가 설정되지 않았습니다.");
-  const sa = serviceAccount();
+  const { sa, problem } = serviceAccount();
+  if (problem) console.error("[sheets-sync]", problem);
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // ── 요청한 사람 확인: 관리자만 ──
@@ -64,9 +74,9 @@ export default async function handler(req, res) {
   const { data: actor } = await sb.from("profiles").select("roles, active").eq("id", auth.user.id).single();
   if (!actor?.active || !actor.roles.some((r) => r === "admin" || r === "super")) return fail(res, 403, "관리자만 할 수 있습니다.");
 
-  if (req.method === "GET") return res.status(200).json({ configured: !!sa, email: sa?.client_email ?? null });
+  if (req.method === "GET") return res.status(200).json({ configured: !!sa, email: sa?.client_email ?? null, problem });
   if (req.method !== "POST") return fail(res, 405, "지원하지 않는 요청입니다.");
-  if (!sa) return fail(res, 503, "Google 서비스 계정 키(GOOGLE_SERVICE_ACCOUNT_JSON)가 서버에 설정되지 않았습니다.");
+  if (!sa) return fail(res, 503, problem);
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const { data: settingsRow } = await sb.from("settings").select("data").eq("id", 1).single();
