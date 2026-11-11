@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
@@ -698,6 +698,52 @@ function TeacherImportModal({ rows, onClose }: { rows: TeacherRow[]; onClose: ()
   );
 }
 
+type RowMenuItem = { icon: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean };
+/** 자주 쓰지 않는 동작을 담는 ⋯ 더보기 메뉴. 표가 가로 스크롤 영역 안에 있어 잘리지 않도록 화면 기준(fixed)으로 띄운다. */
+function RowMenu({ label, items }: { label: string; items: RowMenuItem[] }) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pos) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent) { if (e.key === "Escape") { setPos(null); btn.current?.focus(); } return; }
+      if (e.type === "mousedown" && (pop.current?.contains(e.target as Node) || btn.current?.contains(e.target as Node))) return;
+      setPos(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    pop.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+  const toggle = () => {
+    if (pos) return setPos(null);
+    const r = btn.current!.getBoundingClientRect();
+    const h = items.length * 40 + 12;
+    const top = r.bottom + 6 + h > window.innerHeight ? r.top - 6 - h : r.bottom + 6;
+    setPos({ top, right: window.innerWidth - r.right });
+  };
+  return (
+    <>
+      <button ref={btn} type="button" className="more-btn" aria-label={label} aria-haspopup="menu" aria-expanded={!!pos} onClick={toggle}><Icon name="more" size={20} stroke={2.6} /></button>
+      {pos && (
+        <div ref={pop} className="user-pop row-pop" role="menu" style={{ top: pos.top, right: pos.right }}>
+          {items.map((it) => (
+            <button key={it.label} type="button" role="menuitem" className={it.danger ? "danger" : ""} disabled={it.disabled} onClick={() => { setPos(null); it.onSelect(); }}><Icon name={it.icon} size={18} />{it.label}</button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function Teachers() {
   const d = useData();
   const me = useMe()!;
@@ -763,8 +809,10 @@ export function Teachers() {
                   <td><span className="row g6">
                     <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => setEdit(u)}>수정</Button>
                     <Button variant="danger" size="s" disabled={!canResetPassword(me, u)} onClick={() => doReset(u)}>비밀번호 초기화</Button>
-                    <Button variant="outline" size="s" disabled={!canManageAccount(me, u)} onClick={() => { const e = setUserActive(u.id, !u.active); if (e) toast(e, "error"); }}>{u.active ? "비활성화" : "활성화"}</Button>
-                    {canDelete && <Button variant="outline" size="s" className="btn-del" disabled={u.roles.includes("owner") || u.id === me.id} onClick={() => doDelete(u)}>삭제</Button>}
+                    <RowMenu label={`${u.name} 더보기`} items={[
+                      { icon: u.active ? "ban" : "checkCircle", label: u.active ? "비활성화" : "활성화", disabled: !canManageAccount(me, u), onSelect: () => { const e = setUserActive(u.id, !u.active); if (e) toast(e, "error"); } },
+                      ...(canDelete ? [{ icon: "trash", label: "삭제", danger: true, disabled: u.roles.includes("owner") || u.id === me.id, onSelect: () => void doDelete(u) }] : []),
+                    ]} />
                   </span></td>
                 </tr>
               ))}
