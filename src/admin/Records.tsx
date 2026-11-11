@@ -67,10 +67,6 @@ export function StudentAttendance() {
   const classIds = new Set(classes.map((c) => c.id));
   const rows = students.filter((s) => classIds.has(s.classId) && (!streakOnly || (streaks.get(s.id) ?? 0) >= 2)).sort((a, b) => a.classId.localeCompare(b.classId) || a.name.localeCompare(b.name, "ko"));
   const cols = dates.slice(-5);
-  const exportCsv = () =>
-    tab === "class"
-      ? download(`반별_출석현황_${date}.csv`, toCSV([["반", "담임", "전체", "출석", "결석", "미확인", "출석률", "상태"], ...classes.map((c) => { const s = classSummary(d, date, c.id); return [classLabel(c), homeroomName(d, c.id), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; })]))
-      : download(`학생별_출석현황_${date}.csv`, toCSV([["학생", "반", ...cols.map(fmtMD), "연간 출석률"], ...rows.map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", ...cols.map((dt) => markText(d.studentMarks[`${dt}|${s.id}`])), pctText(personRate(d.studentMarks, s.id, dates).rate)]; })]));
   return (
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
       <div className="grid cols-4">
@@ -100,7 +96,6 @@ export function StudentAttendance() {
             <label className="row g6 sb"><input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />미완료 반만</label>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
           </div>
-          <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
         </div>
         <div className="tablewrap">
           {tab === "class" ? (
@@ -171,7 +166,23 @@ export function Stats() {
   const classRates = d.classes.map((c) => ({ c, rate: rateOver(d.studentMarks, ids(roster(d, c.id)), range) })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
   const streaks = students.map((s) => ({ s, ...consecutiveAbsences(d.studentMarks, s.id, all) })).filter((x) => x.count >= 2).sort((a, b) => b.count - a.count);
   const title = tab === "week" ? fmtDot(date) : tab === "month" ? `${y}년 ${m}월` : `${y}학년도`;
-  const exportCsv = () => download(`출석통계_${tab}_${date}.csv`, toCSV([["구분", "항목", "출석률"], ...trend.map((t) => ["추세", t.label, pctText(t.rate)]), ...([1, 2] as const).map((g) => ["그룹", `${g}부`, pctText(groupRate(g))]), ...[4, 5, 6].map((g) => ["학년", `${g}학년`, pctText(gradeRate(g))]), ...classRates.map(({ c, rate }) => ["반", classLabel(c), pctText(rate)])]));
+  // 학생별 출결현황: 선택한 기간(주간·월간·연간)의 주일별 출결과 합계
+  const exportCsv = () => {
+    const list = [...students].sort((p, q) => p.classId.localeCompare(q.classId) || p.name.localeCompare(q.name, "ko"));
+    download(
+      `학생별_출결현황_${title.replace(/[\s.()]+/g, "_").replace(/_+$/, "")}.csv`,
+      toCSV([
+        ["이름", "그룹", "학년", "반", "담임", ...range.map(fmtMD), "출석", "결석", "미확인", "출석률"],
+        ...list.map((s) => {
+          const c = classOf(d, s);
+          const marks = range.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
+          const p = marks.filter((x) => x === "P").length;
+          const a = marks.filter((x) => x === "A").length;
+          return [s.name, c ? `${c.group}부` : "", c ? `${c.grade}학년` : "", c ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a))];
+        }),
+      ]),
+    );
+  };
   return (
     <Page title="학생 출석 통계" sub="주간·월간·연간 출석 통계와 추세를 확인합니다">
       <div className="row between wrap g12">
@@ -179,7 +190,7 @@ export function Stats() {
           <Seg value={tab} options={[["week", "주간"], ["month", "월간"], ["year", "연간"]] as const} onChange={setTab} />
           <strong className="t-lg b">{title}</strong>
         </div>
-        <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />Excel 다운로드</Button>
+        <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />학생별 출결 Excel 다운로드</Button>
       </div>
       <div className="grid split">
         <section className="panel">

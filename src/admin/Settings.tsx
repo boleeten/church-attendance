@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
-import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, toCSV, yearSundays } from "../lib/stats";
+import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
 import { canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
 import type { Data, Mark, Role, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, Modal, Note, Switch } from "../ui";
@@ -45,14 +45,13 @@ export function Sheets() {
     <>
       <tr className="group">
         <td colSpan={2}><span className="row g8">{title}{badge && <Badge tone="warning">관리자 전용</Badge>}</span></td>
-        <td colSpan={2} className="muted t-xs" style={{ fontWeight: 400 }}>Google Sheets 연결 후 열 수 있습니다</td>
+        <td className="muted t-xs" style={{ fontWeight: 400 }}>Google Sheets 연결 후 열 수 있습니다</td>
       </tr>
       {defs.map((def, i) => (
         <tr key={def.name}>
           <td>{i + 1}. {def.name}</td>
           <td className="num">{(def.rows(d).length - 1).toLocaleString()}</td>
           <td className="muted">{fmtRelDay(s.sheetLastSuccess)}</td>
-          <td><Button variant="outline" size="s" onClick={() => download(`${def.name}.csv`, toCSV(def.rows(d)))}>CSV 받기</Button></td>
         </tr>
       ))}
     </>
@@ -65,10 +64,9 @@ export function Sheets() {
           <div className="row g8"><strong className="t-lg b">{y} 초등부 Google Sheets</strong><Badge tone="warning">연결 필요</Badge></div>
           <span className="muted">파일 2개(교사 공유용 출석대장 · 관리자 전용 관리자료) · 마지막 동기화 {fmtRelDay(s.sheetLastSuccess)}</span>
         </div>
-        <Button variant="outline" onClick={() => [...SHARED, ...PRIVATE].forEach((def, i) => setTimeout(() => download(`${def.name}.csv`, toCSV(def.rows(d))), i * 250))}><Icon name="download" size={16} />Excel 다운로드 (전체)</Button>
         <Button onClick={sync}>수동 동기화</Button>
       </section>
-      <Note warm icon="warning">아직 Google Sheets와 연결되지 않았습니다. 자동 동기화는 Google 서비스 계정과 서버 함수 설정이 끝난 뒤 동작하며, 그 전에는 아래에서 각 시트를 CSV(Excel에서 열림)로 내려받을 수 있습니다.</Note>
+      <Note warm icon="warning">아직 Google Sheets와 연결되지 않았습니다. 자동 동기화는 Google 서비스 계정과 서버 함수 설정이 끝난 뒤 동작합니다. 그 전에는 학생 관리·학생 출석 통계·심방노트 관리·교사 출결현황 화면의 Excel 다운로드를 이용해 주세요.</Note>
       <div className="grid cols-3">
         <Kpi label="마지막 동기화 성공" value={fmtRelDay(s.sheetLastSuccess)} sub={`시트 ${SHARED.length + PRIVATE.length}개`} icon="cloud" tone="success" />
         <Kpi label="마지막 동기화 실패" value={fmtRelDay(s.sheetLastFail)} sub="실패 시 자동으로 다시 시도합니다" icon="warning" tone="error" />
@@ -79,7 +77,7 @@ export function Sheets() {
           <div className="row between"><h2>시트 구성</h2><span className="muted">파일 2개 · 시트 {SHARED.length + PRIVATE.length}개</span></div>
           <div className="tablewrap">
             <table className="tbl">
-              <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th><th /></tr></thead>
+              <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th></tr></thead>
               <tbody>
                 {group(`교사 공유용 · ${y} 초등부 출석대장`, false, SHARED)}
                 {group(`관리자 전용 · ${y} 초등부 관리자료`, true, PRIVATE)}
