@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { addClass, deleteClass, canManageAccount, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { addClass, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -545,6 +545,122 @@ function TeacherForm({ user, onClose, onTemp }: { user: User | null; onClose: ()
   );
 }
 
+
+// ───────── 교사 일괄 등록 (CSV) ─────────
+type TeacherRow = { line: number; name: string; loginId: string; group: 1 | 2 | null; head: boolean; classId: string | null; kind: "담임" | "보조"; error: string | null };
+const TEACHER_TEMPLATE = [
+  ["이름", "아이디", "소속", "구분", "담당 반", "담당 구분"],
+  ["홍길동", "hong_gd01", "1부", "교사", "4-1", "담임"],
+  ["김보조", "kim_bj02", "1부", "교사", "4-1", "보조"],
+  ["박부장", "park_bj03", "2부", "부장교사", "", ""],
+];
+
+function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
+  const seenIds = new Set<string>();
+  const homeroomTaken = new Map<string, string>(); // 반 → 담임 이름 (기존 + 파일 안)
+  for (const a of d.assignments.filter((x) => x.kind === "담임")) homeroomTaken.set(a.classId, d.users.find((u) => u.id === a.userId)?.name ?? "기존 교사");
+  return lines
+    .map((cols, i) => ({ cols: cols.map((c) => (c ?? "").trim()), line: i + 2 }))
+    .filter(({ cols }) => cols.some(Boolean))
+    .map(({ cols: [name, id, g, role, cls, kindText], line }) => {
+      const loginId = (id ?? "").toLowerCase();
+      const gn = Number(String(g ?? "").replace(/[^0-9]/g, ""));
+      const group = gn === 1 || gn === 2 ? gn : null;
+      const head = /부장/.test(role ?? "");
+      const kind: "담임" | "보조" = /보조/.test(kindText ?? "") ? "보조" : "담임";
+      let classId: string | null = null;
+      let error: string | null = null;
+      const nums = (cls ?? "").match(/\d+/g);
+      if (!name) error = "이름이 없습니다";
+      else if (!/^[a-z0-9_]{4,20}$/.test(loginId)) error = "아이디는 영문 소문자·숫자·밑줄 4~20자";
+      else if (seenIds.has(loginId)) error = "파일 안에서 아이디가 중복됩니다";
+      else if (d.users.some((u) => u.loginId === loginId)) error = "이미 사용 중인 아이디입니다";
+      else if (!group) error = "소속은 1부 또는 2부로 적어 주세요";
+      else if (cls && !head) {
+        const c = nums && nums.length >= 2 ? d.classes.find((x) => x.group === group && x.grade === Number(nums[0]) && x.no === Number(nums[1])) : undefined;
+        if (!c) error = `${group}부에 '${cls}' 반이 없습니다`;
+        else if (kind === "담임" && homeroomTaken.has(c.id)) error = `${classShort(c)}에 이미 담임(${homeroomTaken.get(c.id)})이 있습니다. '보조'로 적어 주세요`;
+        else {
+          classId = c.id;
+          if (kind === "담임") homeroomTaken.set(c.id, name);
+        }
+      }
+      seenIds.add(loginId);
+      return { line, name: name ?? "", loginId, group, head, classId, kind, error };
+    });
+}
+
+function TeacherImportModal({ rows, onClose }: { rows: TeacherRow[]; onClose: () => void }) {
+  const d = useData();
+  const ok = rows.filter((r) => !r.error);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(0);
+  const [result, setResult] = useState<{ created: { name: string; loginId: string; pw: string }[]; failed: { name: string; reason: string }[] } | null>(null);
+  const run = async () => {
+    setBusy(true);
+    const created: { name: string; loginId: string; pw: string }[] = [];
+    const failed: { name: string; reason: string }[] = [];
+    for (const r of ok) {
+      const res = await upsertUser({ name: r.name, loginId: r.loginId, group: r.group, roles: [r.head ? "head" : "teacher"] });
+      if (typeof res === "string" || !res) failed.push({ name: r.name, reason: typeof res === "string" ? res : "알 수 없는 오류" });
+      else {
+        created.push({ name: r.name, loginId: r.loginId, pw: res.tempPassword });
+        const u = getData().users.find((x) => x.loginId === r.loginId);
+        if (u && r.classId) {
+          const cur = getData().assignments.filter((a) => a.classId === r.classId && a.kind === r.kind).map((a) => a.userId);
+          setAssignment(r.classId, r.kind, r.kind === "담임" ? [u.id] : [...cur, u.id]);
+        }
+      }
+      setDone((n) => n + 1);
+    }
+    setBusy(false);
+    setResult({ created, failed });
+  };
+  const samePw = result && result.created.length > 0 && result.created.every((c) => c.pw === result.created[0].pw) ? result.created[0].pw : null;
+  if (result)
+    return (
+      <Modal title="교사 일괄 등록 결과" onClose={onClose} wide footer={<>
+        {result.created.length > 0 && <Button variant="outline" onClick={() => download(`교사_계정_${new Date().toISOString().slice(0, 10)}.csv`, toCSV([["이름", "아이디", "임시 비밀번호"], ...result.created.map((c) => [c.name, c.loginId, c.pw])]))}><Icon name="download" size={14} />계정 목록 받기</Button>}
+        <Button onClick={onClose}>확인</Button>
+      </>}>
+        <div className="row g8"><Badge tone="success">등록 {result.created.length}명</Badge>{result.failed.length > 0 && <Badge tone="error">실패 {result.failed.length}명</Badge>}</div>
+        {samePw && <div className="card pad row between"><span className="muted">임시 비밀번호 (모든 계정 공통)</span><strong className="t-lg b num">{samePw}</strong></div>}
+        {result.failed.length > 0 && <ul className="col g4 t-xs c-error" style={{ margin: 0, paddingLeft: 18 }}>{result.failed.map((f) => <li key={f.name}>{f.name}: {f.reason}</li>)}</ul>}
+        <Note>각 교사는 첫 로그인 때 비밀번호를 바꿔야 합니다. {samePw ? "" : "계정마다 임시 비밀번호가 다르니 '계정 목록 받기'로 받아 전달해 주세요. "}담당 반을 적은 교사는 그 반에 바로 배정했습니다.</Note>
+      </Modal>
+    );
+  return (
+    <Modal title="교사 일괄 등록" onClose={() => !busy && onClose()} wide footer={<>
+      <Button variant="outline" disabled={busy} onClick={onClose}>취소</Button>
+      <Button disabled={busy || !ok.length} onClick={run}>{busy ? `등록 중… ${done}/${ok.length}` : `${ok.length}명 등록`}</Button>
+    </>}>
+      <div className="row g8"><Badge tone="success">등록 가능 {ok.length}명</Badge>{rows.length - ok.length > 0 && <Badge tone="error">확인 필요 {rows.length - ok.length}명 (등록 안 함)</Badge>}</div>
+      <div className="tablewrap" style={{ maxHeight: 360, overflow: "auto" }}>
+        <table className="tbl">
+          <thead><tr><th>줄</th><th>이름</th><th>아이디</th><th>소속</th><th>구분</th><th>담당 반</th><th>확인</th></tr></thead>
+          <tbody>
+            {rows.map((r) => {
+              const c = r.classId ? d.classes.find((x) => x.id === r.classId) : undefined;
+              return (
+                <tr key={r.line}>
+                  <td className="muted num">{r.line}</td>
+                  <td className="sb">{r.name || "-"}</td>
+                  <td className="muted">{r.loginId || "-"}</td>
+                  <td>{r.group ? `${r.group}부` : "-"}</td>
+                  <td>{r.head ? "부장교사" : "교사"}</td>
+                  <td>{c ? `${classShort(c)} ${r.kind}` : "-"}</td>
+                  <td>{r.error ? <span className="t-xs c-error">{r.error}</span> : <Badge tone="success">OK</Badge>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Note>'확인 필요' 줄은 등록하지 않습니다. 파일을 고쳐 다시 올리면 됩니다. 새 계정은 첫 로그인 때 비밀번호를 바꿔야 하며, 관리자 권한은 등록 후 '관리자 계정 관리'에서 따로 줍니다.</Note>
+    </Modal>
+  );
+}
+
 export function Teachers() {
   const d = useData();
   const me = useMe()!;
@@ -553,6 +669,14 @@ export function Teachers() {
   const [role, setRole] = useState("");
   const [edit, setEdit] = useState<User | null | "new">(null);
   const [temp, setTemp] = useState<{ id: string; pw: string } | null>(null);
+  const [importRows, setImportRows] = useState<TeacherRow[] | null>(null);
+  const teacherFile = useRef<HTMLInputElement>(null);
+  const readTeacherCsv = async (f: File) => {
+    if (!/\.csv$/i.test(f.name)) return toast("CSV 파일만 올릴 수 있습니다. Excel에서 '다른 이름으로 저장 → CSV UTF-8'로 저장해 주세요.", "error");
+    const rows = parseTeacherRows(d, parseCSV(await f.text()).slice(1));
+    if (!rows.length) return toast("등록할 교사가 없습니다. 양식의 둘째 줄부터 적어 주세요.", "error");
+    setImportRows(rows);
+  };
   const list = d.users
     .filter((u) => u.roles.includes("teacher") || u.roles.includes("head"))
     .filter((u) => (!q.trim() || u.name.includes(q.trim()) || u.loginId.includes(q.trim())) && (!group || String(u.group) === group) && (!role || u.roles.includes(role as Role)))
@@ -570,7 +694,10 @@ export function Teachers() {
           <div className="input m grow" style={{ minWidth: 220 }}><Icon name="search" size={18} /><input placeholder="교사 이름, 아이디 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 검색" /></div>
           <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
           <SelectBox label="역할" value={role} onChange={setRole}><option value="">역할: 전체</option><option value="teacher">교사</option><option value="head">부장교사</option><option value="admin">일반 관리자</option><option value="super">최고 관리자</option></SelectBox>
+          <button type="button" className="link" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}>양식 받기</button>
+          <Button variant="secondary" onClick={() => teacherFile.current?.click()}>Excel/CSV 일괄 등록</Button>
           <Button onClick={() => setEdit("new")}><Icon name="plus" size={16} />교사 등록</Button>
+          <input ref={teacherFile} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void readTeacherCsv(f); e.target.value = ""; }} />
         </div>
         <div className="tablewrap">
           <table className="tbl">
@@ -602,6 +729,7 @@ export function Teachers() {
       </section>
       {edit && <TeacherForm user={edit === "new" ? null : edit} onClose={() => setEdit(null)} onTemp={(id, pw) => setTemp({ id, pw })} />}
       {temp && <TempPasswordModal loginId={temp.id} password={temp.pw} onClose={() => setTemp(null)} />}
+      {importRows && <TeacherImportModal rows={importRows} onClose={() => setImportRows(null)} />}
     </Page>
   );
 }
