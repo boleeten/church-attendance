@@ -457,28 +457,6 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
   );
 }
 
-/** 부마다 하나 있는 장결자반 카드. 교사 배정 없이 상태가 '장결자'인 학생을 모아 보여 준다. */
-function LongClassCard({ g }: { g: 1 | 2 }) {
-  const d = useData();
-  const list = d.students.filter((s) => s.status === "장결자" && d.classes.find((c) => c.id === s.classId)?.group === g).sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  return (
-    <section className="col g12">
-      <h2 className="t-base b">장결자반</h2>
-      <div className="class-card long-card">
-        <div className="row between">
-          <strong className="t-base b">{longLabel(g)}</strong>
-          <Badge tone="warning">{list.length}명</Badge>
-        </div>
-        <span className="t-xs muted">교사 배정 없음 · 출석체크·출석률에서 제외 · 학생 상태를 '장결자'로 바꾸면 이 반으로 옮겨집니다</span>
-        {list.length > 0 ? (
-          <div className="row g6 wrap">{list.map((s) => { const c = d.classes.find((x) => x.id === s.classId); return <span key={s.id} className="long-chip">{s.name}{c && <span className="muted"> · 원래 {classShort(c)}</span>}</span>; })}</div>
-        ) : <span className="t-xs muted">장결자 학생이 없습니다.</span>}
-        <div className="row g8"><Link to={`/admin/students?class=${longClassId(g)}`} className="btn secondary s">학생 보기·복귀</Link></div>
-      </div>
-    </section>
-  );
-}
-
 export function Classes() {
   const d = useData();
   const [g, setG] = useState<"1" | "2">("1");
@@ -540,7 +518,6 @@ export function Classes() {
           </div>
         </section>
       ))}
-      <LongClassCard g={group} />
       </div>
       {assign && <AssignModal cls={assign} onClose={() => setAssign(null)} />}
       {adding && (
