@@ -241,14 +241,14 @@ export function Accounts() {
   const candidates = d.users.filter((u) => !u.roles.includes("admin") && !u.roles.includes("super") && u.active);
   const isSuper = me.roles.includes("super");
   const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화"].includes(a.type)).slice(0, 30);
-  const doReset = (u: User) => {
+  const doReset = async (u: User) => {
     if (!window.confirm(`${u.name}(${u.loginId}) 계정의 비밀번호를 초기화할까요?`)) return;
-    const r = resetPassword(u.id);
+    const r = await resetPassword(u.id);
     if (typeof r === "string") toast(r, "error");
     else setTemp({ id: u.loginId, pw: r.tempPassword });
   };
-  const setRoles = (u: User, roles: Role[], extra: Partial<User> = {}) => {
-    const r = upsertUser({ ...u, ...extra, roles });
+  const setRoles = async (u: User, roles: Role[], extra: Partial<User> = {}) => {
+    const r = await upsertUser({ ...u, ...extra, roles });
     if (typeof r === "string") toast(r, "error");
   };
   return (

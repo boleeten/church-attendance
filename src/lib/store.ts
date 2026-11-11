@@ -395,7 +395,7 @@ export function setAssignment(classId: string, kind: AssignKind, userIds: string
   emit();
 }
 
-export function upsertUser(u: Partial<User> & { name: string; loginId: string; roles: Role[]; group: 1 | 2 | null }): string | { tempPassword: string } | null {
+export async function upsertUser(u: Partial<User> & { name: string; loginId: string; roles: Role[]; group: 1 | 2 | null }): Promise<string | { tempPassword: string } | null> {
   if (u.id) {
     const cur = data.users.find((x) => x.id === u.id)!;
     if (data.users.some((x) => x.loginId === u.loginId && x.id !== u.id)) return "이미 사용 중인 아이디입니다.";
@@ -406,8 +406,16 @@ export function upsertUser(u: Partial<User> & { name: string; loginId: string; r
     emit();
     return null;
   }
-  if (remoteEnabled) return "실제 DB 모드에서는 계정 생성이 서버 함수(Edge Function)를 통해 이뤄져야 합니다. README의 안내를 확인해 주세요.";
   if (data.users.some((x) => x.loginId === u.loginId)) return "이미 사용 중인 아이디입니다.";
+  if (remoteEnabled) {
+    const r = await remote.adminUsers<{ user: Record<string, unknown>; tempPassword: string }>({ action: "create", loginId: u.loginId, name: u.name, group: u.group, roles: u.roles });
+    if (typeof r === "string") return r;
+    const p = r.user;
+    data.users.push({ id: String(p.id), loginId: String(p.login_id), name: String(p.name), roles: p.roles as Role[], group: (p.group as 1 | 2 | null) ?? null, password: "", active: true, mustChangePassword: true, pushAllowed: false });
+    audit("계정 등록", `${u.name} (${u.loginId})`, "-", "임시 비밀번호 발급");
+    emit();
+    return { tempPassword: r.tempPassword };
+  }
   const row: User = { id: "u_" + uid(), password: TEMP_PASSWORD, active: true, mustChangePassword: true, pushAllowed: false, ...u } as User;
   data.users.push(row);
   audit("계정 등록", `${row.name} (${row.loginId})`, "-", "임시 비밀번호 발급");
@@ -431,12 +439,19 @@ export function canManageAccount(actor: User, target: User): boolean {
   return actor.roles.includes("super") || actor.roles.includes("admin");
 }
 
-export function resetPassword(targetId: string): string | { tempPassword: string } {
+export async function resetPassword(targetId: string): Promise<string | { tempPassword: string }> {
   const actor = me();
   const t = data.users.find((x) => x.id === targetId);
   if (!actor || !t) return "대상을 찾을 수 없습니다.";
   if (!canResetPassword(actor, t)) return "이 계정의 비밀번호를 초기화할 권한이 없습니다.";
-  if (remoteEnabled) return "실제 DB 모드에서는 비밀번호 초기화가 서버 함수(Edge Function)를 통해 이뤄져야 합니다. README의 안내를 확인해 주세요.";
+  if (remoteEnabled) {
+    const r = await remote.adminUsers<{ tempPassword: string }>({ action: "reset", userId: t.id });
+    if (typeof r === "string") return r;
+    t.mustChangePassword = true;
+    audit("비밀번호 초기화", t.loginId, "-", "임시 비밀번호 발급");
+    emit();
+    return { tempPassword: r.tempPassword };
+  }
   const temp = "tmp" + Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10);
   t.password = temp;
   t.mustChangePassword = true;

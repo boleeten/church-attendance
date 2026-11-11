@@ -509,18 +509,21 @@ function TeacherForm({ user, onClose, onTemp }: { user: User | null; onClose: ()
   const [group, setGroup] = useState(String(user?.group ?? 1));
   const [head, setHead] = useState(user?.roles.includes("head") ?? false);
   const [err, setErr] = useState("");
-  const save = () => {
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
     if (!name.trim() || !/^[a-z0-9_]{4,20}$/.test(loginId)) return setErr("이름과 아이디(영문 소문자·숫자·밑줄 4~20자)를 확인해 주세요.");
     const keep = (user?.roles ?? []).filter((r) => r !== "teacher" && r !== "head");
     const roles: Role[] = [...keep, ...(head ? (["head"] as Role[]) : (["teacher"] as Role[]))];
-    const r = upsertUser({ id: user?.id, name: name.trim(), loginId, group: Number(group) as 1 | 2, roles });
+    setBusy(true);
+    const r = await upsertUser({ id: user?.id, name: name.trim(), loginId, group: Number(group) as 1 | 2, roles });
+    setBusy(false);
     if (typeof r === "string") return setErr(r);
     toast(user ? "교사 정보를 수정했습니다." : "교사를 등록했습니다.");
     onClose();
     if (r) onTemp(loginId, r.tempPassword);
   };
   return (
-    <Modal title={user ? "교사 정보 수정" : "교사 등록"} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={save}>저장</Button></>}>
+    <Modal title={user ? "교사 정보 수정" : "교사 등록"} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button disabled={busy} onClick={save}>{busy ? "저장 중…" : "저장"}</Button></>}>
       <div className="field"><label>이름</label><div className="input m"><input value={name} onChange={(e) => setName(e.target.value)} aria-label="이름" /></div></div>
       <div className="field"><label>아이디</label><div className="input m"><input value={loginId} onChange={(e) => setLoginId(e.target.value.toLowerCase())} placeholder="teacher_hong01" aria-label="아이디" /></div></div>
       <div className="grid cols-2" style={{ gap: 12 }}>
@@ -545,9 +548,9 @@ export function Teachers() {
     .filter((u) => u.roles.includes("teacher") || u.roles.includes("head"))
     .filter((u) => (!q.trim() || u.name.includes(q.trim()) || u.loginId.includes(q.trim())) && (!group || String(u.group) === group) && (!role || u.roles.includes(role as Role)))
     .sort((a, b) => (a.group ?? 9) - (b.group ?? 9) || Number(b.roles.includes("head")) - Number(a.roles.includes("head")) || a.name.localeCompare(b.name, "ko"));
-  const doReset = (u: User) => {
+  const doReset = async (u: User) => {
     if (!window.confirm(`${u.name}(${u.loginId}) 계정의 비밀번호를 초기화할까요?`)) return;
-    const r = resetPassword(u.id);
+    const r = await resetPassword(u.id);
     if (typeof r === "string") toast(r, "error");
     else setTemp({ id: u.loginId, pw: r.tempPassword });
   };

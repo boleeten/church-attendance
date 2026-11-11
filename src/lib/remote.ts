@@ -132,6 +132,19 @@ export const remote = {
       toast("기기 푸시 발송에 실패했습니다. 앱 안의 알림 목록에는 표시됩니다.", "error");
     }
   },
+  /** 계정 생성·비밀번호 초기화는 secret 키가 필요해 서버 함수(api/admin-users.js)가 처리한다. */
+  async adminUsers<T>(payload: Record<string, unknown>): Promise<T | string> {
+    const { data } = await sb!.auth.getSession();
+    if (!data.session) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+    try {
+      const r = await fetch("/api/admin-users", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify(payload) });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) return json.error ?? `서버 오류가 났습니다. (${r.status})`;
+      return json as T;
+    } catch {
+      return "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
+    }
+  },
   async signOut() {
     await sb?.auth.signOut();
   },
