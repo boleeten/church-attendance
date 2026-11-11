@@ -12,13 +12,25 @@ let userId: string | null = localStorage.getItem(SESSION_KEY);
 let version = 0;
 const listeners = new Set<() => void>();
 
+/** 알림은 1개월이 지나면 목록에서 뺀다. (DB에서는 매주 서버 작업이 지운다: api/push-reminders.js) */
+export function notifCutoff(): number {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return d.getTime();
+}
+function pruneNotifications(d: Data): Data {
+  const cut = notifCutoff();
+  d.notifications = d.notifications.filter((n) => new Date(n.createdAt).getTime() >= cut);
+  return d;
+}
+
 function load(): Data {
   if (remoteEnabled) return emptyData();
   try {
     const raw = localStorage.getItem(DATA_KEY);
     if (raw) {
       const d = JSON.parse(raw) as Data;
-      if (d.version === 1) return d;
+      if (d.version === 1) return pruneNotifications(d);
     }
   } catch {
     /* 손상된 저장값은 무시하고 새로 만든다 */
@@ -88,7 +100,7 @@ export async function login(loginId: string, password: string): Promise<string |
   if (remoteEnabled) {
     const res = await remote.signIn(loginId.trim(), password);
     if (typeof res === "string") return res;
-    data = res.data;
+    data = pruneNotifications(res.data);
     userId = res.userId;
     localStorage.setItem(SESSION_KEY, userId);
     emit();
@@ -108,7 +120,7 @@ export async function restoreSession(): Promise<void> {
   if (!remoteEnabled) return;
   const res = await remote.restore();
   if (res) {
-    data = res.data;
+    data = pruneNotifications(res.data);
     userId = res.userId;
   } else {
     userId = null;

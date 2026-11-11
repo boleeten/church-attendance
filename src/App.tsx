@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AdminApp from "./admin/AdminApp";
 import { remoteEnabled } from "./lib/remote";
-import { useMe } from "./lib/store";
+import { syncAppBadge } from "./lib/push";
+import { useData, useMe } from "./lib/store";
 import type { Role } from "./lib/types";
 import { AttendanceCheck } from "./mobile/Attendance";
 import { ForcedPassword, Login } from "./mobile/Auth";
@@ -28,6 +29,17 @@ function Root() {
 
 export default function App() {
   const u = useMe();
+  const d = useData();
+  const unread = u ? d.notifications.filter((n) => n.userId === u.id && !n.read).length : 0;
+  // 홈 화면 아이콘 숫자를 안 읽은 알림 수에 맞춘다 (모두 읽으면 숫자와 알림 센터의 알림을 지움)
+  useEffect(() => {
+    if (!u) return;
+    void syncAppBadge(unread);
+    // 앱을 다시 열어 화면에 돌아올 때도 맞춘다 (그 사이 푸시가 와서 숫자가 바뀌었을 수 있음)
+    const onShow = () => document.visibilityState === "visible" && void syncAppBadge(unread);
+    document.addEventListener("visibilitychange", onShow);
+    return () => document.removeEventListener("visibilitychange", onShow);
+  }, [u, unread]);
   const T = (el: ReactNode) => <Guard roles={["teacher"]}>{el}</Guard>;
   const H = (el: ReactNode) => <Guard roles={["head"]}>{el}</Guard>;
   return (

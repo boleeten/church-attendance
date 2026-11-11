@@ -91,6 +91,13 @@ export default async function handler(req, res) {
     if (!ok) return res.status(401).json({ error: "권한이 없습니다." });
   }
 
+  // 매주 자동 실행 때 1개월이 지난 알림은 DB에서 지운다 (앱 목록에서는 이미 숨겨짐)
+  if (isCron) {
+    const cut = new Date();
+    cut.setMonth(cut.getMonth() - 1);
+    await sb.from("notifications").delete().lt("created_at", cut.toISOString());
+  }
+
   const date = body.date || currentSundayKST();
   const mode = isCron ? "자동" : "수동";
 

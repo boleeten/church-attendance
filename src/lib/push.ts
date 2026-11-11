@@ -56,3 +56,24 @@ export async function sendTestNotification(url: string): Promise<{ ok: boolean; 
   });
   return { ok: true, message: "테스트 알림을 보냈습니다. 화면 위쪽이나 알림 센터를 확인해 주세요." };
 }
+
+type BadgeNavigator = Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+
+/**
+ * 홈 화면 아이콘의 숫자 배지를 앱 안의 '안 읽은 알림' 수에 맞춘다.
+ * 모두 읽었으면 배지를 지우고, 알림 센터(상태바)에 남아 있는 이 앱의 알림도 닫는다.
+ * (안드로이드는 알림 센터에 남은 알림 수를 아이콘 숫자로 보여 주기 때문에 이것까지 닫아야 숫자가 사라진다.)
+ */
+export async function syncAppBadge(unread: number) {
+  try {
+    const nav = navigator as BadgeNavigator;
+    if (unread > 0) await nav.setAppBadge?.(unread);
+    else await nav.clearAppBadge?.();
+    if (unread === 0 && "serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      for (const n of (await reg?.getNotifications()) ?? []) n.close();
+    }
+  } catch {
+    /* 배지를 지원하지 않는 기기는 무시 */
+  }
+}
