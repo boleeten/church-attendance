@@ -97,11 +97,11 @@ export function Dashboard() {
       <div className="grid cols-2">
         <section className="panel">
           <div className="row between"><h2>학생 출석현황</h2><Badge tone="success">실시간</Badge></div>
-          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={incompleteClasses(d, date, g).length > 0} />)}
+          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={false} />)}
         </section>
         <section className="panel">
           <div className="row between"><h2>교사 출석현황</h2><Badge tone="success">실시간</Badge></div>
-          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={!d.sessions[`${date}|group:${g}`]?.completed} />)}
+          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={false} />)}
         </section>
       </div>
       <div className="grid split">
