@@ -65,34 +65,37 @@ async function loadAll(): Promise<Data> {
   };
 }
 
+// 서버 쓰기는 보낸 순서대로 하나씩 처리한다.
+// 동시에 보내면 "기존 배정 지우기"가 "새 배정 저장"보다 늦게 도착해 방금 저장한 줄을 지우는 일이 생긴다.
+let writes: Promise<unknown> = Promise.resolve();
+type Res = PromiseLike<{ error: { message: string } | null }>;
+function queue(table: string, run: () => Res) {
+  writes = writes.then(async () => {
+    const { error } = await run();
+    if (error) fail(table, error.message);
+  }).catch(() => undefined);
+}
+/** 대기 중인 서버 쓰기가 모두 끝날 때까지 기다린다 */
+export const flushWrites = () => writes;
+
 export const remote = {
   upsert(table: string, row: object) {
     if (!sb) return;
-    sb.from(table)
-      .upsert(mapKeys(row as Record<string, unknown>, snake))
-      .then(({ error }) => error && fail(table, error.message));
+    queue(table, () => sb!.from(table).upsert(mapKeys(row as Record<string, unknown>, snake)));
   },
   /** 새 줄만 추가한다. 본인이 읽을 권한이 없는 테이블(감사 로그)은 upsert 대신 이것을 쓴다. */
   insert(table: string, row: object) {
     if (!sb) return;
-    sb.from(table)
-      .insert(mapKeys(row as Record<string, unknown>, snake))
-      .then(({ error }) => error && fail(table, error.message));
+    queue(table, () => sb!.from(table).insert(mapKeys(row as Record<string, unknown>, snake)));
   },
   /** 이미 있는 줄을 고친다. 추가 권한이 없는 사용자(교사의 프로필·알림·학생 사진)는 upsert 대신 이것을 쓴다. */
   update(table: string, match: Record<string, unknown>, row: object) {
     if (!sb) return;
-    sb.from(table)
-      .update(mapKeys(row as Record<string, unknown>, snake))
-      .match(mapKeys(match, snake))
-      .then(({ error }) => error && fail(table, error.message));
+    queue(table, () => sb!.from(table).update(mapKeys(row as Record<string, unknown>, snake)).match(mapKeys(match, snake)));
   },
   remove(table: string, match: Record<string, unknown>) {
     if (!sb) return;
-    sb.from(table)
-      .delete()
-      .match(mapKeys(match, snake))
-      .then(({ error }) => error && fail(table, error.message));
+    queue(table, () => sb!.from(table).delete().match(mapKeys(match, snake)));
   },
   async signIn(loginId: string, password: string): Promise<string | { userId: string; data: Data }> {
     const { data, error } = await sb!.auth.signInWithPassword({ email: `${loginId}@${EMAIL_DOMAIN}`, password });
@@ -159,6 +162,7 @@ export const remote = {
     }
   },
   async signOut() {
+    await writes; // 로그아웃 전에 남은 저장을 마친다
     await sb?.auth.signOut();
   },
   async changePassword(user: User, current: string, next: string): Promise<string | null> {
