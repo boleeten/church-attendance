@@ -118,7 +118,7 @@ export default function AdminApp() {
         {open && <div className="backdrop" style={{ zIndex: 39 }} onClick={() => setOpen(false)} />}
         <aside className={`sidebar ${open ? "open" : ""}`}>
           <div className="brand">
-            <span className="logo"><Icon name="check" stroke={2.6} /></span>
+            <span className="logo"><img src="/brand-flower.svg" alt="" width={43.4} height={43.4} /></span>
             <div className="col">
               <strong className="b">주님의교회 초등부</strong>
               <span className="t-xs" style={{ opacity: 0.7 }}>출석관리 Admin</span>
