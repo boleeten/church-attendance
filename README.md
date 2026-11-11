@@ -45,7 +45,7 @@ npm run build
 
 - **계정 생성·비밀번호 초기화**: `api/admin-users.js`(Vercel 서버 함수)가 처리합니다. Vercel 환경 변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`(Supabase secret 키, Production 전용)가 있어야 동작합니다. 함수는 요청한 사람이 관리자인지와 대상 계정을 다룰 권한(목사님 계정은 초기화 불가, 최고 관리자 계정은 최고 관리자만)을 먼저 확인합니다. 새 계정은 교사·부장교사 권한으로만 만들어지고, 임시 비밀번호는 Vercel 환경 변수 `TEMP_PASSWORD`가 있으면 그 값(고정), 없으면 무작위(영문 6자+숫자 4자)이고, 화면에 한 번만 보여 주며 첫 로그인 때 변경해야 합니다.
 - **푸시 알림(일요일 오후 3시)**: 코드는 들어 있습니다(`public/sw.js`, `src/lib/push.ts`, `api/push-reminders.js`, `vercel.json`의 cron). 전화번호 없이 홈 화면에 설치한 앱으로 알림이 갑니다. 동작하려면 Supabase 연결 후 Vercel 환경 변수에 `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`(`npx web-push generate-vapid-keys`로 생성), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`을 넣어야 합니다. 예약 시각은 `vercel.json`의 cron(일요일 06:00 UTC = 한국 15:00)으로 고정이며, 관리자 화면의 발송 시간 설정과는 아직 연결되지 않았습니다. 실제 키로 발송해 본 적은 없습니다.
-- **Google Sheets 동기화**: Google 서비스 계정과 서버 함수가 필요합니다. 교사 공유용 출석대장(시트 7개)과 관리자 전용 파일(연락처, 심방노트) 두 개로 나눠 동기화하도록 설계되어 있고, 지금은 각 시트를 CSV로 내려받을 수 있습니다.
+- **Google Sheets 동기화**: `api/sheets-sync.js`가 처리합니다. 관리자 화면 Google Sheets에서 교사 공유용 출석대장(시트 7개)과 관리자 전용 파일(연락처, 심방노트) 링크를 지정하고 **수동 동기화**를 누르면, 각 시트 내용을 지우고 앱 데이터로 새로 씁니다. Vercel 환경 변수 `GOOGLE_SERVICE_ACCOUNT_JSON`(Google Cloud 서비스 계정 키 JSON 전체, Sheets API 사용 설정)이 필요하고, 각 시트를 서비스 계정 이메일에 편집자로 공유해야 합니다. 자동(정기) 동기화는 아직 없습니다.
 
 ## 학생 사진 저장 정책
 

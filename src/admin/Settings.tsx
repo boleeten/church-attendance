@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
-import { remoteEnabled, toast } from "../lib/remote";
+import { remote, remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
 import { canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
 import type { Data, Mark, Role, User } from "../lib/types";
@@ -30,28 +30,74 @@ const SHARED: SheetDef[] = [
 ];
 const PRIVATE: SheetDef[] = [
   { name: "학생·보호자 연락처", rows: (d) => [["이름", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ...d.students.map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", s.phone, s.guardianPhone, s.guardianRel]; })] },
-  { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt)]; })] },
+  { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""]; })] },
 ];
+
+/** 구글 시트 링크나 ID에서 파일 ID만 뽑는다 */
+const sheetIdOf = (v: string) => v.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/)?.[1] ?? (/^[a-zA-Z0-9_-]{20,}$/.test(v.trim()) ? v.trim() : null);
+const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
+
+function SheetFileField({ label, desc, value, onSave }: { label: string; desc: string; value: string | null | undefined; onSave: (id: string | null) => void }) {
+  const [text, setText] = useState(value ? sheetUrl(value) : "");
+  const id = sheetIdOf(text);
+  const dirty = (id ?? null) !== (value ?? null);
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <span className="t-xs muted">{desc}</span>
+      <div className="row g8">
+        <div className="input m grow"><Icon name="table" size={16} /><input value={text} onChange={(e) => setText(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" aria-label={label} /></div>
+        <Button variant={dirty ? "primary" : "outline"} disabled={!dirty || (!!text.trim() && !id)} onClick={() => { onSave(id); toast(id ? `${label} 파일을 지정했습니다.` : `${label} 파일 지정을 해제했습니다.`); }}>저장</Button>
+        {value && <a className="btn outline m" href={sheetUrl(value)} target="_blank" rel="noreferrer">열기</a>}
+      </div>
+      {!!text.trim() && !id && <span className="t-xs c-error">구글 시트 주소 형식이 아닙니다.</span>}
+    </div>
+  );
+}
 
 export function Sheets() {
   const d = useData();
   const s = d.settings;
   const y = s.year;
-  const sync = () => {
-    updateSettings({ sheetLastSuccess: new Date().toISOString(), sheetSyncCount: s.sheetSyncCount + 1 });
-    toast("동기화 기록을 남겼습니다. 실제 Google Sheets 전송은 서버 연동 후 동작합니다.");
+  const [busy, setBusy] = useState(false);
+  const [sa, setSa] = useState<{ configured: boolean; email: string | null } | null>(null);
+  useEffect(() => {
+    if (!remoteEnabled) return;
+    void remote.api<{ configured: boolean; email: string | null }>("sheets-sync", "GET").then((r) => typeof r !== "string" && setSa(r));
+  }, []);
+  const ready = remoteEnabled && !!sa?.configured && !!s.sheetSharedId;
+  const payload = (defs: SheetDef[]) => defs.map((def) => ({ title: def.name, rows: def.rows(d) }));
+  const sync = async () => {
+    if (!remoteEnabled) return toast("데모 모드에서는 구글 시트로 보내지 않습니다.");
+    if (!ready) return toast(!sa?.configured ? "서버에 Google 서비스 계정 키가 아직 설정되지 않았습니다." : "먼저 동기화할 구글 시트를 지정해 주세요.", "error");
+    setBusy(true);
+    const jobs: [string, SheetDef[]][] = [["shared", SHARED]];
+    if (s.sheetPrivateId) jobs.push(["private", PRIVATE]);
+    let err: string | null = null;
+    for (const [target, defs] of jobs) {
+      const r = await remote.api<{ ok: boolean }>("sheets-sync", "POST", { target, sheets: payload(defs) });
+      if (typeof r === "string") { err = r; break; }
+    }
+    setBusy(false);
+    const at = new Date().toISOString();
+    if (err) {
+      updateSettings({ sheetLastFail: at, sheetSyncCount: s.sheetSyncCount + 1, sheetFailCount: s.sheetFailCount + 1 });
+      return toast(err, "error");
+    }
+    updateSettings({ sheetLastSuccess: at, sheetSyncCount: s.sheetSyncCount + 1 });
+    toast(s.sheetPrivateId ? "구글 시트 2개 파일에 동기화했습니다." : "교사 공유용 출석대장에 동기화했습니다. 연락처·심방노트는 관리자 전용 파일을 지정해야 보냅니다.");
   };
-  const group = (title: string, badge: boolean, defs: SheetDef[]) => (
+  const group = (title: string, badge: boolean, defs: SheetDef[], fileId: string | null | undefined) => (
     <>
       <tr className="group">
         <td colSpan={2}><span className="row g8">{title}{badge && <Badge tone="warning">관리자 전용</Badge>}</span></td>
-        <td className="muted t-xs" style={{ fontWeight: 400 }}>Google Sheets 연결 후 열 수 있습니다</td>
+        <td className="muted t-xs" style={{ fontWeight: 400 }}>{fileId ? <a className="link" href={sheetUrl(fileId)} target="_blank" rel="noreferrer">파일 열기</a> : "파일 지정 안 됨"}</td>
       </tr>
       {defs.map((def, i) => (
         <tr key={def.name}>
           <td>{i + 1}. {def.name}</td>
           <td className="num">{(def.rows(d).length - 1).toLocaleString()}</td>
-          <td className="muted">{fmtRelDay(s.sheetLastSuccess)}</td>
+          <td className="muted">{fileId ? fmtRelDay(s.sheetLastSuccess) : "-"}</td>
         </tr>
       ))}
     </>
@@ -61,43 +107,40 @@ export function Sheets() {
       <section className="panel" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
         <span className="kpi" style={{ padding: 0, boxShadow: "none" }}><span className="ico warm" style={{ width: 56, height: 56, borderRadius: 28 }}><Icon name="cloud" size={28} /></span></span>
         <div className="col g4 grow">
-          <div className="row g8"><strong className="t-lg b">{y} 초등부 Google Sheets</strong><Badge tone="warning">연결 필요</Badge></div>
-          <span className="muted">파일 2개(교사 공유용 출석대장 · 관리자 전용 관리자료) · 마지막 동기화 {fmtRelDay(s.sheetLastSuccess)}</span>
+          <div className="row g8"><strong className="t-lg b">{y} 초등부 Google Sheets</strong>{ready ? <Badge tone="success">연결됨</Badge> : <Badge tone="warning">연결 필요</Badge>}</div>
+          <span className="muted">교사 공유용 출석대장{s.sheetPrivateId ? " · 관리자 전용 관리자료" : ""} · 마지막 동기화 {fmtRelDay(s.sheetLastSuccess)}</span>
         </div>
-        <Button onClick={sync}>수동 동기화</Button>
+        <Button disabled={busy} onClick={sync}>{busy ? "동기화 중…" : "수동 동기화"}</Button>
       </section>
-      <Note warm icon="warning">아직 Google Sheets와 연결되지 않았습니다. 자동 동기화는 Google 서비스 계정과 서버 함수 설정이 끝난 뒤 동작합니다. 그 전에는 학생 관리·학생 출석 통계·심방노트 관리·교사 출결현황 화면의 Excel 다운로드를 이용해 주세요.</Note>
+      <section className="panel">
+        <h2>동기화할 파일</h2>
+        <SheetFileField label="교사 공유용 출석대장" desc="학생·교사 명부와 출석 기록 7개 시트가 들어갑니다. 연락처와 심방노트는 들어가지 않습니다." value={s.sheetSharedId} onSave={(id) => updateSettings({ sheetSharedId: id })} />
+        <SheetFileField label="관리자 전용 관리자료" desc="학생·보호자 연락처와 심방노트가 들어갑니다. 지정하지 않으면 이 두 시트는 보내지 않습니다." value={s.sheetPrivateId} onSave={(id) => updateSettings({ sheetPrivateId: id })} />
+        {remoteEnabled && (sa?.email ? (
+          <Note icon="info">각 구글 시트의 <b>공유</b>에서 <b className="num">{sa.email}</b> 을(를) <b>편집자</b>로 추가해야 앱이 시트에 쓸 수 있습니다.</Note>
+        ) : (
+          <Note warm icon="warning">서버에 Google 서비스 계정 키(GOOGLE_SERVICE_ACCOUNT_JSON)가 아직 설정되지 않았습니다. 설정이 끝나면 여기에 시트를 공유할 이메일이 표시됩니다.</Note>
+        ))}
+        <Note warm icon="lock">학생 이름·출석이 들어가는 파일입니다. 구글 시트 공유 설정을 <b>"링크가 있는 모든 사용자"가 아니라 "제한됨"</b>으로 두고 필요한 사람만 추가하세요. 관리자 전용 파일은 교사에게 공유하지 마세요.</Note>
+      </section>
       <div className="grid cols-3">
-        <Kpi label="마지막 동기화 성공" value={fmtRelDay(s.sheetLastSuccess)} sub={`시트 ${SHARED.length + PRIVATE.length}개`} icon="cloud" tone="success" />
-        <Kpi label="마지막 동기화 실패" value={fmtRelDay(s.sheetLastFail)} sub="실패 시 자동으로 다시 시도합니다" icon="warning" tone="error" />
+        <Kpi label="마지막 동기화 성공" value={fmtRelDay(s.sheetLastSuccess)} sub={`시트 ${SHARED.length + (s.sheetPrivateId ? PRIVATE.length : 0)}개`} icon="cloud" tone="success" />
+        <Kpi label="마지막 동기화 실패" value={fmtRelDay(s.sheetLastFail)} sub="실패하면 오류 내용을 알려 드립니다" icon="warning" tone="error" />
         <Kpi label="누적 동기화" value={`${s.sheetSyncCount}회`} sub={`성공 ${s.sheetSyncCount - s.sheetFailCount} · 실패 ${s.sheetFailCount}`} icon="refresh" />
       </div>
-      <div className="grid split">
-        <section className="panel">
-          <div className="row between"><h2>시트 구성</h2><span className="muted">파일 2개 · 시트 {SHARED.length + PRIVATE.length}개</span></div>
-          <div className="tablewrap">
-            <table className="tbl">
-              <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th></tr></thead>
-              <tbody>
-                {group(`교사 공유용 · ${y} 초등부 출석대장`, false, SHARED)}
-                {group(`관리자 전용 · ${y} 초등부 관리자료`, true, PRIVATE)}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section className="panel">
-          <h2>공유 권한</h2>
-          {[
-            ["목사님", "소유자", "warning"],
-            ["최고 관리자", "편집자", "info"],
-            ["일반 관리자", "보기 전용", "neutral"],
-            ["교사 전체 (링크)", "출석대장만", "neutral"],
-          ].map(([who, perm, tone]) => (
-            <div key={who} className="row g10"><Avatar name={who} size={32} /><strong className="sb grow">{who}</strong><Badge tone={tone as "warning" | "info" | "neutral"}>{perm}</Badge></div>
-          ))}
-          <Note>앱 데이터베이스가 원본이며, 시트에서 직접 수정한 내용은 앱에 반영되지 않습니다. 전화번호·심방노트는 관리자 전용 파일에만 동기화되고, 교사 공유 링크로는 볼 수 없습니다.</Note>
-        </section>
-      </div>
+      <section className="panel">
+        <div className="row between"><h2>시트 구성</h2><span className="muted">시트 {SHARED.length + PRIVATE.length}개</span></div>
+        <div className="tablewrap">
+          <table className="tbl">
+            <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th></tr></thead>
+            <tbody>
+              {group(`교사 공유용 · ${y} 초등부 출석대장`, false, SHARED, s.sheetSharedId)}
+              {group(`관리자 전용 · ${y} 초등부 관리자료`, true, PRIVATE, s.sheetPrivateId)}
+            </tbody>
+          </table>
+        </div>
+        <Note>앱 데이터베이스가 원본입니다. 동기화할 때마다 각 시트 내용을 지우고 새로 쓰므로, 시트에서 직접 고친 내용은 사라지고 앱에도 반영되지 않습니다. 시트 탭 이름은 바꾸지 마세요.</Note>
+      </section>
     </Page>
   );
 }

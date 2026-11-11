@@ -104,6 +104,9 @@ export interface Settings {
   sheetLastFail: string | null;
   sheetSyncCount: number;
   sheetFailCount: number;
+  /** 동기화할 구글 시트 파일 ID (교사 공유용 출석대장 / 관리자 전용) */
+  sheetSharedId?: string | null;
+  sheetPrivateId?: string | null;
   lastBackup: string | null;
 }
 
