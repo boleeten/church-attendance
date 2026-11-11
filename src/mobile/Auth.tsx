@@ -13,18 +13,24 @@ const DEMO_ACCOUNTS = [
   ["pastor_han", "관리자", "목사님 · 계정 총괄", "/admin"],
 ] as const;
 
+const SAVED_ID_KEY = "ca-saved-id";
+const savedId = () => { try { return localStorage.getItem(SAVED_ID_KEY) ?? ""; } catch { return ""; } };
+
 export function Login() {
   const nav = useNavigate();
-  const [id, setId] = useState("");
+  const [id, setId] = useState(savedId);
+  const [saveId, setSaveId] = useState(() => !!savedId());
   const [pw, setPw] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (loginId: string, password: string, target?: string) => {
+  const submit = async (loginId: string, password: string, target?: string, typed = false) => {
     setBusy(true);
     const e = await login(loginId, password);
     setBusy(false);
     if (e) return setErr(e);
+    // 직접 입력해 로그인에 성공했을 때만 아이디를 기억한다 (비밀번호는 저장하지 않는다)
+    if (typed) try { if (saveId) localStorage.setItem(SAVED_ID_KEY, loginId.trim()); else localStorage.removeItem(SAVED_ID_KEY); } catch { /* 저장소를 못 쓰는 환경이면 건너뛴다 */ }
     const u = me()!;
     nav(u.mustChangePassword ? "/password" : target ?? afterLoginPath(u), { replace: true });
   };
@@ -36,7 +42,7 @@ export function Login() {
         style={{ padding: "72px 28px 32px", flex: 1 }}
         onSubmit={(e) => {
           e.preventDefault();
-          void submit(id, pw);
+          void submit(id, pw, undefined, true);
         }}
       >
         <div className="col center g16" style={{ marginBottom: 16 }}>
@@ -57,6 +63,10 @@ export function Login() {
           <label htmlFor="login-pw">비밀번호</label>
           <PasswordInput id="login-pw" label="비밀번호" autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={pw} onChange={(e) => setPw(e.target.value)} />
         </div>
+        <label className="chk" style={{ alignSelf: "flex-start" }}>
+          <input type="checkbox" checked={saveId} onChange={(e) => { setSaveId(e.target.checked); if (!e.target.checked) try { localStorage.removeItem(SAVED_ID_KEY); } catch { /* 무시 */ } }} />
+          아이디 저장
+        </label>
         {err && <p className="c-error t-xs sb" role="alert">{err}</p>}
         <Button size="l" block type="submit" disabled={busy || !id || !pw}>{busy ? "로그인 중…" : "로그인"}</Button>
         <Note>계정은 관리자가 발급합니다. 비밀번호를 잊으셨다면 부서 관리자에게 초기화를 요청해 주세요.</Note>
