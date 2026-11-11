@@ -582,8 +582,9 @@ function TeacherForm({ user, onClose, onTemp }: { user: User | null; onClose: ()
 type TeacherRow = { line: number; name: string; loginId: string; group: 1 | 2 | null; head: boolean; classId: string | null; kind: "담임" | "보조"; error: string | null };
 const TEACHER_TEMPLATE = [
   ["이름", "아이디", "소속", "구분", "담당 반", "담당 구분"],
-  ["홍길동", "hong_gd01", "1부", "교사", "4-1", "담임"],
-  ["김보조", "kim_bj02", "1부", "교사", "2부 5-1", "보조"],
+  // 담당 반은 '학년-반반'(예: 4-1반)으로 적는다. '4-1'만 적으면 Excel이 날짜(4월 1일)로 바꿔 버린다.
+  ["홍길동", "hong_gd01", "1부", "교사", "4-1반", "담임"],
+  ["김보조", "kim_bj02", "2부", "교사", "5-1반", "보조"],
   ["박부장", "park_bj03", "2부", "부장교사", "", ""],
 ];
 
@@ -602,6 +603,9 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
       const kind: "담임" | "보조" = /보조/.test(kindText ?? "") ? "보조" : "담임";
       let classId: string | null = null;
       let error: string | null = null;
+      // Excel이 '4-1'을 날짜로 바꿔 저장한 경우(2026-04-01, 4월 1일)도 학년-반으로 읽는다
+      const dateLike = (cls ?? "").match(/^\d{4}[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})\.?$/);
+      if (dateLike) cls = `${Number(dateLike[1])}-${Number(dateLike[2])}반`;
       const nums = (cls ?? "").match(/\d+/g);
       if (!name) error = "이름이 없습니다";
       else if (!/^[a-z0-9_]{4,20}$/.test(loginId)) error = "아이디는 영문 소문자·숫자·밑줄 4~20자";
@@ -609,7 +613,7 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
       else if (d.users.some((u) => u.loginId === loginId)) error = "이미 사용 중인 아이디입니다";
       else if (!group) error = "소속은 1부 또는 2부로 적어 주세요";
       else if (cls && !head) {
-        // "4-1"이면 소속 부의 반, "2부 4-1"처럼 부를 적으면 그 부의 반
+        // "4-1반"이면 소속 부의 반, "2부 4-1반"처럼 부를 적으면 그 부의 반
         const gm = (cls ?? "").match(/([12])\s*부/);
         const cg = gm ? Number(gm[1]) : group;
         const rest = gm ? (cls ?? "").replace(gm[0], "").match(/\d+/g) : nums;
