@@ -50,7 +50,7 @@ export async function sendTestNotification(url: string): Promise<{ ok: boolean; 
   await reg.showNotification("주일 출석체크 안내 (테스트)", {
     body: "알림이 정상적으로 표시됩니다. 누르면 출석체크 화면으로 이동합니다.",
     icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    badge: "/badge-96.png",
     tag: "attendance-test",
     data: { url },
   });
