@@ -2,14 +2,18 @@
 // 다른 사람의 로그인 계정을 만들거나 비밀번호를 바꾸려면 Supabase secret(service_role) 키가 필요해서
 // 브라우저가 아니라 여기서 처리한다. 요청한 사람이 관리자인지, 대상 계정을 다룰 권한이 있는지 먼저 확인한다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// 선택: TEMP_PASSWORD — 새 계정·초기화 때 쓸 고정 임시 비밀번호. 없으면 매번 무작위로 만든다.
+//       저장소가 공개되어 있으므로 값은 코드가 아니라 Vercel 환경 변수에만 둔다.
 import { randomInt } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const EMAIL_DOMAIN = "attendance.local";
 const LOGIN_ID = /^[a-z0-9_]{4,20}$/;
 
-/** 헷갈리는 글자(0/O, 1/l/I)를 뺀 임시 비밀번호. 영문 6자 + 숫자 4자 */
+/** 고정 임시 비밀번호(TEMP_PASSWORD)가 있으면 그것을, 없으면 헷갈리는 글자(0/O, 1/l/I)를 뺀 영문 6자 + 숫자 4자 */
 function tempPassword() {
+  const fixed = (process.env.TEMP_PASSWORD || "").trim();
+  if (fixed.length >= 6) return fixed;
   const letters = "abcdefghjkmnpqrstuvwxyz";
   const digits = "23456789";
   let s = "";
