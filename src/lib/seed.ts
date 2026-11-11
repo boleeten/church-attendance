@@ -66,7 +66,8 @@ export function buildSeed(): Data {
     assignments.push({ userId: u.id, classId: byGroup(2)[i].id, kind: "담임" });
   });
   const moon = mkUser("teacher_moon02", "문지영", ["teacher"], 1);
-  assignments.push({ userId: moon.id, classId: "g1-4-1", kind: "보조" }, { userId: moon.id, classId: "g1-5-2", kind: "보조" });
+  // 같은 부에서는 한 반만, 다른 부의 반은 하나 더 맡을 수 있다 (1부 4-1반 · 2부 5-2반 보조)
+  assignments.push({ userId: moon.id, classId: "g1-4-1", kind: "보조" }, { userId: moon.id, classId: "g2-5-2", kind: "보조" });
   const baek = mkUser("teacher_baek16", "백승호", ["teacher"], 1, { pushAllowed: false });
   assignments.push({ userId: baek.id, classId: "g1-6-2", kind: "보조" });
   const hwang = mkUser("teacher_hwang17", "황보람", ["teacher"], 2);
@@ -199,7 +200,7 @@ export function buildSeed(): Data {
   ];
   const audits: Data["audits"] = [
     { id: "a1", at: at(cur, "12:52"), actorId: kim.id, type: "학생 출석", target: `박지호 · ${ym(cur).m}/${ym(cur).d} 출석부`, before: "미확인", after: "결석" },
-    { id: "a2", at: at(addWeeks(cur, -1), "18:20"), actorId: "u_admin_lee01", type: "교사 배정", target: "문지영", before: "4학년 1반 보조", after: "4-1반 · 5-2반 보조" },
+    { id: "a2", at: at(addWeeks(cur, -1), "18:20"), actorId: "u_admin_lee01", type: "교사 배정", target: "문지영", before: "4학년 1반 보조", after: "1부 4-1반 · 2부 5-2반 보조" },
     { id: "a3", at: at(addWeeks(cur, -1), "09:31"), actorId: "u_admin_lee01", type: "비밀번호 초기화", target: "teacher_hong19", before: "-", after: "임시 비밀번호 발급" },
   ];
 

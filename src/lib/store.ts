@@ -4,7 +4,7 @@ import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v4";
+const DATA_KEY = "ca-demo-v5";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -412,8 +412,35 @@ export function deleteClass(classId: string): string | null {
   return null;
 }
 
-export function setAssignment(classId: string, kind: AssignKind, userIds: string[]) {
+/**
+ * 반 배정 원칙: 한 교사는 같은 부에서 반을 하나만 맡는다(담임·보조 합쳐서). 다른 부의 반은 하나 더 맡을 수 있다.
+ * 이 반과 같은 부의 다른 반을 이미 맡고 있으면 그 반을 돌려준다.
+ */
+export function sameGroupClass(userId: string, classId: string): ClassRoom | null {
+  const c = data.classes.find((x) => x.id === classId);
+  if (!c) return null;
+  const other = data.assignments.find((a) => a.userId === userId && a.classId !== classId && data.classes.find((x) => x.id === a.classId)?.group === c.group);
+  return other ? data.classes.find((x) => x.id === other.classId) ?? null : null;
+}
+
+/** 원칙을 어긴 기존 배정: 같은 부에서 반을 2개 이상 맡은 교사 */
+export function assignmentViolations(): { user: User; group: 1 | 2; classes: ClassRoom[] }[] {
+  const out: { user: User; group: 1 | 2; classes: ClassRoom[] }[] = [];
+  for (const u of data.users) {
+    for (const g of [1, 2] as const) {
+      const cls = data.classes.filter((c) => c.group === g && data.assignments.some((a) => a.userId === u.id && a.classId === c.id));
+      if (cls.length > 1) out.push({ user: u, group: g, classes: cls });
+    }
+  }
+  return out;
+}
+
+export function setAssignment(classId: string, kind: AssignKind, userIds: string[]): string | null {
   const c = data.classes.find((x) => x.id === classId)!;
+  for (const userId of userIds) {
+    const other = sameGroupClass(userId, classId);
+    if (other) return `${data.users.find((u) => u.id === userId)?.name ?? "교사"} 교사는 ${c.group}부 ${classShort(other)}을(를) 이미 맡고 있습니다. 같은 부에서는 반을 하나만 맡을 수 있습니다.`;
+  }
   const name = (ids: string[]) => ids.map((i) => data.users.find((u) => u.id === i)?.name).join(", ") || "미배정";
   const before = data.assignments.filter((a) => a.classId === classId && a.kind === kind).map((a) => a.userId);
   data.assignments = data.assignments.filter((a) => !(a.classId === classId && a.kind === kind));
@@ -425,6 +452,7 @@ export function setAssignment(classId: string, kind: AssignKind, userIds: string
   }
   audit("교사 배정", `${classLabel(c)} ${kind}`, name(before), name(userIds));
   emit();
+  return null;
 }
 
 export async function upsertUser(u: Partial<User> & { name: string; loginId: string; roles: Role[]; group: 1 | 2 | null }): Promise<string | { tempPassword: string } | null> {

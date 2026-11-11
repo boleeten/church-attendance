@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { accountClasses, accountRecords, addClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -414,21 +414,24 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
   const otherPool = all.filter((u) => u.group !== cls.group);
   const pool = [...same, ...otherPool];
   const cur = (k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cls.id && a.kind === k).map((a) => a.userId);
+  // 같은 부의 다른 반을 이미 맡은 교사는 고를 수 없다
+  const busy = (id: string) => sameGroupClass(id, cls.id);
   const [main, setMain] = useState(cur("담임")[0] ?? "");
   const [subs, setSubs] = useState<string[]>(cur("보조"));
   return (
-    <Modal title={`${classLabel(cls)} 교사 배정`} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={() => { setAssignment(cls.id, "담임", main ? [main] : []); setAssignment(cls.id, "보조", subs.filter((x) => x !== main)); toast("교사 배정을 저장했습니다."); onClose(); }}>저장</Button></>}>
+    <Modal title={`${classLabel(cls)} 교사 배정`} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={() => { const e = setAssignment(cls.id, "담임", main ? [main] : []) ?? setAssignment(cls.id, "보조", subs.filter((x) => x !== main)); if (e) return toast(e, "error"); toast("교사 배정을 저장했습니다."); onClose(); }}>저장</Button></>}>
       <div className="field"><label>담임</label>
         <SelectBox label="담임" value={main} onChange={setMain}><option value="">미배정</option>
-          <optgroup label={`${cls.group}부 교사`}>{same.map((u) => <option key={u.id} value={u.id}>{u.name} ({teacherDuty(d, u)})</option>)}</optgroup>
-          {otherPool.length > 0 && <optgroup label={`다른 부 교사`}>{otherPool.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.group}부 · {teacherDuty(d, u)})</option>)}</optgroup>}
+          <optgroup label={`${cls.group}부 교사`}>{same.map((u) => { const b = busy(u.id); return <option key={u.id} value={u.id} disabled={!!b}>{u.name} ({b ? `${classShort(b)} 배정됨` : teacherDuty(d, u)})</option>; })}</optgroup>
+          {otherPool.length > 0 && <optgroup label={`다른 부 교사`}>{otherPool.map((u) => { const b = busy(u.id); return <option key={u.id} value={u.id} disabled={!!b}>{u.name} ({u.group}부 · {b ? `이 부의 ${classShort(b)} 배정됨` : teacherDuty(d, u)})</option>; })}</optgroup>}
         </SelectBox>
       </div>
       <div className="field"><label>보조 (여러 명 선택 가능)</label>
         <div className="row wrap g8">
           {same.filter((u) => u.id !== main).map((u) => {
             const on = subs.includes(u.id);
-            return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name}</button>;
+            const b = busy(u.id);
+            return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} disabled={!!b && !on} title={b ? `${classShort(b)}을(를) 이미 맡고 있습니다` : undefined} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name}{b ? ` · ${classShort(b)}` : ""}</button>;
           })}
         </div>
         {otherPool.length > 0 && (
@@ -437,13 +440,14 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
             <div className="row wrap g8" style={{ marginTop: 8 }}>
               {otherPool.filter((u) => u.id !== main).map((u) => {
                 const on = subs.includes(u.id);
-                return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name} · {u.group}부</button>;
+                const b = busy(u.id);
+                return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} disabled={!!b && !on} title={b ? `이 부의 ${classShort(b)}을(를) 이미 맡고 있습니다` : undefined} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name} · {u.group}부{b ? ` (${classShort(b)} 배정됨)` : ""}</button>;
               })}
             </div>
           </details>
         )}
       </div>
-      <Note>한 교사가 여러 반을 맡을 수 있고, 다른 부 교사도 배정할 수 있습니다. 두 부에 반이 있는 교사는 로그인 후 1부·2부를 골라 들어갑니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
+      <Note>배정 원칙: 한 교사는 같은 부에서 반을 하나만 맡을 수 있고(담임·보조 포함), 다른 부의 반은 하나 더 맡을 수 있습니다. 보조 교사도 배정된 반의 출석체크를 할 수 있습니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
     </Modal>
   );
 }
@@ -460,6 +464,7 @@ export function Classes() {
   const full = list.filter((c) => classCount(c.id) >= c.capacity);
   const names = (cid: string, k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cid && a.kind === k).map((a) => d.users.find((u) => u.id === a.userId)?.name).filter(Boolean).join(", ") || "미배정";
   const count = (n: 1 | 2) => d.classes.filter((c) => c.group === n).length;
+  const violations = assignmentViolations();
   const removeClass = (c: ClassRoom) => {
     const members = d.students.filter((s) => s.classId === c.id).length;
     if (members) return toast(`${classLabel(c)}에 학생 ${members}명이 있어 삭제할 수 없습니다. 먼저 '학생 이동'으로 다른 반에 옮겨 주세요.`, "error");
@@ -477,6 +482,7 @@ export function Classes() {
         </div>
         <Button onClick={() => setAdding(true)}><Icon name="plus" size={16} />반 추가</Button>
       </div>
+      {violations.length > 0 && <Note warm icon="warning">배정 원칙(같은 부에서는 한 반만)에 맞지 않는 교사가 있습니다: {violations.map((v) => `${v.user.name}(${v.group}부 ${v.classes.map(classShort).join("·")})`).join(", ")}. 해당 반의 '교사 배정'에서 한 반만 남겨 주세요.</Note>}
       {full.length > 0 && <Note warm icon="warning">{full.map(classShort).join(", ")}이 정원(10명)에 도달했습니다. 학생을 추가하려면 다른 반으로 배정하세요.</Note>}
       {[4, 5, 6].map((gr) => (
         <section key={gr} className="col g12">
