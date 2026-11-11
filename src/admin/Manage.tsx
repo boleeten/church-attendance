@@ -412,7 +412,6 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
   const all = d.users.filter((u) => u.roles.includes("teacher") && u.active);
   const same = all.filter((u) => u.group === cls.group);
   const otherPool = all.filter((u) => u.group !== cls.group);
-  const pool = [...same, ...otherPool];
   const cur = (k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cls.id && a.kind === k).map((a) => a.userId);
   // 같은 부의 다른 반을 이미 맡은 교사는 고를 수 없다
   const busy = (id: string) => sameGroupClass(id, cls.id);
@@ -420,33 +419,40 @@ function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) 
   const [subs, setSubs] = useState<string[]>(cur("보조"));
   return (
     <Modal title={`${classLabel(cls)} 교사 배정`} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={() => { const e = setAssignment(cls.id, "담임", main ? [main] : []) ?? setAssignment(cls.id, "보조", subs.filter((x) => x !== main)); if (e) return toast(e, "error"); toast("교사 배정을 저장했습니다."); onClose(); }}>저장</Button></>}>
-      <div className="field"><label>담임</label>
-        <SelectBox label="담임" value={main} onChange={setMain}><option value="">미배정</option>
-          <optgroup label={`${cls.group}부 교사`}>{same.map((u) => { const b = busy(u.id); return <option key={u.id} value={u.id} disabled={!!b}>{u.name} ({b ? `${classShort(b)} 배정됨` : teacherDuty(d, u)})</option>; })}</optgroup>
-          {otherPool.length > 0 && <optgroup label={`다른 부 교사`}>{otherPool.map((u) => { const b = busy(u.id); return <option key={u.id} value={u.id} disabled={!!b}>{u.name} ({u.group}부 · {b ? `이 부의 ${classShort(b)} 배정됨` : teacherDuty(d, u)})</option>; })}</optgroup>}
-        </SelectBox>
-      </div>
-      <div className="field"><label>보조 (여러 명 선택 가능)</label>
-        <div className="row wrap g8">
-          {same.filter((u) => u.id !== main).map((u) => {
-            const on = subs.includes(u.id);
-            const b = busy(u.id);
-            return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} disabled={!!b && !on} title={b ? `${classShort(b)}을(를) 이미 맡고 있습니다` : undefined} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name}{b ? ` · ${classShort(b)}` : ""}</button>;
-          })}
-        </div>
-        {otherPool.length > 0 && (
-          <details className="col g8" open={subs.some((id) => otherPool.some((u) => u.id === id))}>
-            <summary className="t-xs sb muted" style={{ cursor: "pointer" }}>다른 부 교사 ({otherPool.length}명)</summary>
-            <div className="row wrap g8" style={{ marginTop: 8 }}>
-              {otherPool.filter((u) => u.id !== main).map((u) => {
-                const on = subs.includes(u.id);
-                const b = busy(u.id);
-                return <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} disabled={!!b && !on} title={b ? `이 부의 ${classShort(b)}을(를) 이미 맡고 있습니다` : undefined} onClick={() => setSubs(on ? subs.filter((x) => x !== u.id) : [...subs, u.id])}>{u.name} · {u.group}부{b ? ` (${classShort(b)} 배정됨)` : ""}</button>;
-              })}
-            </div>
-          </details>
-        )}
-      </div>
+      {(["담임", "보조"] as const).map((kind) => {
+        const isMain = kind === "담임";
+        const picked = (id: string) => (isMain ? main === id : subs.includes(id));
+        const toggle = (id: string) => {
+          if (isMain) {
+            setMain(main === id ? "" : id);
+            setSubs(subs.filter((x) => x !== id)); // 담임으로 고르면 보조에서는 뺀다
+          } else setSubs(subs.includes(id) ? subs.filter((x) => x !== id) : [...subs, id]);
+        };
+        const chip = (u: User) => {
+          const on = picked(u.id);
+          const b = busy(u.id);
+          const otherGroup = u.group !== cls.group;
+          return (
+            <button key={u.id} type="button" className={`chip ${on ? "on" : ""}`} aria-pressed={on} disabled={!!b && !on} title={b ? `${otherGroup ? "이 부의 " : ""}${classShort(b)}을(를) 이미 맡고 있습니다` : undefined} onClick={() => toggle(u.id)}>
+              {u.name}{otherGroup ? ` · ${u.group}부` : ""}{b ? ` (${classShort(b)} 배정됨)` : ""}
+            </button>
+          );
+        };
+        const visible = (list: User[]) => list.filter((u) => (isMain ? true : u.id !== main));
+        const pickedName = isMain ? (main ? d.users.find((u) => u.id === main)?.name : null) : null;
+        return (
+          <div key={kind} className="field">
+            <label>{isMain ? "담임 (한 명)" : "보조 (여러 명 선택 가능)"}{isMain && <span className="muted" style={{ fontWeight: 400 }}> · {pickedName ?? "미배정"}</span>}</label>
+            <div className="row wrap g8">{visible(same).map(chip)}</div>
+            {otherPool.length > 0 && (
+              <details className="col g8" open={visible(otherPool).some((u) => picked(u.id))}>
+                <summary className="t-xs sb muted" style={{ cursor: "pointer" }}>다른 부 교사 ({otherPool.length}명)</summary>
+                <div className="row wrap g8" style={{ marginTop: 8 }}>{visible(otherPool).map(chip)}</div>
+              </details>
+            )}
+          </div>
+        );
+      })}
       <Note>배정 원칙: 한 교사는 같은 부에서 반을 하나만 맡을 수 있고(담임·보조 포함), 다른 부의 반은 하나 더 맡을 수 있습니다. 보조 교사도 배정된 반의 출석체크를 할 수 있습니다. 변경 내역은 감사 로그에 기록됩니다.</Note>
     </Modal>
   );
