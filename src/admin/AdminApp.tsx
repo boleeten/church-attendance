@@ -108,7 +108,6 @@ function UserMenu({ name, role }: { name: string; role: string }) {
 
 export default function AdminApp() {
   const u = useMe()!;
-  const nav = useNavigate();
   const [date, setDate] = useState(currentSunday());
   const [open, setOpen] = useState(false);
   openSidebar = () => setOpen(true);
@@ -133,10 +132,11 @@ export default function AdminApp() {
               </NavLink>
             ))}
           </nav>
-          <div className="col g4" style={{ marginTop: "auto", paddingTop: 16 }}>
-            {home !== "/admin" && <Link to={home}><Icon name="refresh" />{home === "/h" ? "부장교사 화면" : "교사 화면"}</Link>}
-            <a href="/login" onClick={(e) => { e.preventDefault(); logout(); nav("/login", { replace: true }); }}><Icon name="logout" />로그아웃</a>
-          </div>
+          {home !== "/admin" && (
+            <div className="col g4" style={{ marginTop: "auto", paddingTop: 16 }}>
+              <Link to={home}><Icon name="refresh" />{home === "/h" ? "부장교사 화면" : "교사 화면"}</Link>
+            </div>
+          )}
         </aside>
         <Routes>
           <Route index element={<Dashboard />} />
