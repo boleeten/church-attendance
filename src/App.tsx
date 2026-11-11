@@ -8,7 +8,7 @@ import type { Role } from "./lib/types";
 import { AttendanceCheck } from "./mobile/Attendance";
 import { EntrySelect, ForcedPassword, Login } from "./mobile/Auth";
 import { History } from "./mobile/History";
-import { homePath } from "./mobile/Shell";
+import { afterLoginPath, homePath } from "./mobile/Shell";
 import { HeadHome, MyInfo, Notifications, StudentDetail, StudentList, TeacherHome } from "./mobile/Teacher";
 import { Toasts } from "./ui";
 
@@ -24,7 +24,8 @@ function Guard({ roles, children }: { roles: Role[]; children: ReactNode }) {
 function Root() {
   const u = useMe();
   if (!u) return <Navigate to="/login" replace />;
-  return <Navigate to={u.mustChangePassword ? "/password" : homePath(u)} replace />;
+  // 앱을 열 때(시작 주소 "/")도 들어갈 화면이 여러 개면 선택 화면을 보여 준다 (로그인이 유지된 경우 포함)
+  return <Navigate to={u.mustChangePassword ? "/password" : afterLoginPath(u)} replace />;
 }
 
 export default function App() {
@@ -48,7 +49,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Root />} />
         <Route path="/select" element={u && !u.mustChangePassword ? <EntrySelect /> : <Navigate to="/login" replace />} />
-        <Route path="/login" element={u && !u.mustChangePassword ? <Navigate to={homePath(u)} replace /> : <Login />} />
+        <Route path="/login" element={u && !u.mustChangePassword ? <Navigate to={afterLoginPath(u)} replace /> : <Login />} />
         <Route path="/password" element={u ? <ForcedPassword /> : <Navigate to="/login" replace />} />
         <Route path="/t" element={T(<TeacherHome />)} />
         <Route path="/t/notifications" element={T(<Notifications base="/t" />)} />
