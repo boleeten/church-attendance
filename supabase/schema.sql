@@ -36,7 +36,7 @@ create table if not exists public.students (
   id text primary key,
   name text not null,
   class_id text not null references public.classes (id),
-  status text not null default '등록' check (status in ('등록', '장결자', '교회이동')),
+  status text not null default '등록' check (status in ('등록', '장결자', '교회이동', '졸업')),
   phone text not null default '',
   guardian_phone text not null default '',
   guardian_rel text not null default '모',
@@ -320,3 +320,7 @@ select 'g' || g || '-' || gr || '-' || n, g, gr, n
 from (values (1), (2)) as groups (g), generate_series(4, 6) as gr, generate_series(1, 4) as n
 where n <= case when g = 1 then 4 else 3 end
 on conflict do nothing;
+
+-- 학생 상태에 '졸업' 추가 (이미 만든 DB에도 적용되도록 제약을 다시 만든다. 여러 번 실행해도 된다)
+alter table public.students drop constraint if exists students_status_check;
+alter table public.students add constraint students_status_check check (status in ('등록', '장결자', '교회이동', '졸업'));

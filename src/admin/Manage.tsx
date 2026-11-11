@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -177,7 +177,7 @@ export function Dashboard() {
 }
 
 // ───────── A02 학생 목록 및 관리 ─────────
-const STATUSES: StudentStatus[] = ["등록", "장결자", "교회이동"];
+const STATUSES: StudentStatus[] = ["등록", "장결자", "교회이동", "졸업"];
 const statusTone = (s: StudentStatus) => (s === "등록" ? "success" : s === "장결자" ? "warning" : "neutral");
 
 function StudentForm({ student, onClose }: { student: Student | null; onClose: () => void }) {
@@ -275,7 +275,7 @@ export function Students() {
   const [params] = useSearchParams();
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
-  const [grade, setGrade] = useState("");
+  const [grade, setGrade] = useState(params.get("grade") ?? "");
   const [classId, setClassId] = useState(params.get("class") ?? "");
   const [status, setStatus] = useState("");
   const [mark, setMark] = useState("");
@@ -300,7 +300,7 @@ export function Students() {
         const lg = longGroupOf(classId);
         if (lg && (s.status !== "장결자" || c?.group !== lg)) return false;
         if (classId && !lg && (s.classId !== classId || s.status === "장결자")) return false;
-        if (status && s.status !== status) return false;
+        if (status ? s.status !== status : s.status === "졸업") return false; // 졸업생은 상태 필터에서 '졸업'을 골랐을 때만 보인다
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
         if (streakOnly && consecutiveAbsences(d.studentMarks, s.id, dates).count < 2) return false;
@@ -315,6 +315,30 @@ export function Students() {
   const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setPage(0); };
   const upd = (f: (v: string) => void) => (v: string) => { f(v); setPage(0); };
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
+
+  const fmtAt = (iso?: string | null) => (iso ? iso.slice(0, 10) : "");
+  /** 선택한 학생의 명부 + 지금까지의 심방노트 전체 (졸업 전 보관용). 노트 1건이 1줄, 노트가 없으면 학생 1줄 */
+  const exportWithNotes = () => {
+    const picked = d.students.filter((s) => sel.has(s.id)).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
+    const uname = (id?: string | null) => d.users.find((u) => u.id === id)?.name ?? "";
+    const lines = picked.flatMap(({ s, c }) => {
+      const info = [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
+      const notes = d.notes.filter((n) => n.studentId === s.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+      return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), n.reply ?? "", uname(n.replyBy), fmtAt(n.replyAt)]) : [[...info, 0, "", "", "", "", "", "", ""]];
+    });
+    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
+    toast(`${picked.length}명의 명부와 심방노트를 내려받았습니다.`);
+  };
+  const graduate = async () => {
+    const picked = d.students.filter((s) => sel.has(s.id));
+    if (!window.confirm(`선택한 ${picked.length}명을 졸업 처리할까요?\n\n· 학생 관리 목록, 출석부, 통계에서 보이지 않게 됩니다.\n· 출석 기록과 심방노트는 지워지지 않습니다.\n· 상태 필터에서 '졸업'을 고르면 다시 볼 수 있습니다.\n\n먼저 '선택 학생 Excel (심방노트 포함)'으로 내려받아 두셨나요?`)) return;
+    const err = await graduateStudents([...sel]);
+    if (err) return toast(err, "error");
+    toast(`${picked.length}명을 졸업 처리했습니다.`);
+    setSel(new Set());
+  };
+  const allSelected = rows.length > 0 && rows.every(({ s }) => sel.has(s.id));
+  const toggleAll = () => setSel(allSelected ? new Set() : new Set(rows.map(({ s }) => s.id)));
 
   const exportCsv = () =>
     download(`학생명부_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
@@ -355,6 +379,8 @@ export function Students() {
           <h2>검색 결과 {rows.length}명{sel.size > 0 && <span className="muted sb"> · {sel.size}명 선택됨</span>}</h2>
           <div className="row g8 wrap">
             <Button variant="outline" size="s" disabled={!sel.size} onClick={() => { setMoveTo(""); setMoving(true); }}>선택 학생 반 이동</Button>
+            <Button variant="outline" size="s" disabled={!sel.size} onClick={exportWithNotes}><Icon name="download" size={14} />선택 학생 Excel (심방노트 포함)</Button>
+            <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void graduate()}>선택 학생 졸업 처리</Button>
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
             <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"]]))}><Icon name="download" size={14} />양식 받기</Button>
@@ -364,7 +390,7 @@ export function Students() {
         </div>
         <div className="tablewrap">
           <table className="tbl">
-            <thead><tr><th style={{ width: 36 }} /><th>학생</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
+            <thead><tr><th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="검색 결과 전체 선택" title="검색 결과 전체 선택" /></th><th>학생</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
             <tbody>
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>

@@ -80,9 +80,17 @@ const subscribe = (l: () => void) => {
 };
 
 /** 데이터가 바뀔 때마다 다시 그리는 훅 */
+// 데이터가 바뀔 때마다 새 겉껍데기 객체를 돌려준다.
+// 같은 객체를 계속 돌려주면 화면의 useMemo([d])가 바뀐 줄 모르고 옛 목록을 보여 준다(예: 졸업·반 이동 직후 목록).
+let snap: Data = data;
+let snapVersion = -1;
 export function useData(): Data {
   useSyncExternalStore(subscribe, () => version);
-  return data;
+  if (snapVersion !== version || snap.students !== data.students) {
+    snap = { ...data };
+    snapVersion = version;
+  }
+  return snap;
 }
 
 export function useMe(): User | null {
@@ -632,10 +640,29 @@ export function updateSettings(patch: Partial<Data["settings"]>) {
   emit();
 }
 
+/** 아직 졸업 처리하지 않은 6학년 학생 (등록·장결자) */
+export const pendingGraduates = () => data.students.filter((s) => (s.status === "등록" || s.status === "장결자") && data.classes.find((c) => c.id === s.classId)?.grade === 6);
+
+/** 6학년 학생을 졸업 처리한다. 기록(출석·심방노트)은 남고, 학생 목록·출석부·통계에서는 빠진다. */
+export async function graduateStudents(ids: string[]): Promise<string | null> {
+  const picked = data.students.filter((s) => ids.includes(s.id) && s.status !== "졸업");
+  if (!picked.length) return "졸업 처리할 학생을 선택해 주세요.";
+  const wrong = picked.filter((s) => data.classes.find((c) => c.id === s.classId)?.grade !== 6);
+  if (wrong.length) return `6학년 학생만 졸업 처리할 수 있습니다. (${wrong.slice(0, 3).map((s) => s.name).join(", ")}${wrong.length > 3 ? ` 외 ${wrong.length - 3}명` : ""})`;
+  if (remoteEnabled) {
+    const err = await remote.updateIn("students", picked.map((s) => s.id), { status: "졸업" });
+    if (err) return /check|constraint/i.test(err) ? "DB에 '졸업' 상태가 아직 추가되지 않았습니다. Supabase SQL Editor에서 안내된 SQL을 먼저 실행해 주세요." : `졸업 처리에 실패했습니다. (${err})`;
+  }
+  for (const s of picked) s.status = "졸업";
+  audit("졸업 처리", `6학년 ${picked.length}명`, "등록", "졸업");
+  emit();
+  return null;
+}
+
 export function promoteGrades(): number {
   let n = 0;
   for (const s of data.students) {
-    if (s.status !== "등록") continue;
+    if (s.status !== "등록" && s.status !== "장결자") continue;
     const c = data.classes.find((x) => x.id === s.classId);
     if (!c || c.grade >= 6) continue;
     const next = data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1 && x.no === c.no) ?? data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1);

@@ -93,6 +93,13 @@ export const remote = {
     if (!sb) return;
     queue(table, () => sb!.from(table).update(mapKeys(row as Record<string, unknown>, snake)).match(mapKeys(match, snake)));
   },
+  /** 여러 줄을 한 번에 고치고 결과를 기다린다. 실패하면 오류 문구를 돌려준다(화면을 먼저 바꾸면 안 되는 작업용). */
+  async updateIn(table: string, ids: string[], row: object): Promise<string | null> {
+    if (!sb) return null;
+    await writes;
+    const { error } = await sb.from(table).update(mapKeys(row as Record<string, unknown>, snake)).in("id", ids);
+    return error ? error.message : null;
+  },
   remove(table: string, match: Record<string, unknown>) {
     if (!sb) return;
     queue(table, () => sb!.from(table).delete().match(mapKeys(match, snake)));
