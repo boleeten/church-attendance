@@ -239,7 +239,7 @@ export function YearSettings() {
         </div>
         <Note>진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다. 6학년을 먼저 졸업 처리해야 5학년이 올라갈 6학년 반이 비워지므로, 졸업 처리 전에는 진급 처리를 할 수 없습니다.</Note>
         <div className="grid cols-3" style={{ gap: 16 }}>
-          {action("users", "6학년 졸업 처리", sixth ? `6학년 ${sixth}명이 남아 있습니다. 학생 관리에서 선택해 심방노트 포함 Excel을 받은 뒤 졸업 처리합니다.` : "졸업 처리할 6학년 학생이 없습니다.", <Link to="/admin/students?grade=6" className="btn outline s">6학년 학생 보기</Link>)}
+          {action("users", "6학년 졸업 처리", sixth ? `6학년 ${sixth}명이 남아 있습니다. 학생 관리에서 선택해 심방노트 포함 Excel을 받은 뒤 졸업 처리합니다.` : "졸업 처리할 6학년 학생이 없습니다.", <Link to="/admin/students?grade=6&status=" className="btn outline s">6학년 학생 보기</Link>)}
           {action("chart", "학생 진급 처리", sixth ? `6학년 ${sixth}명을 먼저 졸업 처리해 주세요.` : `4·5학년 ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower || sixth > 0} onClick={() => window.confirm(`4·5학년 ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>진급 처리</Button>)}
           {action("grid", "학생 반 재배정", "새 학년도 반 편성에 맞춰 학생과 교사를 배정합니다.", <Link to="/admin/classes" className="btn outline s">반 재배정</Link>)}
           {action("download", "백업 및 복구", `마지막 백업 ${fmtRelDay(d.settings.lastBackup)}. 전체 데이터를 파일로 내려받거나 복구합니다.`, <div className="row g6"><Button variant="outline" size="s" onClick={() => download(`출석관리_백업_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(), "application/json")}>백업 받기</Button><Button variant="outline" size="s" disabled={remoteEnabled} onClick={() => file.current?.click()}>복구</Button></div>)}

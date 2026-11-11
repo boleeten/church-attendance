@@ -277,7 +277,9 @@ export function Students() {
   const [group, setGroup] = useState("");
   const [grade, setGrade] = useState(params.get("grade") ?? "");
   const [classId, setClassId] = useState(params.get("class") ?? "");
-  const [status, setStatus] = useState("");
+  // 기본은 '등록'. 장결자반 바로가기는 '장결자', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
+  const defaultStatus = params.get("status") ?? (longGroupOf(params.get("class") ?? "") ? "장결자" : "등록");
+  const [status, setStatus] = useState(defaultStatus);
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
   const [page, setPage] = useState(0);
@@ -312,7 +314,7 @@ export function Students() {
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const cur = Math.min(page, pages - 1);
   const view = rows.slice(cur * PAGE, cur * PAGE + PAGE);
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus(""); setMark(""); setStreakOnly(false); setPage(0); };
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setPage(0); };
   const upd = (f: (v: string) => void) => (v: string) => { f(v); setPage(0); };
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
