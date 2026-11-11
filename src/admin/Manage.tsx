@@ -694,8 +694,8 @@ export function Teachers() {
           <div className="input m grow" style={{ minWidth: 220 }}><Icon name="search" size={18} /><input placeholder="교사 이름, 아이디 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 검색" /></div>
           <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
           <SelectBox label="역할" value={role} onChange={setRole}><option value="">역할: 전체</option><option value="teacher">교사</option><option value="head">부장교사</option><option value="admin">일반 관리자</option><option value="super">최고 관리자</option></SelectBox>
-          <Button variant="outline" className="btn-line" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}><Icon name="download" size={16} />양식 받기</Button>
           <Button variant="secondary" onClick={() => teacherFile.current?.click()}>Excel/CSV 일괄 등록</Button>
+          <Button variant="outline" className="btn-line" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}><Icon name="download" size={16} />양식 받기</Button>
           <Button onClick={() => setEdit("new")}><Icon name="plus" size={16} />교사 등록</Button>
           <input ref={teacherFile} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void readTeacherCsv(f); e.target.value = ""; }} />
         </div>
