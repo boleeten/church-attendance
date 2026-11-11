@@ -405,7 +405,7 @@ export function Students() {
 function AssignModal({ cls, onClose }: { cls: ClassRoom; onClose: () => void }) {
   const d = useData();
   // 같은 부 교사를 먼저, 다른 부 교사도 고를 수 있다 (한 교사가 1부·2부 반을 함께 맡는 경우)
-  const all = d.users.filter((u) => u.roles.includes("teacher") && u.active);
+  const all = d.users.filter((u) => (u.roles.includes("teacher") || u.roles.includes("head")) && u.active); // 부장교사도 반을 맡을 수 있다
   const same = all.filter((u) => u.group === cls.group);
   const otherPool = all.filter((u) => u.group !== cls.group);
   const cur = (k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cls.id && a.kind === k).map((a) => a.userId);
@@ -796,7 +796,7 @@ export function Teachers() {
                   <td><span className="row g8"><Avatar name={u.name} size={28} /><strong className="sb">{u.name}</strong></span></td>
                   <td className="muted">{u.loginId}</td>
                   <td>{u.group}부</td>
-                  <td>{u.roles.includes("head") ? "-" : teacherDuty(d, u, false)}</td>
+                  <td>{u.roles.includes("head") && !d.assignments.some((a) => a.userId === u.id) ? "-" : teacherDuty(d, u, false).replace(/^부장교사 · /, "")}</td>
                   <td><span className="row g6">
                     <Badge tone="info">{u.roles.includes("head") ? "부장교사" : "교사"}</Badge>
                     {u.roles.includes("super") ? <Badge tone="warning">최고 관리자</Badge> : u.roles.includes("admin") ? <Badge tone="warning">일반 관리자</Badge> : null}

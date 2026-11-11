@@ -397,7 +397,7 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
   };
   const curGroup = currentTeacherGroup(u.id);
   const otherGroups = base === "/t" ? teacherGroups(u.id).filter((g) => g !== curGroup) : [];
-  const other = base === "/t" && u.roles.includes("head") ? "/h" : base === "/h" && u.roles.includes("teacher") && d.assignments.some((a) => a.userId === u.id) ? "/t" : null;
+  const other = base === "/t" && u.roles.includes("head") ? "/h" : base === "/h" && d.assignments.some((a) => a.userId === u.id) ? "/t" : null;
   return (
     <Phone tabs={base === "/t" ? TEACHER_TABS : HEAD_TABS}>
       <AppBar title="내 정보" />

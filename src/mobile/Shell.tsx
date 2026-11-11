@@ -63,7 +63,7 @@ export const onAdminHost = () => window.location.hostname.startsWith("lord-admin
 /** 로그인한 사용자가 첫 화면으로 가야 할 경로 */
 export function homePath(u: User): string {
   if (onAdminHost() && isAdmin(u)) return "/admin";
-  if (u.roles.includes("teacher") && myClasses(getData(), u.id).length) return "/t";
+  if (myClasses(getData(), u.id).length) return "/t";
   if (u.roles.includes("head")) return "/h";
   if (u.roles.includes("admin") || u.roles.includes("super")) return "/admin";
   return "/t";
@@ -95,7 +95,7 @@ export function entryOptions(u: User): EntryOption[] {
   const out: EntryOption[] = [];
   const classes = myClasses(getData(), u.id);
   const groups = teacherGroups(u.id);
-  if (u.roles.includes("teacher") && classes.length) {
+  if (classes.length) { // 반을 맡은 부장교사도 포함
     const desc = (list: ClassRoom[]) => `${list.map((c) => `${c.grade}-${c.no}반`).join(", ")} 학생 출석체크·심방노트`;
     if (groups.length > 1) for (const g of groups) out.push({ path: "/t", group: g, title: `${g}부 담당 반 출석관리`, desc: desc(classes.filter((c) => c.group === g)), icon: "users" });
     else out.push({ path: "/t", title: "담당 반 출석관리", desc: desc(classes), icon: "users" });

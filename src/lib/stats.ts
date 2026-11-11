@@ -96,15 +96,15 @@ export function consecutiveAbsences(marks: Record<string, Mark>, id: string, dat
 export const myClasses = (d: Data, userId: string): ClassRoom[] => d.classes.filter((c) => d.assignments.some((a) => a.userId === userId && a.classId === c.id));
 
 export function teacherDuty(d: Data, u: User, short = true): string {
-  if (u.roles.includes("head")) return "부장교사";
   const as = d.assignments.filter((a) => a.userId === u.id);
-  if (!as.length) return "미배정";
+  const head = u.roles.includes("head") ? "부장교사" : "";
+  if (!as.length) return head || "미배정";
   const kinds = [...new Set(as.map((a) => a.kind))];
   const names = as.map((a) => {
     const c = d.classes.find((x) => x.id === a.classId)!;
     return short || as.length > 1 ? `${c.grade}-${c.no}반` : `${c.grade}학년 ${c.no}반`;
   });
-  return `${names.join(" · ")} ${kinds.join("·")}`;
+  return `${head ? `${head} · ` : ""}${names.join(" · ")} ${kinds.join("·")}`;
 }
 
 export const homeroomName = (d: Data, classId: string): string => {

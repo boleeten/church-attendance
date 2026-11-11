@@ -41,7 +41,7 @@ export default function App() {
     document.addEventListener("visibilitychange", onShow);
     return () => document.removeEventListener("visibilitychange", onShow);
   }, [u, unread]);
-  const T = (el: ReactNode) => <Guard roles={["teacher"]}>{el}</Guard>;
+  const T = (el: ReactNode) => <Guard roles={["teacher", "head"]}>{el}</Guard>;
   const H = (el: ReactNode) => <Guard roles={["head"]}>{el}</Guard>;
   return (
     <BrowserRouter>
