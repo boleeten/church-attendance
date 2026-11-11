@@ -71,6 +71,19 @@ export function homePath(u: User): string {
 
 export const isAdmin = (u: User) => u.roles.includes("admin") || u.roles.includes("super");
 
+/** 이 사용자가 들어갈 수 있는 화면들. 2개 이상이면 로그인 후 고르게 한다. */
+export function entryOptions(u: User): { path: string; title: string; desc: string; icon: string }[] {
+  const out: { path: string; title: string; desc: string; icon: string }[] = [];
+  const classes = myClasses(getData(), u.id);
+  if (u.roles.includes("teacher") && classes.length) out.push({ path: "/t", title: "담당 반 출석관리", desc: `${classes.map((c) => `${c.grade}-${c.no}반`).join(", ")} 학생 출석체크·심방노트`, icon: "users" });
+  if (u.roles.includes("head")) out.push({ path: "/h", title: "교사 출결관리", desc: `${u.group ?? ""}부 교사 출석체크와 출석 이력`, icon: "calendar" });
+  if (isAdmin(u)) out.push({ path: "/admin", title: "관리자 화면", desc: "학생·교사·출결 전체 관리", icon: "shield" });
+  return out;
+}
+
+/** 로그인(또는 첫 비밀번호 변경) 직후 갈 곳: 들어갈 화면이 여러 개면 선택 화면 */
+export const afterLoginPath = (u: User) => (entryOptions(u).length > 1 ? "/select" : homePath(u));
+
 /** 담당 반이 여러 개인 교사를 위한 현재 반 선택 */
 export function useMyClass(): { cls: ClassRoom | null; classes: ClassRoom[]; setCls: (id: string) => void } {
   const d = useData();

@@ -4,12 +4,12 @@ import { remoteEnabled, toast } from "../lib/remote";
 import { DEMO_PASSWORD } from "../lib/seed";
 import { changePassword, login, logout, me, passwordRules, resetDemo, useMe } from "../lib/store";
 import { Button, Icon, Note, PasswordInput } from "../ui";
-import { homePath, Phone } from "./Shell";
+import { afterLoginPath, entryOptions, Phone } from "./Shell";
 
 // [아이디, 버튼 이름, 설명, 로그인 후 열 화면]
 const DEMO_ACCOUNTS = [
   ["teacher_kim01", "교사", "1부 4학년 1반 담임", "/t"],
-  ["head_park01", "부장교사", "1부 교사 출석관리 · 관리자 모드 전환 가능", "/h"],
+  ["head_park01", "부장교사", "교사 출결관리·관리자 화면 중 선택", undefined],
   ["pastor_han", "관리자", "목사님 · 계정 총괄", "/admin"],
 ] as const;
 
@@ -26,7 +26,7 @@ export function Login() {
     setBusy(false);
     if (e) return setErr(e);
     const u = me()!;
-    nav(u.mustChangePassword ? "/password" : target ?? homePath(u), { replace: true });
+    nav(u.mustChangePassword ? "/password" : target ?? afterLoginPath(u), { replace: true });
   };
 
   return (
@@ -135,7 +135,40 @@ export function ForcedPassword() {
         <button type="button" className="t-xs muted" onClick={() => { logout(); nav("/login", { replace: true }); }}>로그아웃</button>
       </header>
       <div className="mbody">
-        <PasswordForm forced onDone={() => u && nav(homePath(u), { replace: true })} />
+        <PasswordForm forced onDone={() => u && nav(afterLoginPath(u), { replace: true })} />
+      </div>
+    </Phone>
+  );
+}
+
+/** 들어갈 화면 선택 (교사 출결관리·관리자 화면 등 여러 화면을 쓰는 계정) */
+export function EntrySelect() {
+  const nav = useNavigate();
+  const u = useMe()!;
+  const options = entryOptions(u);
+  return (
+    <Phone>
+      <div className="col g16" style={{ padding: "64px 24px 32px", flex: 1 }}>
+        <div className="col g8" style={{ marginBottom: 8 }}>
+          <img src="/logo.png" alt="" width={56} height={56} style={{ borderRadius: "50%" }} />
+          <h1 className="t-2xl b">{u.name}님, 어디로 들어갈까요?</h1>
+          <p className="muted">사용할 화면을 선택해 주세요. 들어간 뒤에도 메뉴에서 다른 화면으로 바꿀 수 있습니다.</p>
+        </div>
+        <div className="col g12">
+          {options.map((o) => (
+            <button key={o.path} type="button" className="entry-card" onClick={() => nav(o.path, { replace: true })}>
+              <span className="entry-ico"><Icon name={o.icon} size={24} /></span>
+              <span className="col g4 grow" style={{ textAlign: "left" }}>
+                <strong className="t-lg b">{o.title}</strong>
+                <span className="t-xs muted">{o.desc}</span>
+              </span>
+              <Icon name="right" size={20} />
+            </button>
+          ))}
+        </div>
+        <button type="button" className="t-xs muted" style={{ marginTop: "auto", alignSelf: "center", textDecoration: "underline" }} onClick={() => { logout(); nav("/login", { replace: true }); }}>
+          다른 계정으로 로그인
+        </button>
       </div>
     </Phone>
   );

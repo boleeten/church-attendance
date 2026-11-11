@@ -316,3 +316,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .btn.btn-line:hover:not(:disabled), .btn.btn-line:focus-visible { background: var(--primary); color: #fff; filter: none; }
 .btn.btn-del { color: var(--error); }
 .btn.btn-del:hover:not(:disabled) { background: var(--error-soft); filter: none; }
+
+/* 로그인 후 들어갈 화면 선택 */
+.entry-card { display: flex; align-items: center; gap: 14px; padding: 18px 16px; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px var(--border); color: var(--text); width: 100%; transition: box-shadow 0.15s; }
+.entry-card:hover, .entry-card:focus-visible { box-shadow: inset 0 0 0 1.5px var(--primary); outline: 0; }
+.entry-card .entry-ico { width: 48px; height: 48px; border-radius: 14px; background: var(--soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex: none; }

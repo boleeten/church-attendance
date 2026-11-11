@@ -6,7 +6,7 @@ import { syncAppBadge } from "./lib/push";
 import { useData, useMe } from "./lib/store";
 import type { Role } from "./lib/types";
 import { AttendanceCheck } from "./mobile/Attendance";
-import { ForcedPassword, Login } from "./mobile/Auth";
+import { EntrySelect, ForcedPassword, Login } from "./mobile/Auth";
 import { History } from "./mobile/History";
 import { homePath } from "./mobile/Shell";
 import { HeadHome, MyInfo, Notifications, StudentDetail, StudentList, TeacherHome } from "./mobile/Teacher";
@@ -47,6 +47,7 @@ export default function App() {
       {!remoteEnabled && <div className="demo-banner">데모 모드 · 예시 데이터이며 입력 내용은 이 브라우저에만 저장됩니다</div>}
       <Routes>
         <Route path="/" element={<Root />} />
+        <Route path="/select" element={u && !u.mustChangePassword ? <EntrySelect /> : <Navigate to="/login" replace />} />
         <Route path="/login" element={u && !u.mustChangePassword ? <Navigate to={homePath(u)} replace /> : <Login />} />
         <Route path="/password" element={u ? <ForcedPassword /> : <Navigate to="/login" replace />} />
         <Route path="/t" element={T(<TeacherHome />)} />
