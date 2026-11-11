@@ -68,7 +68,7 @@ export function History({ mode }: { mode: "student" | "teacher" }) {
             </div>
             <div className="card pad col g10">
               <div className="row between">
-                <span className="muted">{isStudent ? "우리 반" : `${group}부 교사`} 출석률{provisional ? " (잠정)" : ""}</span>
+                <span className="muted">{isStudent ? "우리 반" : `${group}부 교사`} 출석률</span>
                 <strong className="t-2xl b c-primary">{pctText(rate)}</strong>
               </div>
               <Progress value={rate ?? 0} />

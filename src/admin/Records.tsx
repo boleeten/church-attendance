@@ -71,7 +71,7 @@ export function StudentAttendance() {
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
       <div className="grid cols-4">
         <Kpi label="출석 대상" value={`${all.total}명`} sub={`${d.classes.length}개 반`} icon="users" />
-        <Kpi label="출석" value={`${all.p}명`} sub={`출석률 ${pctText(all.rate)}${pending.length ? " (잠정)" : ""}`} icon="check" tone="success" />
+        <Kpi label="출석" value={`${all.p}명`} sub={`출석률 ${pctText(all.rate)}`} icon="check" tone="success" />
         <Kpi label="결석" value={`${all.a}명`} sub={`연속 결석 ${[...streaks.values()].filter((n) => n >= 2).length}명 포함`} icon="x" tone="error" />
         <Kpi label="미확인" value={`${all.u}명`} sub={`미완료 ${pending.length}개 반`} icon="info" tone="warm" />
       </div>
@@ -108,7 +108,7 @@ export function StudentAttendance() {
                     <tr key={c.id}>
                       <td className="sb">{classLabel(c)}</td><td>{homeroomName(d, c.id)}</td><td>{s.total}명</td>
                       <td className="c-success sb">{s.p}</td><td className="c-error sb">{s.a}</td><td className="c-neutral sb">{s.u}</td>
-                      <td><div className="row g8"><div className="grow"><Progress value={s.rate ?? 0} /></div><span className="sb num" style={{ width: 84 }}>{pctText(s.rate)}{!s.completed && s.rate !== null ? " (잠정)" : ""}</span></div></td>
+                      <td><div className="row g8"><div className="grow"><Progress value={s.rate ?? 0} /></div><span className="sb num" style={{ width: 84 }}>{pctText(s.rate)}</span></div></td>
                       <td><Badge tone={s.completed ? "success" : "warning"}>{s.completed ? "완료" : "미완료"}</Badge></td>
                       <td><Button variant="outline" size="s" onClick={() => setSheet(c)}>출석부 수정</Button></td>
                     </tr>
@@ -475,7 +475,7 @@ export function TeacherAttendance() {
     <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
       <div className="grid cols-4">
         <Kpi label="전체 교사" value={`${sum.total}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명 (부장교사 포함)`} icon="badge" />
-        <Kpi label="출석" value={`${sum.p}명`} sub={`출석률 ${pctText(sum.rate)}${pendingGroups.length ? " (잠정)" : ""}`} icon="check" tone="success" />
+        <Kpi label="출석" value={`${sum.p}명`} sub={`출석률 ${pctText(sum.rate)}`} icon="check" tone="success" />
         <Kpi label="결석" value={`${sum.a}명`} sub={`${fmtDot(date)} 기준`} icon="x" tone="error" />
         <Kpi label="미확인" value={`${sum.u}명`} sub={pendingGroups.length ? `${pendingGroups.join("·")}부 교사 출석 미완료` : "모든 부서 완료"} icon="info" tone="warm" />
       </div>
