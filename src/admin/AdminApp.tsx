@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { currentSunday, fmtDot } from "../lib/date";
 import { yearSundays } from "../lib/stats";
 import { logout, useData, useMe } from "../lib/store";
 import { homePath } from "../mobile/Shell";
-import { Avatar, Icon } from "../ui";
+import { Avatar, Icon, Modal } from "../ui";
+import { PasswordForm } from "../mobile/Auth";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
 import { Notes, Stats, StudentAttendance, TeacherAttendance } from "./Records";
 import { Accounts, NotifySettings, Sheets, YearSettings } from "./Settings";
@@ -54,15 +55,53 @@ export function Page({ title, sub, children }: { title: string; sub: string; chi
         <Link to="/admin/notify" className="icon-btn top-bell" aria-label="알림 설정">
           <Icon name="bell" size={20} />
         </Link>
-        <div className="row g8 who">
-          <Avatar name={u.name} size={36} />
-          <div className="col">
-            <strong className="sb">{u.name}</strong>
-            <span className="t-xs muted">{role}</span>
-          </div>
-        </div>
+        <UserMenu name={u.name} role={role} />
       </header>
       <main className="content">{children}</main>
+    </div>
+  );
+}
+
+/** 오른쪽 위 이름 영역: 누르면 비밀번호 변경·로그아웃 메뉴 */
+function UserMenu({ name, role }: { name: string; role: string }) {
+  const nav = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  return (
+    <div className="user-menu" ref={box}>
+      <button type="button" className="row g8 who" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Avatar name={name} size={36} />
+        <span className="col who-text">
+          <strong className="sb">{name}</strong>
+          <span className="t-xs muted">{role}</span>
+        </span>
+        <Icon name="down" size={14} />
+      </button>
+      {open && (
+        <div className="user-pop" role="menu">
+          <div className="col g2 user-pop-head"><strong className="sb">{name}</strong><span className="t-xs muted">{role}</span></div>
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); setPw(true); }}><Icon name="lock" size={18} />비밀번호 변경</button>
+          <button type="button" role="menuitem" onClick={() => { logout(); nav("/login", { replace: true }); }}><Icon name="logout" size={18} />로그아웃</button>
+        </div>
+      )}
+      {pw && (
+        <Modal title="비밀번호 변경" onClose={() => setPw(false)}>
+          <PasswordForm onDone={() => setPw(false)} />
+        </Modal>
+      )}
     </div>
   );
 }

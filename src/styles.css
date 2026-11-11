@@ -250,7 +250,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .sidebar.open { transform: none; box-shadow: var(--shadow-xl); }
   .menu-btn { display: inline-flex; }
   .topbar { padding: 0 16px; gap: 10px; }
-  .topbar .sub, .topbar .who, .topbar .top-bell { display: none; }
+  .topbar .sub, .topbar .who-text, .topbar .who > svg, .topbar .top-bell { display: none; }
   .content { padding: 16px; gap: 16px; }
   .grid { gap: 16px; }
   .cols-2 { grid-template-columns: minmax(0, 1fr); }
@@ -299,3 +299,12 @@ table.tbl { width: 100%; border-collapse: collapse; }
 }
 .field .selbox, .modal .selbox { display: flex; width: 100%; }
 .field .selbox .selbox-text, .modal .selbox .selbox-text { flex: 1; }
+
+/* 관리자 계정 메뉴 */
+.user-menu { position: relative; flex: none; }
+.user-menu .who { padding: 4px 6px 4px 4px; border-radius: 12px; text-align: left; color: var(--text); }
+.user-menu .who:hover, .user-menu .who[aria-expanded="true"] { background: var(--canvas); }
+.user-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 220px; background: #fff; border-radius: 12px; box-shadow: var(--shadow-xl), inset 0 0 0 1px var(--border); padding: 6px; display: flex; flex-direction: column; }
+.user-pop-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.user-pop button { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 8px; font-size: 14px; color: var(--text); text-align: left; }
+.user-pop button:hover, .user-pop button:focus-visible { background: var(--canvas); outline: 0; }
