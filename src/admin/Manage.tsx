@@ -359,7 +359,7 @@ export function Students() {
             <Button variant="outline" size="s" disabled={!sel.size} onClick={() => { setMoveTo(""); setMoving(true); }}>선택 학생 반 이동</Button>
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
-            <button type="button" className="link" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"]]))}>양식 받기</button>
+            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"]]))}><Icon name="download" size={14} />양식 받기</Button>
             <Button size="s" onClick={() => setEdit("new")}><Icon name="plus" size={14} />학생 등록</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }} />
           </div>
@@ -694,7 +694,7 @@ export function Teachers() {
           <div className="input m grow" style={{ minWidth: 220 }}><Icon name="search" size={18} /><input placeholder="교사 이름, 아이디 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 검색" /></div>
           <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
           <SelectBox label="역할" value={role} onChange={setRole}><option value="">역할: 전체</option><option value="teacher">교사</option><option value="head">부장교사</option><option value="admin">일반 관리자</option><option value="super">최고 관리자</option></SelectBox>
-          <button type="button" className="link" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}>양식 받기</button>
+          <Button variant="outline" className="btn-line" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}><Icon name="download" size={16} />양식 받기</Button>
           <Button variant="secondary" onClick={() => teacherFile.current?.click()}>Excel/CSV 일괄 등록</Button>
           <Button onClick={() => setEdit("new")}><Icon name="plus" size={16} />교사 등록</Button>
           <input ref={teacherFile} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void readTeacherCsv(f); e.target.value = ""; }} />
