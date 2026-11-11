@@ -321,3 +321,16 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .entry-card { display: flex; align-items: center; gap: 14px; padding: 18px 16px; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px var(--border); color: var(--text); width: 100%; transition: box-shadow 0.15s; }
 .entry-card:hover, .entry-card:focus-visible { box-shadow: inset 0 0 0 1.5px var(--primary); outline: 0; }
 .entry-card .entry-ico { width: 48px; height: 48px; border-radius: 14px; background: var(--soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+
+/* 그룹·반 관리: 1부(파랑)·2부(보라)를 색으로 구분 */
+.g1 { --gc: #2563eb; --gc-soft: #eef4ff; --gc-line: #c7d8fb; }
+.g2 { --gc: #7c3aed; --gc-soft: #f4effe; --gc-line: #dccdfa; }
+.grp-seg .seg button.on:nth-child(1) { background: #2563eb; color: #fff; }
+.grp-seg .seg button.on:nth-child(2) { background: #7c3aed; color: #fff; }
+.grp-zone { background: var(--gc-soft); box-shadow: inset 0 0 0 1px var(--gc-line); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.grp-zone h2 { color: var(--gc); }
+.grp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grp-mark { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border-radius: 14px; background: var(--gc); color: #fff; font-weight: 700; font-size: 13px; }
+.grp-zone .class-card { box-shadow: inset 0 0 0 1px var(--gc-line); border-top: 4px solid var(--gc); }
+.grp-zone .class-card > .row:first-child strong { color: var(--gc); }
+@media (max-width: 860px) { .grp-zone { padding: 12px; border-radius: 16px; } }

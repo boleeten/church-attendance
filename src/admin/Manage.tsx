@@ -483,13 +483,15 @@ export function Classes() {
     <Page title="그룹·반 관리" sub="1부·2부 그룹과 학년별 반, 담당 교사를 관리합니다">
       <div className="row between wrap g12">
         <div className="row g16 wrap">
-          <Seg value={g} options={[["1", `1부 · ${count(1)}개 반`], ["2", `2부 · ${count(2)}개 반`]] as const} onChange={setG} />
+          <span className="grp-seg"><Seg value={g} options={[["1", `1부 · ${count(1)}개 반`], ["2", `2부 · ${count(2)}개 반`]] as const} onChange={setG} /></span>
           <span className="muted sb">{g}부 등록 {total}명 / 정원 {list.reduce((n, c) => n + c.capacity, 0)}명</span>
         </div>
         <Button onClick={() => setAdding(true)}><Icon name="plus" size={16} />반 추가</Button>
       </div>
       {violations.length > 0 && <Note warm icon="warning">배정 원칙(같은 부에서는 한 반만)에 맞지 않는 교사가 있습니다: {violations.map((v) => `${v.user.name}(${v.group}부 ${v.classes.map(classShort).join("·")})`).join(", ")}. 해당 반의 '교사 배정'에서 한 반만 남겨 주세요.</Note>}
       {full.length > 0 && <Note warm icon="warning">{full.map(classShort).join(", ")}이 정원(10명)에 도달했습니다. 학생을 추가하려면 다른 반으로 배정하세요.</Note>}
+      <div className={`grp-zone g${g}`}>
+      <div className="grp-head"><span className="grp-mark">{g}부</span><strong className="t-lg b">{g}부 반 목록</strong><span className="muted t-xs">{count(group)}개 반 · 등록 {total}명</span></div>
       {[4, 5, 6].map((gr) => (
         <section key={gr} className="col g12">
           <h2 className="t-base b">{gr}학년</h2>
@@ -504,7 +506,7 @@ export function Classes() {
                   </div>
                   <div className="row g8"><Badge tone="info">담임</Badge><span className="sb ellipsis">{names(c.id, "담임")}</span></div>
                   <div className="row g8"><Badge>보조</Badge><span className="ellipsis muted">{names(c.id, "보조")}</span></div>
-                  <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : undefined} />
+                  <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : "var(--gc)"} />
                   <span className="t-xs muted">현재 {n}명 / 정원 {c.capacity}명</span>
                   <div className="row g8">
                     <Button variant="outline" size="s" className="grow" onClick={() => setAssign(c)}>교사 배정</Button>
@@ -517,6 +519,7 @@ export function Classes() {
           </div>
         </section>
       ))}
+      </div>
       {assign && <AssignModal cls={assign} onClose={() => setAssign(null)} />}
       {adding && (
         <Modal title={`${g}부 반 추가`} onClose={() => setAdding(false)} footer={<><Button variant="outline" onClick={() => setAdding(false)}>취소</Button><Button onClick={() => { addClass(group, Number(grade)); toast("반을 추가했습니다."); setAdding(false); }}>추가</Button></>}>
