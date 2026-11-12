@@ -110,6 +110,13 @@ export const remote = {
     if (error) return error.message;
     return data && data.length ? null : "삭제 권한이 없거나 이미 삭제되었습니다.";
   },
+  /** 여러 줄을 id로 한 번에 지우고, 실제로 지워진 줄 수를 돌려준다 */
+  async removeIn(table: string, ids: string[]): Promise<string | number> {
+    if (!sb) return ids.length;
+    await writes;
+    const { data, error } = await sb.from(table).delete().in("id", ids).select("id");
+    return error ? error.message : data?.length ?? 0;
+  },
   remove(table: string, match: Record<string, unknown>) {
     if (!sb) return;
     queue(table, () => sb!.from(table).delete().match(mapKeys(match, snake)));

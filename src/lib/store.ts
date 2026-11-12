@@ -646,17 +646,28 @@ export const pendingGraduates = () => data.students.filter((s) => (s.status === 
 /** 6학년 학생을 졸업 처리한다. 기록(출석·심방노트)은 남고, 학생 목록·출석부·통계에서는 빠진다. */
 /** 학생 영구 삭제(관리자 전용). 출석 기록·심방노트도 함께 지워진다. */
 export async function deleteStudent(id: string): Promise<string | null> {
-  const st = data.students.find((s) => s.id === id);
-  if (!st) return "학생을 찾을 수 없습니다.";
+  return deleteStudents([id]);
+}
+
+export async function deleteStudents(ids: string[]): Promise<string | null> {
+  const picked = data.students.filter((s) => ids.includes(s.id));
+  if (!picked.length) return "삭제할 학생을 선택해 주세요.";
   if (remoteEnabled) {
-    const err = await remote.removeNow("students", { id });
-    if (err) return `학생 삭제에 실패했습니다. (${err})`;
+    for (let i = 0; i < picked.length; i += 200) {
+      const r = await remote.removeIn("students", picked.slice(i, i + 200).map((s) => s.id));
+      if (typeof r === "string") return `학생 삭제에 실패했습니다. (${r})`;
+      if (r === 0) return "학생 삭제 권한이 없습니다.";
+    }
   }
-  const c = data.classes.find((x) => x.id === st.classId);
-  data.students = data.students.filter((s) => s.id !== id);
-  for (const k of Object.keys(data.studentMarks)) if (k.endsWith(`|${id}`)) delete data.studentMarks[k];
-  data.notes = data.notes.filter((n) => n.studentId !== id);
-  audit("학생 삭제", `${st.name}${c ? ` (${classLabel(c)})` : ""}`, st.status, "삭제");
+  const gone = new Set(picked.map((s) => s.id));
+  data.students = data.students.filter((s) => !gone.has(s.id));
+  for (const k of Object.keys(data.studentMarks)) if (gone.has(k.slice(k.indexOf("|") + 1))) delete data.studentMarks[k];
+  data.notes = data.notes.filter((n) => !gone.has(n.studentId));
+  if (picked.length === 1) {
+    const st = picked[0];
+    const c = data.classes.find((x) => x.id === st.classId);
+    audit("학생 삭제", `${st.name}${c ? ` (${classLabel(c)})` : ""}`, st.status, "삭제");
+  } else audit("학생 삭제", `${picked.length}명 (${picked.slice(0, 3).map((s) => s.name).join(", ")}${picked.length > 3 ? " 외" : ""})`, "-", "삭제");
   emit();
   return null;
 }

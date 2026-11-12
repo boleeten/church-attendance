@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { deleteStudent, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { deleteStudent, deleteStudents, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -309,6 +309,17 @@ export function Students() {
     setSel((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
     toast(`${s.name} 학생을 삭제했습니다.`);
   };
+  const removeSelected = async () => {
+    const ids = [...sel];
+    const marks = Object.keys(d.studentMarks).filter((k) => sel.has(k.slice(k.indexOf("|") + 1))).length;
+    const notes = d.notes.filter((n) => sel.has(n.studentId)).length;
+    const extra = marks || notes ? `\n출석 기록 ${marks}건, 심방노트 ${notes}건도 함께 지워집니다.` : "";
+    if (!window.confirm(`선택한 학생 ${ids.length}명을 삭제할까요?${extra}\n삭제하면 되돌릴 수 없습니다.`)) return;
+    const err = await deleteStudents(ids);
+    if (err) return toast(err, "error");
+    setSel(new Set());
+    toast(`${ids.length}명을 삭제했습니다.`);
+  };
 
   const rows = useMemo(() => {
     const term = q.trim().replace(/-/g, "");
@@ -412,6 +423,7 @@ export function Students() {
             <Button variant="outline" size="s" disabled={!sel.size} onClick={() => { setMoveTo(""); setMoving(true); }}>선택 학생 반 이동</Button>
             <Button variant="outline" size="s" disabled={!sel.size} onClick={exportWithNotes}><Icon name="download" size={14} />선택 학생 Excel (심방노트 포함)</Button>
             <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void graduate()}>선택 학생 졸업 처리</Button>
+            {canDeleteStudent && <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void removeSelected()}><Icon name="trash" size={14} />선택 학생 삭제</Button>}
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
             <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
