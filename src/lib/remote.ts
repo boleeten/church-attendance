@@ -100,6 +100,14 @@ export const remote = {
     const { error } = await sb.from(table).update(mapKeys(row as Record<string, unknown>, snake)).in("id", ids);
     return error ? error.message : null;
   },
+  /** 대기 중인 쓰기를 마친 뒤 바로 지우고 결과를 돌려준다. 권한(RLS) 때문에 지워진 행이 없으면 오류로 본다. */
+  async removeNow(table: string, match: Record<string, unknown>): Promise<string | null> {
+    if (!sb) return null;
+    await writes;
+    const { data, error } = await sb.from(table).delete().match(mapKeys(match, snake)).select("id");
+    if (error) return error.message;
+    return data && data.length ? null : "삭제 권한이 없거나 이미 삭제되었습니다.";
+  },
   remove(table: string, match: Record<string, unknown>) {
     if (!sb) return;
     queue(table, () => sb!.from(table).delete().match(mapKeys(match, snake)));

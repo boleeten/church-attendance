@@ -644,6 +644,23 @@ export function updateSettings(patch: Partial<Data["settings"]>) {
 export const pendingGraduates = () => data.students.filter((s) => (s.status === "등록" || s.status === "장결자") && data.classes.find((c) => c.id === s.classId)?.grade === 6);
 
 /** 6학년 학생을 졸업 처리한다. 기록(출석·심방노트)은 남고, 학생 목록·출석부·통계에서는 빠진다. */
+/** 학생 영구 삭제(관리자 전용). 출석 기록·심방노트도 함께 지워진다. */
+export async function deleteStudent(id: string): Promise<string | null> {
+  const st = data.students.find((s) => s.id === id);
+  if (!st) return "학생을 찾을 수 없습니다.";
+  if (remoteEnabled) {
+    const err = await remote.removeNow("students", { id });
+    if (err) return `학생 삭제에 실패했습니다. (${err})`;
+  }
+  const c = data.classes.find((x) => x.id === st.classId);
+  data.students = data.students.filter((s) => s.id !== id);
+  for (const k of Object.keys(data.studentMarks)) if (k.endsWith(`|${id}`)) delete data.studentMarks[k];
+  data.notes = data.notes.filter((n) => n.studentId !== id);
+  audit("학생 삭제", `${st.name}${c ? ` (${classLabel(c)})` : ""}`, st.status, "삭제");
+  emit();
+  return null;
+}
+
 export async function graduateStudents(ids: string[]): Promise<string | null> {
   const picked = data.students.filter((s) => ids.includes(s.id) && s.status !== "졸업");
   if (!picked.length) return "졸업 처리할 학생을 선택해 주세요.";

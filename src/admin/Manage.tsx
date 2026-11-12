@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { deleteStudent, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -298,6 +298,18 @@ export function Students() {
   const [moveTo, setMoveTo] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const dates = useMemo(() => yearSundays(d), [d]);
+  const me = useMe();
+  const canDeleteStudent = !!me && (me.roles.includes("admin") || me.roles.includes("super"));
+  const removeStudent = async (s: Student) => {
+    const marks = Object.keys(d.studentMarks).filter((k) => k.endsWith(`|${s.id}`)).length;
+    const notes = d.notes.filter((n) => n.studentId === s.id).length;
+    const extra = marks || notes ? `\n출석 기록 ${marks}건, 심방노트 ${notes}건도 함께 지워집니다.` : "";
+    if (!window.confirm(`${s.name} 학생을 삭제할까요?${extra}\n삭제하면 되돌릴 수 없습니다.\n(기록을 남기려면 삭제 대신 상태를 '교회이동'으로 바꿔 주세요.)`)) return;
+    const err = await deleteStudent(s.id);
+    if (err) return toast(err, "error");
+    setSel((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
+    toast(`${s.name} 학생을 삭제했습니다.`);
+  };
 
   const rows = useMemo(() => {
     const term = q.trim().replace(/-/g, "");
@@ -416,7 +428,7 @@ export function Students() {
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
                   <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
-                  <td><span className="row g6"><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button><Button variant="secondary" size="s" onClick={() => setEdit(s)}>수정</Button></span></td>
+                  <td><span className="row g6"><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button><Button variant="secondary" size="s" onClick={() => setEdit(s)}>수정</Button>{canDeleteStudent && <RowMenu label={`${s.name} 더보기`} items={[{ icon: "trash", label: "삭제", danger: true, onSelect: () => void removeStudent(s) }]} />}</span></td>
                 </tr>
               ))}
             </tbody>
