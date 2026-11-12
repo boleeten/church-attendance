@@ -11,6 +11,7 @@ import { History } from "./mobile/History";
 import { afterLoginPath, homePath } from "./mobile/Shell";
 import { HeadHome, MyInfo, Notifications, StudentDetail, StudentList, TeacherHome } from "./mobile/Teacher";
 import { Toasts } from "./ui";
+import { UpdateBanner } from "./lib/update";
 
 /** 로그인·비밀번호 변경·역할을 확인한 뒤에만 화면을 보여 준다. */
 function Guard({ roles, children }: { roles: Role[]; children: ReactNode }) {
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="*" element={<Root />} />
       </Routes>
       <Toasts />
+      <UpdateBanner />
     </BrowserRouter>
   );
 }
