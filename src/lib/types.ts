@@ -1,5 +1,6 @@
 export type Role = "teacher" | "head" | "admin" | "super" | "owner";
 export type Mark = "P" | "A"; // 출석 / 결석 (값이 없으면 미확인)
+export type Gender = "남" | "여";
 export type StudentStatus = "등록" | "장결자" | "교회이동" | "졸업";
 export type AssignKind = "담임" | "보조";
 
@@ -34,6 +35,8 @@ export interface Assignment {
 export interface Student {
   id: string;
   name: string;
+  /** 성별. 예전에 등록한 학생은 비어 있을 수 있다 */
+  gender?: Gender | null;
   classId: string;
   status: StudentStatus;
   phone: string;

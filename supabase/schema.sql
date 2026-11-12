@@ -35,6 +35,7 @@ create table if not exists public.teacher_assignments (
 create table if not exists public.students (
   id text primary key,
   name text not null,
+  gender text check (gender in ('남', '여')),
   class_id text not null references public.classes (id),
   status text not null default '등록' check (status in ('등록', '장결자', '교회이동', '졸업')),
   phone text not null default '',
@@ -188,7 +189,7 @@ create or replace function public.guard_student() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if auth.uid() is null or is_admin() then return new; end if;
-  new.name := old.name; new.class_id := old.class_id; new.status := old.status;
+  new.name := old.name; new.gender := old.gender; new.class_id := old.class_id; new.status := old.status;
   new.phone := old.phone; new.guardian_phone := old.guardian_phone; new.guardian_rel := old.guardian_rel;
   return new;
 end $$;
@@ -324,3 +325,8 @@ on conflict do nothing;
 -- 학생 상태에 '졸업' 추가 (이미 만든 DB에도 적용되도록 제약을 다시 만든다. 여러 번 실행해도 된다)
 alter table public.students drop constraint if exists students_status_check;
 alter table public.students add constraint students_status_check check (status in ('등록', '장결자', '교회이동', '졸업'));
+
+-- 학생 성별 추가 (이미 만든 DB에도 적용. 여러 번 실행해도 된다)
+alter table public.students add column if not exists gender text;
+alter table public.students drop constraint if exists students_gender_check;
+alter table public.students add constraint students_gender_check check (gender is null or gender in ('남', '여'));

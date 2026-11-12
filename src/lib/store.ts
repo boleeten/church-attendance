@@ -4,7 +4,7 @@ import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v5";
+const DATA_KEY = "ca-demo-v6";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();

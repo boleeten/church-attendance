@@ -100,6 +100,7 @@ export function buildSeed(): Data {
       students.push({
         id: `s${sid++}`,
         name,
+        gender: sid % 2 ? "남" : "여",
         classId: c.id,
         status: "등록",
         phone: r() < 0.15 ? "" : phone("2345"),

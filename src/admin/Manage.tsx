@@ -4,7 +4,7 @@ import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "..
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
 import { graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
-import type { ClassRoom, Data, Role, Student, StudentStatus, User } from "../lib/types";
+import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 
@@ -182,9 +182,9 @@ const statusTone = (s: StudentStatus) => (s === "등록" ? "success" : s === "�
 
 function StudentForm({ student, onClose }: { student: Student | null; onClose: () => void }) {
   const d = useData();
-  const [f, setF] = useState<Omit<Student, "id">>(student ?? { name: "", classId: d.classes[0]?.id ?? "", status: "등록", phone: "", guardianPhone: "", guardianRel: "모" });
+  const [f, setF] = useState<Omit<Student, "id">>(student ?? { name: "", classId: d.classes[0]?.id ?? "", gender: null, status: "등록", phone: "", guardianPhone: "", guardianRel: "모" });
   const [err, setErr] = useState("");
-  const set = (k: keyof typeof f, v: string) => setF({ ...f, [k]: v });
+  const set = (k: keyof typeof f, v: string | null) => setF({ ...f, [k]: v });
   const save = () => {
     if (!f.name.trim()) return setErr("이름을 입력해 주세요.");
     const c = d.classes.find((x) => x.id === f.classId);
@@ -200,8 +200,15 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
   );
   return (
     <Modal title={student ? "학생 정보 수정" : "학생 등록"} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={save}>저장</Button></>}>
-      {inp("이름", "name", "학생 이름")}
       <div className="grid cols-2" style={{ gap: 12 }}>
+        {inp("이름", "name", "학생 이름")}
+        <div className="field"><label>성별</label>
+          <div className="row g8" role="radiogroup" aria-label="성별">
+            {(["남", "여"] as Gender[]).map((g) => (
+              <button key={g} type="button" role="radio" aria-checked={f.gender === g} className={`chip ${f.gender === g ? "on" : ""}`} style={{ minWidth: 64 }} onClick={() => set("gender", f.gender === g ? null : g)}>{g}</button>
+            ))}
+          </div>
+        </div>
         <div className="field"><label>{f.status === "장결자" ? "원래 반 (복귀할 반)" : "반"}</label>
           <SelectBox label="반" value={f.classId} onChange={(v) => set("classId", v)}>
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
@@ -233,6 +240,7 @@ export function StudentDetailModal({ student, onClose }: { student: Student; onC
         <div className="col g6 grow">
           <strong className="t-lg b">{student.name}</strong>
           <div className="row g6 wrap">
+            {student.gender && <Badge>{student.gender}</Badge>}
             <Badge tone="info">{c ? classLabel(c) : "미배정"}</Badge>
             <Badge tone={statusTone(student.status)}>{student.status}</Badge>
             {streak.count >= 2 && <Badge tone="error">{streak.count}주 연속 결석</Badge>}
@@ -324,11 +332,11 @@ export function Students() {
     const picked = d.students.filter((s) => sel.has(s.id)).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
     const uname = (id?: string | null) => d.users.find((u) => u.id === id)?.name ?? "";
     const lines = picked.flatMap(({ s, c }) => {
-      const info = [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
+      const info = [s.name, s.gender ?? "", c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
       const notes = d.notes.filter((n) => n.studentId === s.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
       return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), n.reply ?? "", uname(n.replyBy), fmtAt(n.replyAt)]) : [[...info, 0, "", "", "", "", "", "", ""]];
     });
-    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
+    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "성별", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
     toast(`${picked.length}명의 명부와 심방노트를 내려받았습니다.`);
   };
   const graduate = async () => {
@@ -343,16 +351,20 @@ export function Students() {
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(rows.map(({ s }) => s.id)));
 
   const exportCsv = () =>
-    download(`학생명부_${date}.csv`, toCSV([["이름", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
+    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
 
   const importCsv = async (file: File) => {
-    const lines = parseCSV(await file.text()).slice(1);
+    const all = parseCSV(await file.text());
+    // 새 양식은 둘째 칸이 '성별'. 성별 칸이 없는 예전 양식도 받는다
+    const hasGender = /성별/.test(all[0]?.[1] ?? "");
+    const lines = all.slice(1).map((r) => (hasGender ? r : [r[0], "", ...r.slice(1)]));
     let ok = 0;
     const skipped: string[] = [];
-    for (const [name, g, gr, no, phone, guardian, rel] of lines) {
+    for (const [name, sex, g, gr, no, phone, guardian, rel] of lines) {
+      const gender: Gender | null = /^\s*(남|남자|M)\s*$/i.test(sex ?? "") ? "남" : /^\s*(여|여자|F)\s*$/i.test(sex ?? "") ? "여" : null;
       const c = d.classes.find((x) => String(x.group) === String(g).replace("부", "") && String(x.grade) === String(gr) && String(x.no) === String(no));
       if (!name || !c || classCount(c.id) >= c.capacity) { skipped.push(name || "(이름 없음)"); continue; }
-      upsertStudent({ name, classId: c.id, status: "등록", phone: phone ?? "", guardianPhone: guardian ?? "", guardianRel: rel || "모" });
+      upsertStudent({ name, gender, classId: c.id, status: "등록", phone: phone ?? "", guardianPhone: guardian ?? "", guardianRel: rel || "모" });
       ok++;
     }
     toast(`${ok}명 등록${skipped.length ? `, ${skipped.length}명 제외(반 없음·정원 초과): ${skipped.slice(0, 3).join(", ")}` : ""}`, skipped.length ? "error" : "info");
@@ -385,19 +397,20 @@ export function Students() {
             <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void graduate()}>선택 학생 졸업 처리</Button>
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
-            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"]]))}><Icon name="download" size={14} />양식 받기</Button>
+            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
             <Button size="s" onClick={() => setEdit("new")}><Icon name="plus" size={14} />학생 등록</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }} />
           </div>
         </div>
         <div className="tablewrap">
           <table className="tbl">
-            <thead><tr><th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="검색 결과 전체 선택" title="검색 결과 전체 선택" /></th><th>학생</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
+            <thead><tr><th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="검색 결과 전체 선택" title="검색 결과 전체 선택" /></th><th>학생</th><th>성별</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
             <tbody>
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
                   <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
+                  <td>{s.gender ?? "-"}</td>
                   <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : "-"}</td>
                   <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
