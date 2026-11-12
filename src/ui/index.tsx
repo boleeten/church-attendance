@@ -193,7 +193,7 @@ export function Modal({ title, onClose, children, wide, footer }: { title: strin
           <button type="button" className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="x" /></button>
         </div>
         {children}
-        {footer && <div className="row g8" style={{ justifyContent: "flex-end" }}>{footer}</div>}
+        {footer && <div className="row g8 modal-foot">{footer}</div>}
       </div>
     </div>
   );
