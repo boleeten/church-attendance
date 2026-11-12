@@ -188,9 +188,9 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
   const save = () => {
     if (!f.name.trim()) return setErr("이름을 입력해 주세요.");
     const c = d.classes.find((x) => x.id === f.classId);
-    if (!c) return setErr("반을 선택해 주세요.");
+    if (!c && f.status === "장결자") return setErr("장결자는 복귀할 반을 선택해 주세요.");
     const joining = f.status === "등록" && (!student || student.classId !== f.classId || student.status !== "등록");
-    if (joining && classCount(c.id) >= c.capacity) return setErr(`${classLabel(c)}은 정원(${c.capacity}명)이 찼습니다. 다른 반을 선택해 주세요.`);
+    if (c && joining && classCount(c.id) >= c.capacity) return setErr(`${classLabel(c)}은 정원(${c.capacity}명)이 찼습니다. 다른 반을 선택해 주세요.`);
     upsertStudent({ ...f, name: f.name.trim(), id: student?.id });
     toast(student ? "학생 정보를 수정했습니다." : "학생을 등록했습니다.");
     onClose();
@@ -211,6 +211,7 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
         </div>
         <div className="field"><label>{f.status === "장결자" ? "원래 반 (복귀할 반)" : "반"}</label>
           <SelectBox label="반" value={f.classId} onChange={(v) => set("classId", v)}>
+            <option value="">반 미배정</option>
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
           </SelectBox>
         </div>
@@ -275,7 +276,6 @@ export function StudentDetailModal({ student, onClose }: { student: Student; onC
   );
 }
 
-const PAGE = 12;
 
 export function Students() {
   const d = useData();
@@ -290,7 +290,6 @@ export function Students() {
   const [status, setStatus] = useState(defaultStatus);
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
-  const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Student | null | "new">(null);
   const [detail, setDetail] = useState<Student | null>(null);
@@ -321,7 +320,7 @@ export function Students() {
         if (grade && String(c?.grade) !== grade) return false;
         const lg = longGroupOf(classId);
         if (lg && (s.status !== "장결자" || c?.group !== lg)) return false;
-        if (classId && !lg && (s.classId !== classId || s.status === "장결자")) return false;
+        if (classId === "none" ? !!c : classId && !lg && (s.classId !== classId || s.status === "장결자")) return false;
         if (status ? s.status !== status : s.status === "졸업") return false; // 졸업생은 상태 필터에서 '졸업'을 골랐을 때만 보인다
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
@@ -331,11 +330,9 @@ export function Students() {
       .sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
   }, [d, q, group, grade, classId, status, mark, streakOnly, date, dates]);
 
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
-  const cur = Math.min(page, pages - 1);
-  const view = rows.slice(cur * PAGE, cur * PAGE + PAGE);
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setPage(0); };
-  const upd = (f: (v: string) => void) => (v: string) => { f(v); setPage(0); };
+  const view = rows;
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); };
+  const upd = (f: (v: string) => void) => (v: string) => f(v);
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
   const fmtAt = (iso?: string | null) => (iso ? iso.slice(0, 10) : "");
@@ -370,16 +367,24 @@ export function Students() {
     // 새 양식은 둘째 칸이 '성별'. 성별 칸이 없는 예전 양식도 받는다
     const hasGender = /성별/.test(all[0]?.[1] ?? "");
     const lines = all.slice(1).map((r) => (hasGender ? r : [r[0], "", ...r.slice(1)]));
+    // 이름만 있으면 등록한다. 그룹·학년·반이 비었거나 맞는 반이 없거나 정원이 찼으면 '반 미배정'으로 등록
     let ok = 0;
-    const skipped: string[] = [];
-    for (const [name, sex, g, gr, no, phone, guardian, rel] of lines) {
+    const unassigned: string[] = [];
+    const clean = (v?: string) => (v ?? "").trim();
+    for (const [rawName, sex, g, gr, no, phone, guardian, rel] of lines) {
+      const name = clean(rawName);
+      if (!name) continue;
       const gender: Gender | null = /^\s*(남|남자|M)\s*$/i.test(sex ?? "") ? "남" : /^\s*(여|여자|F)\s*$/i.test(sex ?? "") ? "여" : null;
-      const c = d.classes.find((x) => String(x.group) === String(g).replace("부", "") && String(x.grade) === String(gr) && String(x.no) === String(no));
-      if (!name || !c || classCount(c.id) >= c.capacity) { skipped.push(name || "(이름 없음)"); continue; }
-      upsertStudent({ name, gender, classId: c.id, status: "등록", phone: phone ?? "", guardianPhone: guardian ?? "", guardianRel: rel || "모" });
+      const num = (v?: string) => clean(v).replace(/[^0-9]/g, "");
+      const c = d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
+      const fits = !!c && classCount(c.id) < c.capacity;
+      if (!fits) unassigned.push(name);
+      upsertStudent({ name, gender, classId: fits ? c!.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
       ok++;
     }
-    toast(`${ok}명 등록${skipped.length ? `, ${skipped.length}명 제외(반 없음·정원 초과): ${skipped.slice(0, 3).join(", ")}` : ""}`, skipped.length ? "error" : "info");
+    if (!ok) return toast("등록할 학생이 없습니다. 첫 칸에 학생 이름이 있는지 확인해 주세요.", "error");
+    toast(`${ok}명 등록${unassigned.length ? ` · 그중 ${unassigned.length}명은 반 미배정(반 정보 없음·정원 초과): ${unassigned.slice(0, 3).join(", ")}${unassigned.length > 3 ? " 등" : ""} — 반 필터 '미배정'에서 확인 후 반을 지정해 주세요.` : ""}`);
+    if (unassigned.length) { setClassId("none"); setStatus("등록"); }
   };
 
   return (
@@ -392,10 +397,10 @@ export function Students() {
         <div className="filter-row">
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
-          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}</SelectBox>
+          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
-          <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => { setStreakOnly(e.target.checked); setPage(0); }} />연속 결석만</label>
+          <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석만</label>
           <span className="spacer" />
           <button type="button" className="filter-reset" onClick={reset}>필터 초기화</button>
         </div>
@@ -423,7 +428,7 @@ export function Students() {
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
                   <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
                   <td>{s.gender ?? "-"}</td>
-                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : "-"}</td>
+                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : <span className="sb c-warning">미배정</span>}</td>
                   <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
@@ -434,11 +439,6 @@ export function Students() {
             </tbody>
           </table>
           {!rows.length && <p className="empty">조건에 맞는 학생이 없습니다.</p>}
-        </div>
-        <div className="row center g8">
-          <Button variant="outline" size="s" disabled={cur === 0} onClick={() => setPage(cur - 1)} aria-label="이전 페이지">‹</Button>
-          <span className="sb num">{cur + 1} / {pages}</span>
-          <Button variant="outline" size="s" disabled={cur >= pages - 1} onClick={() => setPage(cur + 1)} aria-label="다음 페이지">›</Button>
         </div>
       </section>
       {edit && <StudentForm student={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}

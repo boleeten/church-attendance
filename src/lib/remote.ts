@@ -53,7 +53,7 @@ async function loadAll(): Promise<Data> {
     users: profiles.map((p) => ({ ...p, password: "" })),
     classes: classes.sort((a, b) => a.group - b.group || a.grade - b.grade || a.no - b.no),
     assignments,
-    students,
+    students: students.map((s) => ({ ...s, classId: s.classId ?? "" })),
     studentMarks: Object.fromEntries(sMarks.map((m) => [`${m.date}|${m.studentId}`, m.mark])),
     teacherMarks: Object.fromEntries(tMarks.map((m) => [`${m.date}|${m.teacherId}`, m.mark])),
     sessions: Object.fromEntries(sessions.map((s) => [`${s.date}|${s.target}`, { completed: s.completed, savedAt: s.savedAt, savedBy: s.savedBy }])),
@@ -81,7 +81,9 @@ export const flushWrites = () => writes;
 export const remote = {
   upsert(table: string, row: object) {
     if (!sb) return;
-    queue(table, () => sb!.from(table).upsert(mapKeys(row as Record<string, unknown>, snake)));
+    const r = mapKeys(row as Record<string, unknown>, snake);
+    if (table === "students" && r.class_id === "") r.class_id = null; // 반 미배정
+    queue(table, () => sb!.from(table).upsert(r));
   },
   /** 새 줄만 추가한다. 본인이 읽을 권한이 없는 테이블(감사 로그)은 upsert 대신 이것을 쓴다. */
   insert(table: string, row: object) {
