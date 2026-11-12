@@ -323,21 +323,18 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .entry-card:hover, .entry-card:focus-visible { box-shadow: inset 0 0 0 1.5px var(--primary); outline: 0; }
 .entry-card .entry-ico { width: 48px; height: 48px; border-radius: 14px; background: var(--soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 
-/* 그룹·반 관리: 1부(파랑)·2부(보라)를 색으로 구분 */
-.g1 { --gc: #2563eb; --gc-soft: #eef4ff; --gc-line: #c7d8fb; }
-.g2 { --gc: #7c3aed; --gc-soft: #f4effe; --gc-line: #dccdfa; }
+/* 그룹·반 관리: 1부(파랑)·2부(보라)는 반 카드 색으로만 구분 (Figma 114:2277) */
+.g1 { --gc: #2563eb; --gc-soft: #eff6ff; --gc-line: #bfdbfe; }
+.g2 { --gc: #7c3aed; --gc-soft: #f5f3ff; --gc-line: #ddd6fe; }
 .grp-seg .seg button.on:nth-child(1) { background: #2563eb; color: #fff; }
 .grp-seg .seg button.on:nth-child(2) { background: #7c3aed; color: #fff; }
-.grp-zone { background: var(--gc-soft); box-shadow: inset 0 0 0 1px var(--gc-line); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
-.grp-zone h2 { color: var(--text); }
-.grp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.grp-mark { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border-radius: 14px; background: var(--gc); color: #fff; font-weight: 700; font-size: 13px; }
-/* 반 카드: 따뜻한 크림색 바탕 + 연한 주황 테두리 (첨부 시안) */
-.grp-zone .class-card { background: #fff6ec; box-shadow: inset 0 0 0 1px #f8d8b4; border-radius: 16px; padding: 20px; gap: 12px; }
+.grp-zone { display: flex; flex-direction: column; gap: 24px; }
+.grp-zone .grp-head { display: none; }
+.grp-zone .class-card { background: var(--gc-soft); box-shadow: inset 0 0 0 1px var(--gc-line); border-radius: 16px; padding: 18px; gap: 12px; }
 .grp-zone .class-card > .row:first-child strong { color: var(--text); font-size: 18px; }
-.grp-zone .class-card .btn.outline { background: #fff; }
-.grp-zone .class-card .class-del { background: #fff; }
-@media (max-width: 860px) { .grp-zone { padding: 12px; border-radius: 16px; } }
+.grp-zone .class-card .badge.error, .grp-zone .class-card .badge.warning { background: #fff; }
+.grp-zone .class-card .progress { background: rgba(255, 255, 255, 0.9); }
+.grp-zone .class-card .btn.outline, .grp-zone .class-card .class-del { background: #fff; }
 
 /* 표 행의 ⋯ 더보기 메뉴 (교사·계정 관리: 비활성화·삭제) */
 .more-btn { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); background: #fff; }
