@@ -533,11 +533,12 @@ export function Classes() {
                   </div>
                   <div className="row g8"><Badge tone="info">담임</Badge><span className="sb ellipsis">{names(c.id, "담임")}</span></div>
                   <div className="row g8"><Badge>보조</Badge><span className="ellipsis muted">{names(c.id, "보조")}</span></div>
-                  <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : "var(--gc)"} />
+                  <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : "var(--primary)"} />
                   <span className="t-xs muted">현재 {n}명 / 정원 {c.capacity}명</span>
                   <div className="row g8">
-                    <Button variant="outline" size="s" className="grow" onClick={() => setAssign(c)}>교사 배정</Button>
-                    <Link to={`/admin/students?class=${c.id}`} className="btn secondary s grow">학생 이동</Link>
+                    <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
+                    <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
+                    <span className="spacer" />
                     <button type="button" className="icon-btn bordered class-del" aria-label={`${classShort(c)} 삭제`} title="반 삭제" onClick={() => removeClass(c)}><Icon name="trash" size={16} /></button>
                   </div>
                 </div>
