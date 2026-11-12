@@ -192,13 +192,13 @@ export default function AdminApp() {
       <div className="admin">
         {open && <div className="backdrop" style={{ zIndex: 39 }} onClick={() => setOpen(false)} />}
         <aside className={`sidebar ${open ? "open" : ""}`}>
-          <div className="brand">
+          <Link to="/admin" className="brand" title="대시보드로 이동" onClick={() => setOpen(false)}>
             <span className="logo"><img src="/brand-flower.svg" alt="" width={43.4} height={43.4} /></span>
             <div className="col">
               <strong className="b">주님의교회 초등부</strong>
               <span className="t-xs" style={{ opacity: 0.7 }}>출석관리 Admin</span>
             </div>
-          </div>
+          </Link>
           <nav className="col g4" aria-label="관리자 메뉴">
             {MENU.filter(([to]) => to !== "accounts" || u.roles.includes("super")).map(([to, icon, label]) => (
               <NavLink key={to} to={`/admin/${to}`} end={to === ""} onClick={() => setOpen(false)}>
