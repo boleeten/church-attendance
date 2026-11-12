@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { currentSunday, fmtDot } from "../lib/date";
-import { yearSundays } from "../lib/stats";
+import { activeStudents, pctText, studentsSummary, yearSundays } from "../lib/stats";
+import type { Data } from "../lib/types";
 import { logout, useData, useMe } from "../lib/store";
 import { entryOptions, setTeacherGroup } from "../mobile/Shell";
 import { Avatar, Icon, Modal } from "../ui";
@@ -43,21 +44,94 @@ export function Page({ title, sub, children }: { title: string; sub: string; chi
           <h1 className="ellipsis">{title}</h1>
           <span className="t-xs muted sub ellipsis">{sub}</span>
         </div>
-        <label className="date-select">
-          <Icon name="calendarPlain" size={16} />
-          <select value={date} onChange={(e) => setDate(e.target.value)} aria-label="기준 주일 선택">
-            {[...yearSundays(d)].reverse().map((dt) => (
-              <option key={dt} value={dt}>{fmtDot(dt)} 주일</option>
-            ))}
-          </select>
-          <Icon name="down" size={14} />
-        </label>
+        <WeekPicker date={date} setDate={setDate} />
         <Link to="/admin/notify" className="icon-btn top-bell" aria-label="알림 설정">
           <Icon name="bell" size={20} />
         </Link>
         <UserMenu name={u.name} role={role} />
       </header>
       <main className="content">{children}</main>
+    </div>
+  );
+}
+
+/** 그 주의 입력 상태: 모든 반 완료면 출석률, 일부만 입력했으면 완료한 반 수 */
+function weekStatus(d: Data, dt: string): { text: string; tone: "done" | "doing" | "none" } {
+  const total = d.classes.length;
+  const done = d.classes.filter((c) => d.sessions[`${dt}|class:${c.id}`]?.completed).length;
+  const started = d.classes.filter((c) => d.sessions[`${dt}|class:${c.id}`]).length;
+  const rate = pctText(studentsSummary(d, dt, activeStudents(d)).rate);
+  if (total && done === total) return { text: `출석 ${rate} · 완료`, tone: "done" };
+  if (started) return { text: `입력 중 ${done}/${total}반`, tone: "doing" };
+  return { text: "미입력", tone: "none" };
+}
+
+/** 기준 주일 선택: ‹ › 로 한 주씩, '이번 주'로 복귀, 가운데 날짜를 누르면 월별 주일 목록 */
+function WeekPicker({ date, setDate }: { date: string; setDate: (d: string) => void }) {
+  const d = useData();
+  const weeks = [...yearSundays(d)].reverse(); // 최근 주일이 먼저
+  const thisWeek = weeks[0] ?? currentSunday();
+  const idx = Math.max(0, weeks.indexOf(date));
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent) {
+        if (e.key === "Escape") setOpen(false);
+        return;
+      }
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    list.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView({ block: "center" });
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const go = (i: number) => {
+    if (weeks[i]) setDate(weeks[i]);
+  };
+  const md = (dt: string) => {
+    const [, m, dd] = dt.split("-").map(Number);
+    return { m, dd };
+  };
+  let month = "";
+  return (
+    <div className="week-picker" ref={box}>
+      <button type="button" className="wp-now" disabled={date === thisWeek} onClick={() => setDate(thisWeek)}>이번 주</button>
+      <button type="button" className="wp-btn" aria-label="이전 주일" disabled={idx >= weeks.length - 1} onClick={() => go(idx + 1)}><Icon name="left" size={16} /></button>
+      <button type="button" className="wp-btn wp-date" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="calendarPlain" size={16} />
+        <span className="num wp-long">{fmtDot(date)} 주일</span>
+        <span className="num wp-short">{Number(date.slice(5, 7))}.{Number(date.slice(8, 10))} 주일</span>
+        {date === thisWeek && <span className="wp-tag">이번 주</span>}
+      </button>
+      <button type="button" className="wp-btn" aria-label="다음 주일" disabled={idx === 0} onClick={() => go(idx - 1)}><Icon name="right" size={16} /></button>
+      {open && (
+        <div className="wp-pop" role="listbox" aria-label="기준 주일 선택" ref={list}>
+          {weeks.map((dt) => {
+            const { m, dd } = md(dt);
+            const head = dt.slice(0, 7) !== month;
+            month = dt.slice(0, 7);
+            const st = weekStatus(d, dt);
+            return (
+              <div key={dt}>
+                {head && <div className="wp-month">{dt.slice(0, 4)}년 {m}월</div>}
+                <button type="button" role="option" aria-selected={dt === date} className={`wp-item ${dt === date ? "on" : ""}`} onClick={() => { setDate(dt); setOpen(false); }}>
+                  <span className={`wp-dot ${st.tone}`} />
+                  <span>{m}월 {dd}일 주일</span>
+                  {dt === thisWeek && <span className="wp-tag">이번 주</span>}
+                  <span className="wp-st">{st.text}</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
