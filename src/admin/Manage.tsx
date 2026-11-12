@@ -559,7 +559,7 @@ export function Classes() {
       {[4, 5, 6].map((gr) => (
         <section key={gr} className="col g12">
           <h2 className="t-base b">{gr}학년</h2>
-          <div className="grid cols-4" style={{ gap: 16 }}>
+          <div className="grid cols-4 class-grid" style={{ gap: 16 }}>
             {list.filter((c) => c.grade === gr).map((c) => {
               const n = classCount(c.id);
               return (
@@ -572,7 +572,7 @@ export function Classes() {
                   <div className="row g8"><Badge>보조</Badge><span className="ellipsis muted">{names(c.id, "보조")}</span></div>
                   <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : "var(--primary)"} />
                   <span className="t-xs muted">현재 {n}명 / 정원 {c.capacity}명</span>
-                  <div className="row g8">
+                  <div className="row g8 class-actions">
                     <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
                     <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
                     <span className="spacer" />

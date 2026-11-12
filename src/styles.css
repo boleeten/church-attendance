@@ -399,3 +399,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 
 .c-warning { color: #b7791f; }
 .class-card .spacer { flex: 1; }
+.class-card { min-width: 0; }
+.class-actions { flex-wrap: wrap; }
+/* 휴대폰: 반 카드는 한 줄에 하나씩 */
+@media (max-width: 600px) { .grid.class-grid { grid-template-columns: minmax(0, 1fr); } }
