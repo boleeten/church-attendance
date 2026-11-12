@@ -202,19 +202,24 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .date-select { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px var(--border); color: var(--text); flex: none; cursor: pointer; }
 .date-select:focus-within { box-shadow: inset 0 0 0 1.5px var(--primary); }
 .date-select select { appearance: none; -webkit-appearance: none; border: 0; outline: 0; background: transparent; font-size: 14px; font-weight: 400; color: var(--text); padding: 0; cursor: pointer; }
-.week-picker { position: relative; display: flex; align-items: center; gap: 4px; flex: none; }
-.week-picker button { display: inline-flex; align-items: center; justify-content: center; height: 40px; border: 0; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px var(--border); color: var(--text); font-size: 14px; cursor: pointer; }
+/* Figma 114:2274 · 날짜 선택 박스 · ‹› 묶음 · 이번주 (간격 8) */
+.week-picker { position: relative; display: flex; align-items: center; gap: 8px; flex: none; }
+.week-picker button { display: inline-flex; align-items: center; justify-content: center; height: 40px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--text); cursor: pointer; }
 .week-picker button:hover:not(:disabled) { background: var(--canvas); }
-.week-picker button:disabled { opacity: .4; cursor: default; }
-.week-picker button:focus-visible { box-shadow: inset 0 0 0 1.5px var(--primary); outline: 0; }
-.week-picker .wp-now { padding: 0 12px; margin-right: 4px; font-size: 13px; }
-.week-picker .wp-btn { width: 40px; }
-.week-picker .wp-date { width: auto; padding: 0 12px; gap: 8px; min-width: 168px; }
-.week-picker .wp-date[aria-expanded="true"] { box-shadow: inset 0 0 0 1.5px var(--primary); }
+.week-picker button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.week-picker button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.week-picker .wp-date { gap: 8px; padding: 0 12px; font-size: 16px; font-weight: 700; line-height: 1.5; }
+.week-picker .wp-date[aria-expanded="true"] { border-color: var(--primary); }
+.week-picker .wp-date[aria-expanded="true"] svg { transform: rotate(180deg); }
+.wp-arrows { display: flex; }
+.week-picker .wp-arrows button { width: 40px; padding: 0; }
+.week-picker .wp-arrows button:first-child { border-radius: 10px 0 0 10px; border-right: 0; }
+.week-picker .wp-arrows button:last-child { border-radius: 0 10px 10px 0; }
+.week-picker .wp-now { padding: 0 12px; font-size: 16px; font-weight: 600; line-height: 1.5; }
 .wp-tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 6px; background: #eff6ff; color: var(--primary); white-space: nowrap; }
-.wp-pop { position: absolute; top: calc(100% + 6px); right: 44px; z-index: 40; width: 300px; max-height: 360px; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--border), 0 12px 32px rgba(15, 23, 42, .12); padding: 6px; }
+.wp-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 300px; max-height: 360px; overflow: auto; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--border), 0 12px 32px rgba(15, 23, 42, .12); padding: 6px; }
 .wp-month { position: sticky; top: -6px; z-index: 1; background: #fff; font-size: 12px; color: var(--muted); padding: 10px 10px 4px; }
-.week-picker .wp-item { width: 100%; height: 40px; justify-content: flex-start; gap: 8px; padding: 0 10px; box-shadow: none; border-radius: 8px; text-align: left; }
+.week-picker .wp-item { width: 100%; height: 40px; justify-content: flex-start; gap: 8px; padding: 0 10px; border: 0; border-radius: 8px; text-align: left; font-size: 14px; }
 .week-picker .wp-item.on { background: #eff6ff; color: var(--primary); font-weight: 600; }
 .wp-st { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--muted); }
 .wp-item.on .wp-st { color: var(--primary); }
@@ -223,17 +228,14 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .wp-dot.doing { background: var(--warning); }
 .wp-short { display: none; }
 @media (max-width: 520px) {
-  .week-picker { gap: 3px; }
-  .week-picker .wp-btn { width: 34px; height: 36px; }
-  .week-picker .wp-date { width: auto; padding: 0 10px; gap: 6px; }
+  .week-picker { gap: 6px; }
+  .week-picker button { height: 36px; }
+  .week-picker .wp-arrows button { width: 34px; }
+  .week-picker .wp-date { padding: 0 10px; gap: 6px; font-size: 15px; }
+  .week-picker .wp-now { display: none; }
   .wp-long { display: none; }
   .wp-short { display: inline; }
   .week-picker .wp-pop { position: fixed; top: 64px; left: 16px; right: 16px; width: auto; }
-}
-@media (max-width: 900px) {
-  .week-picker .wp-now, .week-picker .wp-date .wp-tag { display: none; }
-  .week-picker .wp-date { min-width: 0; }
-  .wp-pop { right: 0; }
 }
 .top-bell { width: 40px; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--border); color: var(--text); }
 .top-bell:hover { background: var(--canvas); }

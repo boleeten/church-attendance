@@ -102,15 +102,16 @@ function WeekPicker({ date, setDate }: { date: string; setDate: (d: string) => v
   let month = "";
   return (
     <div className="week-picker" ref={box}>
-      <button type="button" className="wp-now" disabled={date === thisWeek} onClick={() => setDate(thisWeek)}>이번 주</button>
-      <button type="button" className="wp-btn" aria-label="이전 주일" disabled={idx >= weeks.length - 1} onClick={() => go(idx + 1)}><Icon name="left" size={16} /></button>
-      <button type="button" className="wp-btn wp-date" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <Icon name="calendarPlain" size={16} />
-        <span className="num wp-long">{fmtDot(date)} 주일</span>
-        <span className="num wp-short">{Number(date.slice(5, 7))}.{Number(date.slice(8, 10))} 주일</span>
-        {date === thisWeek && <span className="wp-tag">이번 주</span>}
+      <button type="button" className="wp-date" aria-haspopup="listbox" aria-expanded={open} aria-label="기준 주일 선택" onClick={() => setOpen(!open)}>
+        <span className="num wp-long">{date.replaceAll("-", ".")}</span>
+        <span className="num wp-short">{date.slice(5).replace("-", ".")}</span>
+        <Icon name="down" size={14} />
       </button>
-      <button type="button" className="wp-btn" aria-label="다음 주일" disabled={idx === 0} onClick={() => go(idx - 1)}><Icon name="right" size={16} /></button>
+      <div className="wp-arrows">
+        <button type="button" aria-label="이전 주일" disabled={idx >= weeks.length - 1} onClick={() => go(idx + 1)}><Icon name="left" size={14} /></button>
+        <button type="button" aria-label="다음 주일" disabled={idx === 0} onClick={() => go(idx - 1)}><Icon name="right" size={14} /></button>
+      </div>
+      <button type="button" className="wp-now" disabled={date === thisWeek} onClick={() => setDate(thisWeek)}>이번주</button>
       {open && (
         <div className="wp-pop" role="listbox" aria-label="기준 주일 선택" ref={list}>
           {weeks.map((dt) => {
