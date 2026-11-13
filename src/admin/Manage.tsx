@@ -532,7 +532,7 @@ export function Classes() {
   /** 카드용 이름: 비어 있으면 흐린 '미배정' */
   const teacherName = (cid: string, k: "담임" | "보조") => {
     const v = names(cid, k);
-    return v === "미배정" ? <span className="cc-none">미배정</span> : v;
+    return v === "미배정" ? <span className="cc-none">{k}교사 미배정</span> : v;
   };
   const count = (n: 1 | 2) => d.classes.filter((c) => c.group === n).length;
   const violations = assignmentViolations();
