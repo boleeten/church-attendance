@@ -377,6 +377,18 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .grp-zone .class-card .badge.error, .grp-zone .class-card .badge.warning { background: #fff; }
 .grp-zone .class-card .progress { background: rgba(255, 255, 255, 0.9); }
 .grp-zone .class-card .btn.outline, .grp-zone .class-card .class-del { background: #fff; }
+/* Figma 114:1923 반 카드 */
+.grp-zone .class-card { padding: 18px 18px 24px; gap: 24px; }
+.cc-top { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.cc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cc-name { font-size: 24px; font-weight: 700; line-height: 1.5; color: var(--text); }
+.cc-teachers { font-size: 20px; font-weight: 600; line-height: 1.5; color: var(--text); word-break: keep-all; }
+.cc-none { color: #9ca3af; font-weight: 400; }
+.cc-bottom { display: flex; flex-direction: column; gap: 12px; }
+.cc-count { font-size: 14px; line-height: 1.3; color: var(--muted); }
+.grp-zone .class-card .btn.outline { box-shadow: none; border: 0; }
+.more-btn.vertical { border-radius: 60px; box-shadow: none; background: transparent; }
+.more-btn.vertical:hover, .more-btn.vertical[aria-expanded="true"] { background: rgba(255, 255, 255, 0.8); }
 
 /* 표 행의 ⋯ 더보기 메뉴 (교사·계정 관리: 비활성화·삭제) */
 .more-btn { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); background: #fff; }

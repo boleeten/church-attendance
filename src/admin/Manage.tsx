@@ -529,6 +529,11 @@ export function Classes() {
   const list = d.classes.filter((c) => c.group === group);
   const total = groupStudents(d, group).length;
   const names = (cid: string, k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cid && a.kind === k).map((a) => d.users.find((u) => u.id === a.userId)?.name).filter(Boolean).join(", ") || "미배정";
+  /** 카드용 이름: 비어 있으면 흐린 '미배정' */
+  const teacherName = (cid: string, k: "담임" | "보조") => {
+    const v = names(cid, k);
+    return v === "미배정" ? <span className="cc-none">미배정</span> : v;
+  };
   const count = (n: 1 | 2) => d.classes.filter((c) => c.group === n).length;
   const violations = assignmentViolations();
   const removeClass = (c: ClassRoom) => {
@@ -559,17 +564,21 @@ export function Classes() {
               const n = classCount(c.id);
               return (
                 <div key={c.id} className="class-card">
-                  <div className="row between">
-                    <strong className="t-base b">{classShort(c)}</strong>
+                  <div className="cc-top">
+                    <div className="cc-head">
+                      <strong className="cc-name">{classShort(c)}</strong>
+                      <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, onSelect: () => removeClass(c) }]} />
+                    </div>
+                    <p className="cc-teachers">
+                      {teacherName(c.id, "담임")} / {teacherName(c.id, "보조")}
+                    </p>
                   </div>
-                  <div className="row g8"><Badge tone="info">담임</Badge><span className="sb ellipsis">{names(c.id, "담임")}</span></div>
-                  <div className="row g8"><Badge>보조</Badge><span className="ellipsis muted">{names(c.id, "보조")}</span></div>
-                  <span className="t-sm muted">현재 <strong className="sb" style={{ color: "var(--text)" }}>{n}명</strong></span>
-                  <div className="row g8 class-actions">
-                    <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
-                    <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
-                    <span className="spacer" />
-                    <button type="button" className="icon-btn bordered class-del" aria-label={`${classShort(c)} 삭제`} title="반 삭제" onClick={() => removeClass(c)}><Icon name="trash" size={16} /></button>
+                  <div className="cc-bottom">
+                    <span className="cc-count">현재 {n}명</span>
+                    <div className="row g8 class-actions">
+                      <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
+                      <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
+                    </div>
                   </div>
                 </div>
               );
@@ -762,7 +771,7 @@ function TeacherImportModal({ rows, onClose }: { rows: TeacherRow[]; onClose: ()
 
 type RowMenuItem = { icon: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean };
 /** 자주 쓰지 않는 동작을 담는 ⋯ 더보기 메뉴. 표가 가로 스크롤 영역 안에 있어 잘리지 않도록 화면 기준(fixed)으로 띄운다. */
-function RowMenu({ label, items }: { label: string; items: RowMenuItem[] }) {
+function RowMenu({ label, items, vertical }: { label: string; items: RowMenuItem[]; vertical?: boolean }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
@@ -794,7 +803,7 @@ function RowMenu({ label, items }: { label: string; items: RowMenuItem[] }) {
   };
   return (
     <>
-      <button ref={btn} type="button" className="more-btn" aria-label={label} aria-haspopup="menu" aria-expanded={!!pos} onClick={toggle}><Icon name="more" size={20} stroke={2.6} /></button>
+      <button ref={btn} type="button" className={`more-btn ${vertical ? "vertical" : ""}`} aria-label={label} aria-haspopup="menu" aria-expanded={!!pos} onClick={toggle}>{vertical ? <img src="/icon-more-vertical.svg" alt="" width={13} height={15} /> : <Icon name="more" size={20} stroke={2.6} />}</button>
       {pos && (
         <div ref={pop} className="user-pop row-pop" role="menu" style={{ top: pos.top, right: pos.right }}>
           {items.map((it) => (
