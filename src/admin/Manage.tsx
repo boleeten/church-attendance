@@ -189,8 +189,6 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
     if (!f.name.trim()) return setErr("이름을 입력해 주세요.");
     const c = d.classes.find((x) => x.id === f.classId);
     if (!c && f.status === "장결자") return setErr("장결자는 복귀할 반을 선택해 주세요.");
-    const joining = f.status === "등록" && (!student || student.classId !== f.classId || student.status !== "등록");
-    if (c && joining && classCount(c.id) >= c.capacity) return setErr(`${classLabel(c)}은 정원(${c.capacity}명)이 찼습니다. 다른 반을 선택해 주세요.`);
     upsertStudent({ ...f, name: f.name.trim(), id: student?.id });
     toast(student ? "학생 정보를 수정했습니다." : "학생을 등록했습니다.");
     onClose();
@@ -212,7 +210,7 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
         <div className="field"><label>{f.status === "장결자" ? "원래 반 (복귀할 반)" : "반"}</label>
           <SelectBox label="반" value={f.classId} onChange={(v) => set("classId", v)}>
             <option value="">반 미배정</option>
-            {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
+            {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} (현재 {classCount(c.id)}명)</option>)}
           </SelectBox>
         </div>
         <div className="field"><label>상태</label>
@@ -378,7 +376,7 @@ export function Students() {
     // 새 양식은 둘째 칸이 '성별'. 성별 칸이 없는 예전 양식도 받는다
     const hasGender = /성별/.test(all[0]?.[1] ?? "");
     const lines = all.slice(1).map((r) => (hasGender ? r : [r[0], "", ...r.slice(1)]));
-    // 이름만 있으면 등록한다. 그룹·학년·반이 비었거나 맞는 반이 없거나 정원이 찼으면 '반 미배정'으로 등록
+    // 이름만 있으면 등록한다. 그룹·학년·반이 비었거나 맞는 반이 없으면 '반 미배정'으로 등록
     let ok = 0;
     const unassigned: string[] = [];
     const clean = (v?: string) => (v ?? "").trim();
@@ -388,13 +386,12 @@ export function Students() {
       const gender: Gender | null = /^\s*(남|남자|M)\s*$/i.test(sex ?? "") ? "남" : /^\s*(여|여자|F)\s*$/i.test(sex ?? "") ? "여" : null;
       const num = (v?: string) => clean(v).replace(/[^0-9]/g, "");
       const c = d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
-      const fits = !!c && classCount(c.id) < c.capacity;
-      if (!fits) unassigned.push(name);
-      upsertStudent({ name, gender, classId: fits ? c!.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
+      if (!c) unassigned.push(name);
+      upsertStudent({ name, gender, classId: c ? c.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
       ok++;
     }
     if (!ok) return toast("등록할 학생이 없습니다. 첫 칸에 학생 이름이 있는지 확인해 주세요.", "error");
-    toast(`${ok}명 등록${unassigned.length ? ` · 그중 ${unassigned.length}명은 반 미배정(반 정보 없음·정원 초과): ${unassigned.slice(0, 3).join(", ")}${unassigned.length > 3 ? " 등" : ""} — 반 필터 '미배정'에서 확인 후 반을 지정해 주세요.` : ""}`);
+    toast(`${ok}명 등록${unassigned.length ? ` · 그중 ${unassigned.length}명은 반 미배정(반 정보 없음): ${unassigned.slice(0, 3).join(", ")}${unassigned.length > 3 ? " 등" : ""} — 반 필터 '미배정'에서 확인 후 반을 지정해 주세요.` : ""}`);
     if (unassigned.length) { setClassId("none"); setStatus("등록"); }
   };
 
@@ -459,10 +456,10 @@ export function Students() {
         <Modal title={`선택 학생 ${sel.size}명 반 이동`} onClose={() => setMoving(false)} footer={<><Button variant="outline" onClick={() => setMoving(false)}>취소</Button><Button disabled={!moveTo} onClick={() => { const e = moveStudents([...sel], moveTo); if (e) return toast(e, "error"); toast("반을 이동했습니다. 이전 출석 기록은 그대로 보존됩니다."); setSel(new Set()); setMoving(false); }}>이동</Button></>}>
           <SelectBox label="이동할 반" value={moveTo} onChange={setMoveTo}>
             <option value="">이동할 반 선택</option>
-            {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} ({classCount(c.id)}/{c.capacity})</option>)}
+            {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} (현재 {classCount(c.id)}명)</option>)}
             {([1, 2] as const).map((g) => <option key={g} value={longClassId(g)}>{longLabel(g)} (교사 배정 없음)</option>)}
           </SelectBox>
-          <Note>반을 옮겨도 이전 출석 기록과 심방노트는 보존됩니다. 정원(10명)을 넘는 이동은 할 수 없습니다. 장결자반으로 옮기면 상태가 '장결자'가 되고, 장결자반에서 일반 반으로 옮기면 '등록'으로 돌아옵니다.</Note>
+          <Note>반을 옮겨도 이전 출석 기록과 심방노트는 보존됩니다. 장결자반으로 옮기면 상태가 '장결자'가 되고, 장결자반에서 일반 반으로 옮기면 '등록'으로 돌아옵니다.</Note>
         </Modal>
       )}
     </Page>
@@ -531,7 +528,6 @@ export function Classes() {
   const group = Number(g) as 1 | 2;
   const list = d.classes.filter((c) => c.group === group);
   const total = groupStudents(d, group).length;
-  const full = list.filter((c) => classCount(c.id) >= c.capacity);
   const names = (cid: string, k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cid && a.kind === k).map((a) => d.users.find((u) => u.id === a.userId)?.name).filter(Boolean).join(", ") || "미배정";
   const count = (n: 1 | 2) => d.classes.filter((c) => c.group === n).length;
   const violations = assignmentViolations();
@@ -548,12 +544,11 @@ export function Classes() {
       <div className="row between wrap g12">
         <div className="row g16 wrap">
           <span className="grp-seg"><Seg value={g} options={[["1", `1부 · ${count(1)}개 반`], ["2", `2부 · ${count(2)}개 반`]] as const} onChange={setG} /></span>
-          <span className="muted sb">{g}부 등록 {total}명 / 정원 {list.reduce((n, c) => n + c.capacity, 0)}명</span>
+          <span className="muted sb">{g}부 등록 {total}명</span>
         </div>
         <Button onClick={() => setAdding(true)}><Icon name="plus" size={16} />반 추가</Button>
       </div>
       {violations.length > 0 && <Note warm icon="warning">배정 원칙(같은 부에서는 한 반만)에 맞지 않는 교사가 있습니다: {violations.map((v) => `${v.user.name}(${v.group}부 ${v.classes.map(classShort).join("·")})`).join(", ")}. 해당 반의 '교사 배정'에서 한 반만 남겨 주세요.</Note>}
-      {full.length > 0 && <Note warm icon="warning">{full.map(classShort).join(", ")}이 정원(10명)에 도달했습니다. 학생을 추가하려면 다른 반으로 배정하세요.</Note>}
       <div className={`grp-zone g${g}`}>
       <div className="grp-head"><span className="grp-mark">{g}부</span><strong className="t-lg b">{g}부 반 목록</strong><span className="muted t-xs">{count(group)}개 반 · 등록 {total}명</span></div>
       {[4, 5, 6].map((gr) => (
@@ -566,12 +561,10 @@ export function Classes() {
                 <div key={c.id} className="class-card">
                   <div className="row between">
                     <strong className="t-base b">{classShort(c)}</strong>
-                    {n >= c.capacity ? <Badge tone="error">정원 마감</Badge> : n >= c.capacity - 1 ? <Badge tone="warning">정원 임박</Badge> : null}
                   </div>
                   <div className="row g8"><Badge tone="info">담임</Badge><span className="sb ellipsis">{names(c.id, "담임")}</span></div>
                   <div className="row g8"><Badge>보조</Badge><span className="ellipsis muted">{names(c.id, "보조")}</span></div>
-                  <Progress value={(n / c.capacity) * 100} color={n >= c.capacity ? "var(--error)" : "var(--primary)"} />
-                  <span className="t-xs muted">현재 {n}명 / 정원 {c.capacity}명</span>
+                  <span className="t-sm muted">현재 <strong className="sb" style={{ color: "var(--text)" }}>{n}명</strong></span>
                   <div className="row g8 class-actions">
                     <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
                     <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
@@ -589,7 +582,7 @@ export function Classes() {
       {adding && (
         <Modal title={`${g}부 반 추가`} onClose={() => setAdding(false)} footer={<><Button variant="outline" onClick={() => setAdding(false)}>취소</Button><Button onClick={() => { addClass(group, Number(grade)); toast("반을 추가했습니다."); setAdding(false); }}>추가</Button></>}>
           <div className="field"><label>학년</label><SelectBox label="학년" value={grade} onChange={setGrade}>{[4, 5, 6].map((x) => <option key={x} value={x}>{x}학년</option>)}</SelectBox></div>
-          <Note>새 반은 해당 학년의 다음 번호로 만들어지며 정원은 10명입니다.</Note>
+          <Note>새 반은 해당 학년의 다음 번호로 만들어집니다.</Note>
         </Modal>
       )}
     </Page>

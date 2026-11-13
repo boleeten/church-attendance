@@ -362,7 +362,7 @@ export function classCount(classId: string) {
 }
 
 /** 장결자반: 부마다 하나. 따로 반을 만들지 않고 상태가 '장결자'인 학생을 그 부의 장결자반으로 본다.
- *  교사 배정·출석체크·정원이 없고, 학생의 원래 반(classId)은 복귀할 반으로 남겨 둔다. */
+ *  교사 배정·출석체크가 없고, 학생의 원래 반(classId)은 복귀할 반으로 남겨 둔다. */
 export const LONG_PREFIX = "long-";
 export const longClassId = (g: 1 | 2) => `${LONG_PREFIX}${g}`;
 export const longGroupOf = (id: string): 1 | 2 | null => (id === "long-1" ? 1 : id === "long-2" ? 2 : null);
@@ -386,8 +386,6 @@ export function moveStudents(ids: string[], classId: string): string | null {
   if (!c) return "반을 선택해 주세요.";
   // 장결자반에서 일반 반으로 옮기면 '등록'으로 복귀한다
   const moving = data.students.filter((s) => ids.includes(s.id) && (s.classId !== classId || s.status === "장결자"));
-  const joining = moving.filter((s) => s.status === "등록" ? s.classId !== classId : s.status === "장결자").length;
-  if (classCount(classId) + joining > c.capacity) return `${classLabel(c)}의 정원(${c.capacity}명)을 초과합니다.`;
   for (const s of moving) {
     const from = data.classes.find((x) => x.id === s.classId);
     if (s.status === "장결자") {
@@ -422,7 +420,7 @@ export function addClass(group: 1 | 2, grade: number): string | null {
   data.classes.push(row);
   data.classes.sort((a, b) => a.group - b.group || a.grade - b.grade || a.no - b.no);
   remote.upsert("classes", row);
-  audit("반 추가", classLabel(row), "-", "정원 10명");
+  audit("반 추가", classLabel(row), "-", "추가");
   emit();
   return null;
 }
