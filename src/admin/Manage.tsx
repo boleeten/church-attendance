@@ -323,9 +323,9 @@ export function Students() {
   const [group, setGroup] = useState("");
   const [grade, setGrade] = useState(params.get("grade") ?? "");
   const [classId, setClassId] = useState(params.get("class") ?? "");
-  // 기본은 '등록'. 장결자반 바로가기는 '장결자', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
   // 기본은 '등록'. 장결자반 바로가기는 '장결자', 새친구반 바로가기는 '새친구', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
-  const defaultStatus = params.get("status") ?? (longGroupOf(params.get("class") ?? "") ? "장결자" : params.get("ready") === "1" ? "새친구" : "등록");
+  const fromNewFriend = d.classes.find((c) => c.id === params.get("class"))?.grade === 0;
+  const defaultStatus = params.get("status") ?? (longGroupOf(params.get("class") ?? "") ? "장결자" : params.get("ready") === "1" || fromNewFriend ? "새친구" : "등록");
   const [status, setStatus] = useState(defaultStatus);
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
@@ -390,6 +390,13 @@ export function Students() {
   const view = rows;
   const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setBirth(""); setReadyOnly(false); };
   const upd = (f: (v: string) => void) => (v: string) => f(v);
+  /** 반 필터: 새친구반을 고르면 상태를 '새친구'로, 새친구반에서 다른 반으로 바꾸면 '등록'으로 맞춘다 */
+  const pickClass = (v: string) => {
+    const nf = d.classes.find((c) => c.id === v)?.grade === 0;
+    if (nf && status !== "새친구" && status !== "") setStatus("새친구");
+    else if (!nf && status === "새친구" && !longGroupOf(v)) setStatus("등록");
+    setClassId(v);
+  };
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
   const fmtAt = (iso?: string | null) => (iso ? iso.slice(0, 10) : "");
@@ -460,7 +467,7 @@ export function Students() {
         <div className="filter-row">
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
-          <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
+          <SelectBox label="반" value={classId} onChange={pickClass}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <SelectBox label="생일" value={birth} onChange={upd(setBirth)}><option value="">생일: 전체</option><option value="this">생일: 이번 달 생일</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1)}>생일: {i + 1}월</option>)}</SelectBox>
