@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
-import { activeStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
+import { activeStudents, attendingStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
 import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg, Toggle } from "../ui";
@@ -59,7 +59,7 @@ export function StudentAttendance() {
   const [sheet, setSheet] = useState<ClassRoom | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const dates = useMemo(() => yearSundays(d).filter((x) => x <= date), [d, date]);
-  const students = activeStudents(d);
+  const students = attendingStudents(d);
   const all = studentsSummary(d, date, students);
   const pending = incompleteClasses(d, date);
   const streaks = useMemo(() => new Map(students.map((s) => [s.id, consecutiveAbsences(d.studentMarks, s.id, dates).count])), [d, dates, students]);

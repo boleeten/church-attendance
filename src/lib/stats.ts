@@ -1,5 +1,5 @@
 import { currentSunday, sundaysOfYear } from "./date";
-import { isEnrolled, type ClassRoom, type Data, type Mark, type Student, type User } from "./types";
+import { attendsClass, isEnrolled, type ClassRoom, type Data, type Mark, type Student, type User } from "./types";
 
 export const pct = (p: number, a: number): number | null => (p + a === 0 ? null : Math.round((p / (p + a)) * 100));
 export const pctText = (v: number | null) => (v === null ? "-" : `${v}%`);
@@ -7,9 +7,12 @@ export const pctText = (v: number | null) => (v === null ? "-" : `${v}%`);
 /** 올해 1월 첫 주일부터 이번 주일까지 */
 export const yearSundays = (d: Data) => sundaysOfYear(d.settings.year, currentSunday());
 
-export const roster = (d: Data, classId: string): Student[] => d.students.filter((s) => s.classId === classId && isEnrolled(s.status)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+export const roster = (d: Data, classId: string): Student[] => d.students.filter((s) => s.classId === classId && attendsClass(s.status)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
+/** 재적 학생(등록) */
 export const activeStudents = (d: Data) => d.students.filter((s) => isEnrolled(s.status));
+/** 출석을 체크하는 학생(등록 + 새친구) */
+export const attendingStudents = (d: Data) => d.students.filter((s) => attendsClass(s.status));
 
 export interface Summary {
   total: number;
@@ -164,7 +167,7 @@ export function newFriendsReady(d: Data): { s: Student; weeks: number }[] {
   const dates = yearSundays(d);
   const nf = new Set(d.classes.filter((c) => c.grade === 0).map((c) => c.id));
   return d.students
-    .filter((s) => isEnrolled(s.status) && nf.has(s.classId))
+    .filter((s) => attendsClass(s.status) && nf.has(s.classId))
     .map((s) => ({ s, weeks: consecutivePresent(d.studentMarks, s.id, dates) }))
     .filter((x) => x.weeks >= NEW_FRIEND_WEEKS)
     .sort((a, b) => a.s.classId.localeCompare(b.s.classId) || a.s.name.localeCompare(b.s.name, "ko"));

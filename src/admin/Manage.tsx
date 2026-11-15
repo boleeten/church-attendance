@@ -4,7 +4,7 @@ import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay
 import { toast } from "../lib/remote";
 import { activeStudents, monthBirthdays, newFriendsReady, NEW_FRIEND_WEEKS, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
 import { deleteStudent, deleteStudents, graduateStudents, statusForClass, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
-import { isEnrolled, type ClassRoom, type Data, type Gender, type Role, type Student, type StudentStatus, type User } from "../lib/types";
+import { attendsClass, type ClassRoom, type Data, type Gender, type Role, type Student, type StudentStatus, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 
@@ -71,7 +71,7 @@ function BirthdayPanel() {
   const d = useData();
   const today = todayISO();
   const m = +today.slice(5, 7);
-  const list = monthBirthdays(d.students.filter((s) => isEnrolled(s.status) || s.status === "장결자"), m, today);
+  const list = monthBirthdays(d.students.filter((s) => attendsClass(s.status) || s.status === "장결자"), m, today);
   const [detail, setDetail] = useState<Student | null>(null);
   return (
     <section className="panel">
@@ -125,6 +125,7 @@ export function Dashboard() {
   const d = useData();
   const { date } = useAdminDate();
   const students = activeStudents(d);
+  const newFriendCount = d.students.filter((s) => s.status === "새친구").length;
   const staff = d.users.filter((u) => u.roles.includes("teacher") && u.group !== null);
   const pending = incompleteClasses(d, date);
   const dates = yearSundays(d).filter((x) => x <= date).slice(-6);
@@ -134,7 +135,7 @@ export function Dashboard() {
     <Page title="통합 대시보드" sub={`${d.settings.year}학년도 · ${fmtDot(date)} 주일 기준`}>
       <NewFriendAlert />
       <div className="grid cols-2">
-        <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록·새친구)`} icon="users" />
+        <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록 기준)${newFriendCount ? ` · 새친구 ${newFriendCount}명 별도` : ""}`} icon="users" />
         <Kpi label="전체 교사" value={`${staff.length}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명`} icon="badge" />
       </div>
       <div className="grid cols-2">
@@ -314,8 +315,8 @@ export function Students() {
   const [grade, setGrade] = useState(params.get("grade") ?? "");
   const [classId, setClassId] = useState(params.get("class") ?? "");
   // 기본은 '등록'. 장결자반 바로가기는 '장결자', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
-  // 기본은 '등록·새친구'(지금 다니는 학생). 장결자반 바로가기는 '장결자', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
-  const defaultStatus = params.get("status") ?? (longGroupOf(params.get("class") ?? "") ? "장결자" : "active");
+  // 기본은 '등록'. 장결자반 바로가기는 '장결자', 새친구반 바로가기는 '새친구', 주소에 status를 주면 그 값(빈 값이면 졸업 제외 전체)
+  const defaultStatus = params.get("status") ?? (longGroupOf(params.get("class") ?? "") ? "장결자" : params.get("ready") === "1" ? "새친구" : "등록");
   const [status, setStatus] = useState(defaultStatus);
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
@@ -366,7 +367,7 @@ export function Students() {
         const lg = longGroupOf(classId);
         if (lg && (s.status !== "장결자" || c?.group !== lg)) return false;
         if (classId === "none" ? !!c : classId && !lg && (s.classId !== classId || s.status === "장결자")) return false;
-        if (status === "active" ? !isEnrolled(s.status) : status ? s.status !== status : s.status === "졸업") return false; // 졸업생은 상태 필터에서 '졸업'을 골랐을 때만 보인다
+        if (status ? s.status !== status : s.status === "졸업") return false; // 졸업생은 상태 필터에서 '졸업'을 골랐을 때만 보인다
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
         if (streakOnly && consecutiveAbsences(d.studentMarks, s.id, dates).count < 2) return false;
@@ -378,7 +379,7 @@ export function Students() {
   }, [d, q, group, grade, classId, status, mark, streakOnly, birth, readyOnly, readyIds, date, dates]);
 
   const view = rows;
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("active"); setMark(""); setStreakOnly(false); setBirth(""); setReadyOnly(false); };
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setBirth(""); setReadyOnly(false); };
   const upd = (f: (v: string) => void) => (v: string) => f(v);
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
@@ -437,7 +438,7 @@ export function Students() {
     }
     if (!ok) return toast("등록할 학생이 없습니다. 첫 칸에 학생 이름이 있는지 확인해 주세요.", "error");
     toast(`${ok}명 등록${unassigned.length ? ` · 그중 ${unassigned.length}명은 반 미배정(반 정보 없음): ${unassigned.slice(0, 3).join(", ")}${unassigned.length > 3 ? " 등" : ""} — 반 필터 '미배정'에서 확인 후 반을 지정해 주세요.` : ""}`);
-    if (unassigned.length) { setClassId("none"); setStatus("active"); }
+    if (unassigned.length) { setClassId("none"); setStatus(""); }
   };
 
   return (
@@ -451,7 +452,7 @@ export function Students() {
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
           <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}<option value="0">학년: 새친구반</option></SelectBox>
           <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
-          <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option><option value="active">상태: 등록·새친구</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
+          <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <SelectBox label="생일" value={birth} onChange={upd(setBirth)}><option value="">생일: 전체</option><option value="this">생일: 이번 달 생일</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1)}>생일: {i + 1}월</option>)}</SelectBox>
           {readyIds.size > 0 && <label className="chk"><input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} />새친구 반 배정 대상 ({readyIds.size})</label>}

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
-import { isEnrolled, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
+import { attendsClass, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
 const DATA_KEY = "ca-demo-v9";
 const SESSION_KEY = "ca-session";
@@ -370,7 +370,7 @@ export function upsertStudent(input: Omit<Student, "id"> & { id?: string }) {
 }
 
 export function classCount(classId: string) {
-  return data.students.filter((s) => s.classId === classId && isEnrolled(s.status)).length;
+  return data.students.filter((s) => s.classId === classId && attendsClass(s.status)).length;
 }
 
 /** 장결자반: 부마다 하나. 따로 반을 만들지 않고 상태가 '장결자'인 학생을 그 부의 장결자반으로 본다.

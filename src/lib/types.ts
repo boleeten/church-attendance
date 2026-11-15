@@ -2,8 +2,10 @@ export type Role = "teacher" | "head" | "admin" | "super" | "owner";
 export type Mark = "P" | "A"; // 출석 / 결석 (값이 없으면 미확인)
 export type Gender = "남" | "여";
 export type StudentStatus = "등록" | "새친구" | "장결자" | "교회이동" | "졸업";
-/** 지금 다니는 학생(출석부·통계 대상): 등록 + 새친구 */
-export const isEnrolled = (s: StudentStatus) => s === "등록" || s === "새친구";
+/** 재적(등록) 학생: 전체 인원·부별 인원·출석률 집계 대상. 새친구는 재적에 넣지 않는다 */
+export const isEnrolled = (s: StudentStatus) => s === "등록";
+/** 반 출석부에 오르는 학생: 등록 + 새친구 (새친구반 출석체크·3주 연속 출석 판단) */
+export const attendsClass = (s: StudentStatus) => s === "등록" || s === "새친구";
 export type AssignKind = "담임" | "보조";
 
 export interface User {
