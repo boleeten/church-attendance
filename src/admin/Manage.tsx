@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
@@ -145,8 +145,12 @@ export function Dashboard() {
       <div className="grid cols-2">
         <section className="panel">
           <div className="row between"><h2>학생 출석현황</h2><Badge tone="success">실시간</Badge></div>
-          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={false} />)}
-          {newFriendStudents(d).length > 0 && <GroupBar title="새친구" sum={studentsSummary(d, date, newFriendStudents(d))} provisional={false} />}
+          {([1, 2] as const).map((g) => (
+            <Fragment key={g}>
+              <GroupBar title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={false} />
+              {newFriendStudents(d, g).length > 0 && <GroupBar title={`${g}부 새친구`} sum={studentsSummary(d, date, newFriendStudents(d, g))} provisional={false} />}
+            </Fragment>
+          ))}
         </section>
         <section className="panel">
           <div className="row between"><h2>교사 출석현황</h2><Badge tone="success">실시간</Badge></div>
