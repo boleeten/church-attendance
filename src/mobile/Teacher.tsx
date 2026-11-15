@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { currentSunday, todayISO, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
-import { classSummary, consecutiveAbsences, monthBirthdays, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
-import { logout, markAllRead, markRead, setPushAllowed, setStudentBirth, setStudentPhoto, useData, useMe } from "../lib/store";
+import { classSummary, consecutiveAbsences, monthBirthdays, newFriendsReady, NEW_FRIEND_WEEKS, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
+import { classLabel, logout, markAllRead, markRead, setPushAllowed, setStudentBirth, setStudentPhoto, useData, useMe } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../ui";
 import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
@@ -71,17 +71,31 @@ export function TeacherHome() {
   const today = todayISO();
   const month = +today.slice(5, 7);
   const birthdays = monthBirthdays(roster(d, cls.id), month, today);
+  const ready = cls.grade === 0 ? newFriendsReady(d).filter(({ s }) => s.classId === cls.id) : [];
   return (
     <Phone tabs={TEACHER_TABS}>
       <header className="row between" style={{ padding: "12px 20px" }}>
         <div className="col g2">
-          <span className="muted">{cls.group}부 · {cls.grade}학년 {cls.no}반 {kind}</span>
+          <span className="muted">{classLabel(cls)} {kind}</span>
           <h1 className="t-2xl b">{u.name} 선생님</h1>
         </div>
         <Bell base="/t" />
       </header>
       <div className="mbody">
         <Hero tone="teacher" label="이번 주 주일" date={date} sum={classSummary(d, date, cls.id)} unit="전체" cta="출석체크 하기" to="/t/check" />
+        {ready.length > 0 && (
+          <div className="nf-alert col" style={{ alignItems: "stretch", gap: 10 }}>
+            <strong className="sb">반 배정 대상 {ready.length}명</strong>
+            <span className="t-sm">{NEW_FRIEND_WEEKS}주 연속 출석했습니다. 관리자(부장교사)에게 학년 반 배정을 요청해 주세요.</span>
+            {ready.map(({ s, weeks }) => (
+              <Link key={s.id} to={`/t/students/${s.id}`} className="row g10" style={{ color: "inherit" }}>
+                <Avatar name={s.name} photo={s.photo} size={32} />
+                <strong className="sb grow">{s.name}</strong>
+                <span className="t-xs">{weeks}주 연속 출석</span>
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="row between">
           <h2 className="t-base b">최근 연속 결석 학생</h2>
           <strong className="c-error">{streaks.length}명</strong>
@@ -307,7 +321,7 @@ export function StudentDetail() {
           <Avatar name={s.name} photo={s.photo} size={88} />
           <strong className="t-xl b">{s.name}</strong>
           <div className="row g6">
-            <Badge tone="info">{cls.group}부 · {cls.grade}학년 {cls.no}반</Badge>
+            <Badge tone="info">{classLabel(cls)}</Badge>
             <Badge tone={s.status === "등록" ? "success" : s.status === "장결자" ? "warning" : "neutral"}>{s.status}</Badge>
           </div>
           <div className="row g8">

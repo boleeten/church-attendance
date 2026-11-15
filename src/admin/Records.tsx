@@ -92,7 +92,7 @@ export function StudentAttendance() {
           <div className="filters">
             <Seg value={tab} options={[["class", "반별 현황"], ["student", "학생별 현황표"]] as const} onChange={setTab} />
             <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
-            <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
+            <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}<option value="0">새친구반</option></SelectBox>
             <label className="row g6 sb"><input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />미완료 반만</label>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
           </div>
@@ -178,7 +178,7 @@ export function Stats() {
           const marks = range.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
           const p = marks.filter((x) => x === "P").length;
           const a = marks.filter((x) => x === "A").length;
-          return [s.name, c ? `${c.group}부` : "", c ? `${c.grade}학년` : "", c ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a))];
+          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a))];
         }),
       ]),
     );

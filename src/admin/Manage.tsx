@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
-import { activeStudents, monthBirthdays, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
+import { activeStudents, monthBirthdays, newFriendsReady, NEW_FRIEND_WEEKS, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
 import { deleteStudent, deleteStudents, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
@@ -104,6 +104,23 @@ function BirthdayPanel() {
   );
 }
 
+/** 새친구반에서 3주 연속 출석한 학생이 있으면 반 배정 안내 */
+function NewFriendAlert() {
+  const d = useData();
+  const ready = newFriendsReady(d);
+  if (!ready.length) return null;
+  return (
+    <div className="nf-alert">
+      <Icon name="users" size={20} />
+      <div className="col g4 grow">
+        <strong className="sb">새친구반 반 배정 대상 {ready.length}명</strong>
+        <span className="t-sm">{ready.map(({ s }) => `${s.name}(${classOf(d, s)?.group}부)`).join(", ")} — {NEW_FRIEND_WEEKS}주 연속 출석했습니다. 학년 반으로 배정해 주세요.</span>
+      </div>
+      <Link to="/admin/students?ready=1" className="btn primary m">반 배정하기</Link>
+    </div>
+  );
+}
+
 export function Dashboard() {
   const d = useData();
   const { date } = useAdminDate();
@@ -115,6 +132,7 @@ export function Dashboard() {
   const noPush = staff.filter((u) => !u.pushAllowed && u.active);
   return (
     <Page title="통합 대시보드" sub={`${d.settings.year}학년도 · ${fmtDot(date)} 주일 기준`}>
+      <NewFriendAlert />
       <div className="grid cols-2">
         <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록 기준)`} icon="users" />
         <Kpi label="전체 교사" value={`${staff.length}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명`} icon="badge" />
@@ -301,6 +319,9 @@ export function Students() {
   const [streakOnly, setStreakOnly] = useState(false);
   // 생일: "" 전체, "this" 이번 달, "1"~"12" 그 달
   const [birth, setBirth] = useState(params.get("birth") ?? "");
+  // 새친구반 반 배정 대상만 (대시보드 안내에서 들어올 때)
+  const [readyOnly, setReadyOnly] = useState(params.get("ready") === "1");
+  const readyIds = useMemo(() => new Set(newFriendsReady(d).map(({ s }) => s.id)), [d]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Student | null | "new">(null);
   const [detail, setDetail] = useState<Student | null>(null);
@@ -347,14 +368,15 @@ export function Students() {
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
         if (streakOnly && consecutiveAbsences(d.studentMarks, s.id, dates).count < 2) return false;
+        if (readyOnly && !readyIds.has(s.id)) return false;
         if (birth && s.birthDate?.slice(5, 7) !== String(birth === "this" ? +todayISO().slice(5, 7) : +birth).padStart(2, "0")) return false;
         return true;
       })
       .sort((a, b) => (birth ? (a.s.birthDate ?? "").slice(8).localeCompare((b.s.birthDate ?? "").slice(8)) : 0) || (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
-  }, [d, q, group, grade, classId, status, mark, streakOnly, birth, date, dates]);
+  }, [d, q, group, grade, classId, status, mark, streakOnly, birth, readyOnly, readyIds, date, dates]);
 
   const view = rows;
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setBirth(""); };
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setBirth(""); setReadyOnly(false); };
   const upd = (f: (v: string) => void) => (v: string) => f(v);
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
@@ -364,7 +386,7 @@ export function Students() {
     const picked = d.students.filter((s) => sel.has(s.id)).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
     const uname = (id?: string | null) => d.users.find((u) => u.id === id)?.name ?? "";
     const lines = picked.flatMap(({ s, c }) => {
-      const info = [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
+      const info = [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
       const notes = d.notes.filter((n) => n.studentId === s.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
       return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), n.reply ?? "", uname(n.replyBy), fmtAt(n.replyAt)]) : [[...info, 0, "", "", "", "", "", "", ""]];
     });
@@ -383,7 +405,7 @@ export function Students() {
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(rows.map(({ s }) => s.id)));
 
   const exportCsv = () =>
-    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
+    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
 
   const importCsv = async (file: File) => {
     const all = parseCSV(await file.text());
@@ -404,7 +426,9 @@ export function Students() {
       if (!name) continue;
       const gender: Gender | null = /^\s*(남|남자|M)\s*$/i.test(sex ?? "") ? "남" : /^\s*(여|여자|F)\s*$/i.test(sex ?? "") ? "여" : null;
       const num = (v?: string) => clean(v).replace(/[^0-9]/g, "");
-      const c = d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
+      // 학년이나 반 칸에 '새친구'라고 적으면 그 부의 새친구반
+      const nf = /새친구/.test(`${gr ?? ""}${no ?? ""}`);
+      const c = nf ? d.classes.find((x) => x.grade === 0 && String(x.group) === num(g)) : d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
       if (!c) unassigned.push(name);
       upsertStudent({ name, gender, birthDate: parseBirth(birth), classId: c ? c.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
       ok++;
@@ -423,11 +447,12 @@ export function Students() {
         </div>
         <div className="filter-row">
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
-          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
+          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}<option value="0">학년: 새친구반</option></SelectBox>
           <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <SelectBox label="생일" value={birth} onChange={upd(setBirth)}><option value="">생일: 전체</option><option value="this">생일: 이번 달 생일</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1)}>생일: {i + 1}월</option>)}</SelectBox>
+          {readyIds.size > 0 && <label className="chk"><input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} />새친구 반 배정 대상 ({readyIds.size})</label>}
           <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석만</label>
           <span className="spacer" />
           <button type="button" className="filter-reset" onClick={reset}>필터 초기화</button>
@@ -455,10 +480,10 @@ export function Students() {
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
-                  <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
+                  <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong>{readyIds.has(s.id) && <Badge tone="warning">반 배정 대상</Badge>}</span></td>
                   <td>{s.gender ?? "-"}</td>
                   <td className="num">{fmtBirth(s.birthDate) || "-"}</td>
-                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : <span className="sb c-warning">미배정</span>}</td>
+                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? (c.grade ? `${c.grade}학년` : "새친구") : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? (c.grade ? `${c.no}반` : "새친구반") : <span className="sb c-warning">미배정</span>}</td>
                   <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
@@ -550,6 +575,8 @@ export function Classes() {
   const list = d.classes.filter((c) => c.group === group);
   const total = groupStudents(d, group).length;
   const names = (cid: string, k: "담임" | "보조") => d.assignments.filter((a) => a.classId === cid && a.kind === k).map((a) => d.users.find((u) => u.id === a.userId)?.name).filter(Boolean).join(", ") || "미배정";
+  const readyList = newFriendsReady(d);
+  const readyHere = (cid: string) => readyList.filter(({ s }) => s.classId === cid).length;
   /** 카드용 이름: 비어 있으면 흐린 '미배정' */
   const teacherName = (cid: string, k: "담임" | "보조") => {
     const v = names(cid, k);
@@ -577,9 +604,9 @@ export function Classes() {
       {violations.length > 0 && <Note warm icon="warning">배정 원칙(같은 부에서는 한 반만)에 맞지 않는 교사가 있습니다: {violations.map((v) => `${v.user.name}(${v.group}부 ${v.classes.map(classShort).join("·")})`).join(", ")}. 해당 반의 '교사 배정'에서 한 반만 남겨 주세요.</Note>}
       <div className={`grp-zone g${g}`}>
       <div className="grp-head"><span className="grp-mark">{g}부</span><strong className="t-lg b">{g}부 반 목록</strong><span className="muted t-xs">{count(group)}개 반 · 등록 {total}명</span></div>
-      {[4, 5, 6].map((gr) => (
+      {[0, 4, 5, 6].filter((gr) => list.some((c) => c.grade === gr)).map((gr) => (
         <section key={gr} className="col g12">
-          <h2 className="t-base b">{gr}학년</h2>
+          <h2 className="t-base b">{gr ? `${gr}학년` : "새친구반"}{!gr && <span className="muted t-sm" style={{ fontWeight: 400, marginLeft: 8 }}>{NEW_FRIEND_WEEKS}주 연속 출석하면 반 배정 대상이 됩니다</span>}</h2>
           <div className="grid cols-4 class-grid" style={{ gap: 16 }}>
             {list.filter((c) => c.grade === gr).map((c) => {
               const n = classCount(c.id);
@@ -588,14 +615,14 @@ export function Classes() {
                   <div className="cc-top">
                     <div className="cc-head">
                       <strong className="cc-name">{classShort(c)}</strong>
-                      <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, onSelect: () => removeClass(c) }]} />
+                      <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, disabled: c.grade === 0, onSelect: () => removeClass(c) }]} />
                     </div>
                     <p className="cc-teachers">
                       {teacherName(c.id, "담임")} / {teacherName(c.id, "보조")}
                     </p>
                   </div>
                   <div className="cc-bottom">
-                    <span className="cc-count">현재 {n}명</span>
+                    <span className="cc-count">현재 {n}명{c.grade === 0 && readyHere(c.id) > 0 && <> · <Link to="/admin/students?ready=1" className="sb c-warning">반 배정 대상 {readyHere(c.id)}명</Link></>}</span>
                     <div className="row g8 class-actions">
                       <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
                       <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
@@ -706,7 +733,7 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
         const gm = (cls ?? "").match(/([12])\s*부/);
         const cg = gm ? Number(gm[1]) : group;
         const rest = gm ? (cls ?? "").replace(gm[0], "").match(/\d+/g) : nums;
-        const c = rest && rest.length >= 2 ? d.classes.find((x) => x.group === cg && x.grade === Number(rest[0]) && x.no === Number(rest[1])) : undefined;
+        const c = /새친구/.test(cls ?? "") ? d.classes.find((x) => x.group === cg && x.grade === 0) : rest && rest.length >= 2 ? d.classes.find((x) => x.group === cg && x.grade === Number(rest[0]) && x.no === Number(rest[1])) : undefined;
         if (!c) error = `${cg}부에 '${cls}' 반이 없습니다`;
         else if (kind === "담임" && homeroomTaken.has(c.id)) error = `${classShort(c)}에 이미 담임(${homeroomTaken.get(c.id)})이 있습니다. '보조'로 적어 주세요`;
         else {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { getData, useData, useMe } from "../lib/store";
+import { getData, useData, useMe, classLabel, classShort } from "../lib/store";
 import { myClasses } from "../lib/stats";
 import type { ClassRoom, User } from "../lib/types";
 import { Icon } from "../ui";
@@ -96,7 +96,7 @@ export function entryOptions(u: User): EntryOption[] {
   const classes = myClasses(getData(), u.id);
   const groups = teacherGroups(u.id);
   if (classes.length) { // 반을 맡은 부장교사도 포함
-    const desc = (list: ClassRoom[]) => `${list.map((c) => `${c.grade}-${c.no}반`).join(", ")} 학생 출석체크·심방노트`;
+    const desc = (list: ClassRoom[]) => `${list.map((c) => classShort(c)).join(", ")} 학생 출석체크·심방노트`;
     if (groups.length > 1) for (const g of groups) out.push({ path: "/t", group: g, title: `${g}부 담당 반 출석관리`, desc: desc(classes.filter((c) => c.group === g)), icon: "users" });
     else out.push({ path: "/t", title: "담당 반 출석관리", desc: desc(classes), icon: "users" });
   }
@@ -129,11 +129,11 @@ export function useMyClass(): { cls: ClassRoom | null; classes: ClassRoom[]; set
 export function ClassPicker() {
   const { cls, classes, setCls } = useMyClass();
   if (!cls) return null;
-  if (classes.length < 2) return <span className="badge info">{cls.group}부 {cls.grade}학년 {cls.no}반</span>;
+  if (classes.length < 2) return <span className="badge info">{classLabel(cls)}</span>;
   return (
     <select className="sel t-xs sb" style={{ height: 28 }} value={cls.id} onChange={(e) => { setCls(e.target.value); window.location.reload(); }} aria-label="담당 반 선택">
       {classes.map((c) => (
-        <option key={c.id} value={c.id}>{c.group}부 {c.grade}학년 {c.no}반</option>
+        <option key={c.id} value={c.id}>{classLabel(c)}</option>
       ))}
     </select>
   );

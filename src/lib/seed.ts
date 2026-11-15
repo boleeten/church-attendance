@@ -35,6 +35,8 @@ export function buildSeed(): Data {
   for (const g of [1, 2] as const)
     for (const grade of [4, 5, 6])
       for (let no = 1; no <= (g === 1 ? 4 : 3); no++) classes.push({ id: `g${g}-${grade}-${no}`, group: g, grade, no, capacity: 10 });
+  // 새친구반 (학년 0): 기존 반 순서를 흐트리지 않도록 뒤에 붙인다
+  for (const g of [1, 2] as const) classes.push({ id: `g${g}-new`, group: g, grade: 0, no: 1, capacity: 10 });
 
   // ── 사용자 ──
   const users: User[] = [];
@@ -74,6 +76,8 @@ export function buildSeed(): Data {
   assignments.push({ userId: hwang.id, classId: "g2-4-1", kind: "보조" });
   const woo = mkUser("teacher_woo18", "우다인", ["teacher"], 2);
   assignments.push({ userId: woo.id, classId: "g2-5-1", kind: "보조" });
+  assignments.push({ userId: mkUser("teacher_new21", "나새롬", ["teacher"], 1).id, classId: "g1-new", kind: "담임" });
+  assignments.push({ userId: mkUser("teacher_new22", "반가람", ["teacher"], 2).id, classId: "g2-new", kind: "담임" });
   mkUser("teacher_hong19", "홍기태", ["teacher", "admin"], 2, {
     password: TEMP_PASSWORD,
     mustChangePassword: true,
@@ -88,7 +92,7 @@ export function buildSeed(): Data {
   let sid = 1;
   const phone = (p: string) => `010-${p}-${String(1000 + Math.floor(r() * 9000))}`;
   for (const c of classes) {
-    const n = sizes[String(c.group)][byGroup(c.group).indexOf(c)];
+    const n = c.grade === 0 ? 4 : sizes[String(c.group)][byGroup(c.group).indexOf(c)];
     for (let i = 0; i < n; i++) {
       let name: string;
       if (c.id === "g1-4-1") name = firstClass[i];
@@ -101,7 +105,7 @@ export function buildSeed(): Data {
         id: `s${sid++}`,
         name,
         gender: sid % 2 ? "남" : "여",
-        birthDate: r() < 0.1 ? null : `${+cur.slice(0, 4) - 6 - c.grade}-${String(1 + Math.floor(r() * 12)).padStart(2, "0")}-${String(1 + Math.floor(r() * 28)).padStart(2, "0")}`,
+        birthDate: r() < 0.1 ? null : `${+cur.slice(0, 4) - 6 - (c.grade || 5)}-${String(1 + Math.floor(r() * 12)).padStart(2, "0")}-${String(1 + Math.floor(r() * 28)).padStart(2, "0")}`,
         classId: c.id,
         status: "등록",
         phone: r() < 0.15 ? "" : phone("2345"),
@@ -147,6 +151,8 @@ export function buildSeed(): Data {
         if (c.id === "g1-4-1" && isCur) m = "P";
         if (s.name === "박지호" && lastThree.includes(date)) m = "A";
         if (s.name === "임시우" && prevTwo.includes(date)) m = "A";
+        // 새친구반: 앞의 두 명은 최근 3주 연속 출석(반 배정 대상), 나머지는 최근 결석 섞음
+        if (c.grade === 0) { const k = roster.indexOf(s); m = k < 2 ? (lastThree.includes(date) ? "P" : m) : lastThree.indexOf(date) === 1 ? "A" : m; }
         studentMarks[`${date}|${s.id}`] = m;
       });
       sessions[`${date}|class:${c.id}`] = { completed: mode === "done", savedAt: at(date, mode === "done" ? "12:2" + (c.no % 10) : "12:48"), savedBy: homeroomOf(c.id) };

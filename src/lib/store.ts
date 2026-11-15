@@ -4,7 +4,7 @@ import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v7";
+const DATA_KEY = "ca-demo-v8";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -295,8 +295,11 @@ function pushNotification(n: Omit<AppNotification, "id" | "createdAt" | "read">,
   remote.upsert("notification_logs", log);
 }
 
-export const classLabel = (c: ClassRoom) => `${c.group}부 ${c.grade}학년 ${c.no}반`;
-export const classShort = (c: ClassRoom) => `${c.grade}-${c.no}반`;
+/** 새친구반: 부마다 하나, 학년 0으로 둔다. 담임 배정·출석체크는 다른 반과 같고 진급·졸업에서는 빠진다. */
+export const isNewFriend = (c?: ClassRoom | null) => c?.grade === 0;
+export const newFriendClassId = (g: 1 | 2) => `g${g}-new`;
+export const classLabel = (c: ClassRoom) => (isNewFriend(c) ? `${c.group}부 새친구반` : `${c.group}부 ${c.grade}학년 ${c.no}반`);
+export const classShort = (c: ClassRoom) => (isNewFriend(c) ? "새친구반" : `${c.grade}-${c.no}반`);
 
 /** 해당 주일 출석이 미완료인 반의 담당 교사에게 앱 알림을 보낸다. classId를 주면 그 반만. */
 export function sendStudentReminders(date: string, classId?: string): number {

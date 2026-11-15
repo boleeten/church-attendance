@@ -102,6 +102,7 @@ export function teacherDuty(d: Data, u: User, short = true): string {
   const kinds = [...new Set(as.map((a) => a.kind))];
   const names = as.map((a) => {
     const c = d.classes.find((x) => x.id === a.classId)!;
+    if (c.grade === 0) return "새친구반";
     return short || as.length > 1 ? `${c.grade}-${c.no}반` : `${c.grade}학년 ${c.no}반`;
   });
   return `${head ? `${head} · ` : ""}${names.join(" · ")} ${kinds.join("·")}`;
@@ -141,4 +142,30 @@ export function monthBirthdays(list: Student[], m: number, today: string): { s: 
     .filter((s) => s.birthDate?.slice(5, 7) === mm)
     .map((s) => ({ s, day: +s.birthDate!.slice(8, 10), isToday: s.birthDate!.slice(5) === today.slice(5) }))
     .sort((a, b) => a.day - b.day || a.s.name.localeCompare(b.s.name, "ko"));
+}
+
+/** 새친구반에서 몇 주 연속 출석하면 반 배정 대상이 되는지 */
+export const NEW_FRIEND_WEEKS = 3;
+
+/** 최근부터 거꾸로 센 연속 출석 주 수. 마지막 주일(오늘)이 아직 체크 전이면 그 주는 건너뛴다. */
+export function consecutivePresent(marks: Record<string, Mark>, id: string, dates: string[]): number {
+  let n = 0;
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const m = marks[`${dates[i]}|${id}`];
+    if (m === "P") n++;
+    else if (!m && i === dates.length - 1) continue;
+    else break;
+  }
+  return n;
+}
+
+/** 새친구반에서 3주 연속 출석해 반 배정이 필요한 학생 */
+export function newFriendsReady(d: Data): { s: Student; weeks: number }[] {
+  const dates = yearSundays(d);
+  const nf = new Set(d.classes.filter((c) => c.grade === 0).map((c) => c.id));
+  return d.students
+    .filter((s) => s.status === "등록" && nf.has(s.classId))
+    .map((s) => ({ s, weeks: consecutivePresent(d.studentMarks, s.id, dates) }))
+    .filter((x) => x.weeks >= NEW_FRIEND_WEEKS)
+    .sort((a, b) => a.s.classId.localeCompare(b.s.classId) || a.s.name.localeCompare(b.s.name, "ko"));
 }

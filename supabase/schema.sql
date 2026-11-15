@@ -17,9 +17,9 @@ create table if not exists public.profiles (
 );
 
 create table if not exists public.classes (
-  id text primary key,                       -- 예: g1-4-1
+  id text primary key,                       -- 예: g1-4-1, 새친구반은 g1-new
   "group" int not null check ("group" in (1, 2)),
-  grade int not null check (grade between 4 and 6),
+  grade int not null check (grade = 0 or grade between 4 and 6), -- 0 = 새친구반
   no int not null,
   capacity int not null default 10,
   unique ("group", grade, no)
@@ -337,3 +337,14 @@ alter table public.students alter column class_id drop not null;
 
 -- 학생 생년월일 (관리자·담당 교사 입력)
 alter table public.students add column if not exists birth_date date;
+
+-- 새친구반: 부마다 하나(학년 0). 담임 배정·출석체크는 다른 반과 같고 진급·졸업에서는 빠진다.
+do $$
+declare r record;
+begin
+  for r in select conname from pg_constraint where conrelid = 'public.classes'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%grade%' loop
+    execute format('alter table public.classes drop constraint %I', r.conname);
+  end loop;
+end $$;
+alter table public.classes add constraint classes_grade_check check (grade = 0 or grade between 4 and 6);
+insert into public.classes (id, "group", grade, no, capacity) values ('g1-new', 1, 0, 1, 10), ('g2-new', 2, 0, 1, 10) on conflict (id) do nothing;

@@ -427,3 +427,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .bday-item:hover { box-shadow: inset 0 0 0 1px var(--border); }
 .bday-item.today { background: #fff0f0; box-shadow: inset 0 0 0 1px #fecaca; }
 .bday-day { font-weight: 700; font-size: 14px; color: var(--primary); min-width: 40px; }
+
+/* 새친구반 반 배정 안내 */
+.nf-alert { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; background: #fff7ed; box-shadow: inset 0 0 0 1px #fed7aa; color: #9a3412; }
+.nf-alert .btn { flex: none; }
+@media (max-width: 600px) { .nf-alert { flex-wrap: wrap; } }
