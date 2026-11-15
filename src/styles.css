@@ -422,7 +422,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 @media (max-width: 600px) { .grid.class-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* 대시보드 · 이번 달 생일 */
-.bday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.bday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; max-height: 420px; overflow: auto; }
 .bday-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--canvas); text-align: left; cursor: pointer; min-width: 0; }
 .bday-item:hover { box-shadow: inset 0 0 0 1px var(--border); }
 .bday-item.today { background: #fff0f0; box-shadow: inset 0 0 0 1px #fecaca; }

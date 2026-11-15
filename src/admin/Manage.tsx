@@ -129,6 +129,7 @@ export function Dashboard() {
           {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={false} />)}
         </section>
       </div>
+      <div className="grid split">
         <section className="panel">
           <div className="row between">
             <h2>학생 출석 미완료 반</h2>
@@ -155,6 +156,8 @@ export function Dashboard() {
             {!pending.length && <p className="empty">모든 반이 출석을 완료했습니다.</p>}
           </div>
         </section>
+        <BirthdayPanel />
+      </div>
       <div className="grid split">
         <section className="panel">
           <h2>최근 학생 출석률</h2>
@@ -178,7 +181,6 @@ export function Dashboard() {
           <Note>알림 권한 미설정 교사 {noPush.length}명 — 앱 안의 알림 목록(종 아이콘)으로 안내됩니다.</Note>
         </section>
       </div>
-      <BirthdayPanel />
     </Page>
   );
 }
