@@ -133,3 +133,12 @@ export function parseCSV(text: string): string[][] {
     .filter((l) => l.trim())
     .map((l) => l.split(",").map((c) => c.trim().replace(/^"|"$/g, "")));
 }
+
+/** 생년월일이 m월(1~12)인 학생을 날짜순으로. today가 생일이면 isToday */
+export function monthBirthdays(list: Student[], m: number, today: string): { s: Student; day: number; isToday: boolean }[] {
+  const mm = String(m).padStart(2, "0");
+  return list
+    .filter((s) => s.birthDate?.slice(5, 7) === mm)
+    .map((s) => ({ s, day: +s.birthDate!.slice(8, 10), isToday: s.birthDate!.slice(5) === today.slice(5) }))
+    .sort((a, b) => a.day - b.day || a.s.name.localeCompare(b.s.name, "ko"));
+}

@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { currentSunday, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
+import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
-import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
+import { activeStudents, monthBirthdays, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
 import { deleteStudent, deleteStudents, setStudentBirths, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
@@ -66,6 +66,44 @@ function SelectBox({ value, onChange, children, label }: { value: string; onChan
 export { SelectBox };
 
 // ───────── A01 통합 대시보드 ─────────
+/** 대시보드: 이번 달 생일 (등록·장결자 학생) */
+function BirthdayPanel() {
+  const d = useData();
+  const today = todayISO();
+  const m = +today.slice(5, 7);
+  const list = monthBirthdays(d.students.filter((s) => s.status === "등록" || s.status === "장결자"), m, today);
+  const [detail, setDetail] = useState<Student | null>(null);
+  return (
+    <section className="panel">
+      <div className="row between">
+        <h2>이번 달 생일 <span className="muted sb t-base">{m}월 · {list.length}명</span></h2>
+        <Link to="/admin/students?birth=this" className="btn outline s">학생 관리에서 보기</Link>
+      </div>
+      {list.length === 0 ? (
+        <p className="muted">이번 달 생일인 학생이 없습니다.</p>
+      ) : (
+        <div className="bday-grid">
+          {list.map(({ s, day, isToday }) => {
+            const c = classOf(d, s);
+            return (
+              <button key={s.id} type="button" className={`bday-item ${isToday ? "today" : ""}`} onClick={() => setDetail(s)}>
+                <span className="bday-day num">{m}.{day}</span>
+                <PhotoAvatar name={s.name} photo={s.photo} size={32} />
+                <span className="col g2 grow" style={{ minWidth: 0, textAlign: "left" }}>
+                  <strong className="sb ellipsis">{s.name}</strong>
+                  <span className="t-xs muted ellipsis">{c ? classLabel(c) : "반 미배정"}</span>
+                </span>
+                {isToday && <Badge tone="error">오늘</Badge>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
+    </section>
+  );
+}
+
 export function Dashboard() {
   const d = useData();
   const { date } = useAdminDate();
@@ -172,6 +210,7 @@ export function Dashboard() {
           <Note>알림 권한 미설정 교사 {noPush.length}명 — 앱 안의 알림 목록(종 아이콘)으로 안내됩니다.</Note>
         </section>
       </div>
+      <BirthdayPanel />
     </Page>
   );
 }
@@ -350,6 +389,8 @@ export function Students() {
   const [status, setStatus] = useState(defaultStatus);
   const [mark, setMark] = useState("");
   const [streakOnly, setStreakOnly] = useState(false);
+  // 생일: "" 전체, "this" 이번 달, "1"~"12" 그 달
+  const [birth, setBirth] = useState(params.get("birth") ?? "");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Student | null | "new">(null);
   const [detail, setDetail] = useState<Student | null>(null);
@@ -397,13 +438,14 @@ export function Students() {
         const m = d.studentMarks[`${date}|${s.id}`];
         if (mark && (mark === "U" ? !!m : m !== mark)) return false;
         if (streakOnly && consecutiveAbsences(d.studentMarks, s.id, dates).count < 2) return false;
+        if (birth && s.birthDate?.slice(5, 7) !== String(birth === "this" ? +todayISO().slice(5, 7) : +birth).padStart(2, "0")) return false;
         return true;
       })
-      .sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
-  }, [d, q, group, grade, classId, status, mark, streakOnly, date, dates]);
+      .sort((a, b) => (birth ? (a.s.birthDate ?? "").slice(8).localeCompare((b.s.birthDate ?? "").slice(8)) : 0) || (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
+  }, [d, q, group, grade, classId, status, mark, streakOnly, birth, date, dates]);
 
   const view = rows;
-  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); };
+  const reset = () => { setQ(""); setGroup(""); setGrade(""); setClassId(""); setStatus("등록"); setMark(""); setStreakOnly(false); setBirth(""); };
   const upd = (f: (v: string) => void) => (v: string) => f(v);
   const toggle = (id: string) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
 
@@ -476,6 +518,7 @@ export function Students() {
           <SelectBox label="반" value={classId} onChange={upd(setClassId)}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
+          <SelectBox label="생일" value={birth} onChange={upd(setBirth)}><option value="">생일: 전체</option><option value="this">생일: 이번 달 생일</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1)}>생일: {i + 1}월</option>)}</SelectBox>
           <label className="chk"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석만</label>
           <span className="spacer" />
           <button type="button" className="filter-reset" onClick={reset}>필터 초기화</button>

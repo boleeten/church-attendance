@@ -9,7 +9,6 @@ import { Avatar, Icon, Modal } from "../ui";
 import { PasswordForm } from "../mobile/Auth";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
 import { Notes, Stats, StudentAttendance, TeacherAttendance } from "./Records";
-import { Birthdays } from "./Birthdays";
 import { Accounts, NotifySettings, Sheets, YearSettings } from "./Settings";
 
 const DateCtx = createContext<{ date: string; setDate: (d: string) => void }>({ date: currentSunday(), setDate: () => {} });
@@ -23,7 +22,6 @@ const MENU = [
   ["attendance", "calendar", "학생 출결현황"],
   ["stats", "chart", "학생 출석 통계"],
   ["notes", "note", "심방노트 관리"],
-  ["birthdays", "cake", "학생 생일"],
   ["sheets", "cloud", "Google Sheets"],
   ["notify", "bell", "알림 설정"],
   ["year", "gear", "학년도·운영 설정"],
@@ -223,7 +221,6 @@ export default function AdminApp() {
           <Route path="attendance" element={<StudentAttendance />} />
           <Route path="stats" element={<Stats />} />
           <Route path="notes" element={<Notes />} />
-          <Route path="birthdays" element={<Birthdays />} />
           <Route path="sheets" element={<Sheets />} />
           <Route path="notify" element={<NotifySettings />} />
           <Route path="year" element={<YearSettings />} />

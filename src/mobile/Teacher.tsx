@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { currentSunday, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
+import { currentSunday, todayISO, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
-import { classSummary, consecutiveAbsences, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
+import { classSummary, consecutiveAbsences, monthBirthdays, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
 import { logout, markAllRead, markRead, setPushAllowed, setStudentBirth, setStudentPhoto, useData, useMe } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../ui";
@@ -68,6 +68,9 @@ export function TeacherHome() {
     .map((s) => ({ s, ...consecutiveAbsences(d.studentMarks, s.id, dates) }))
     .filter((x) => x.count >= 2)
     .sort((a, b) => b.count - a.count);
+  const today = todayISO();
+  const month = +today.slice(5, 7);
+  const birthdays = monthBirthdays(roster(d, cls.id), month, today);
   return (
     <Phone tabs={TEACHER_TABS}>
       <header className="row between" style={{ padding: "12px 20px" }}>
@@ -96,6 +99,23 @@ export function TeacherHome() {
               </Link>
               <a className="icon-btn soft" href={`tel:${s.guardianPhone}`} aria-label={`${s.name} 보호자에게 전화`}><Icon name="phone" /></a>
             </div>
+          ))}
+        </div>
+        <div className="row between">
+          <h2 className="t-base b">이번 달 생일</h2>
+          <strong className="c-primary">{birthdays.length}명</strong>
+        </div>
+        <div className="card pad col g16">
+          {birthdays.length === 0 && <p className="muted" style={{ textAlign: "center" }}>{month}월에 생일인 학생이 없습니다.</p>}
+          {birthdays.map(({ s, day, isToday }) => (
+            <Link key={s.id} to={`/t/students/${s.id}`} className="row g12">
+              <Avatar name={s.name} photo={s.photo} />
+              <div className="col g2 grow">
+                <strong className="t-base sb">{s.name}</strong>
+                <span className="t-xs muted">{month}월 {day}일 · {fmtBirth(s.birthDate)}</span>
+              </div>
+              {isToday && <Badge tone="error">오늘</Badge>}
+            </Link>
           ))}
         </div>
       </div>
