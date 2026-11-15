@@ -43,6 +43,10 @@ export function GroupBar({ title, sum, provisional }: { title: string; sum: Summ
   );
 }
 
+/** 새친구 상태 학생 (재적 인원에는 넣지 않고 출석현황에서 따로 보여준다). g를 주면 그 부만 */
+export const newFriendStudents = (d: Data, g?: 1 | 2) =>
+  d.students.filter((s) => s.status === "새친구" && (!g || d.classes.find((c) => c.id === s.classId)?.group === g));
+
 export const groupStudents = (d: Data, g: 1 | 2) => {
   const ids = new Set(d.classes.filter((c) => c.group === g).map((c) => c.id));
   return activeStudents(d).filter((s) => ids.has(s.classId));
@@ -142,6 +146,7 @@ export function Dashboard() {
         <section className="panel">
           <div className="row between"><h2>학생 출석현황</h2><Badge tone="success">실시간</Badge></div>
           {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={false} />)}
+          {newFriendStudents(d).length > 0 && <GroupBar title="새친구" sum={studentsSummary(d, date, newFriendStudents(d))} provisional={false} />}
         </section>
         <section className="panel">
           <div className="row between"><h2>교사 출석현황</h2><Badge tone="success">실시간</Badge></div>

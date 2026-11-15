@@ -6,7 +6,7 @@ import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeac
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg, Toggle } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
-import { classOf, GroupBar, groupStudents, incompleteClasses, Kpi, SelectBox, StudentDetailModal } from "./Manage";
+import { classOf, GroupBar, groupStudents, newFriendStudents, incompleteClasses, Kpi, SelectBox, StudentDetailModal } from "./Manage";
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
 
@@ -83,6 +83,7 @@ export function StudentAttendance() {
             <section key={g} className="panel">
               <div className="row between"><h2>{g}부</h2><Badge tone={left ? "warning" : "success"}>{total}개 반 중 {total - left}개 완료</Badge></div>
               <GroupBar title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={left > 0} />
+              {newFriendStudents(d, g).length > 0 && <GroupBar title={`${g}부 새친구`} sum={studentsSummary(d, date, newFriendStudents(d, g))} provisional={left > 0} />}
             </section>
           );
         })}
