@@ -110,7 +110,6 @@ export function Dashboard() {
   const students = activeStudents(d);
   const staff = d.users.filter((u) => u.roles.includes("teacher") && u.group !== null);
   const pending = incompleteClasses(d, date);
-  const teacherDone = ([1, 2] as const).filter((g) => d.sessions[`${date}|group:${g}`]?.completed);
   const dates = yearSundays(d).filter((x) => x <= date).slice(-6);
   const feed = Object.entries(d.sessions)
     .filter(([k]) => k.startsWith(date))
@@ -126,11 +125,9 @@ export function Dashboard() {
   const noPush = staff.filter((u) => !u.pushAllowed && u.active);
   return (
     <Page title="통합 대시보드" sub={`${d.settings.year}학년도 · ${fmtDot(date)} 주일 기준`}>
-      <div className="grid cols-4">
+      <div className="grid cols-2">
         <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록 기준)`} icon="users" />
         <Kpi label="전체 교사" value={`${staff.length}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명`} icon="badge" />
-        <Kpi label="학생 출석 완료" value={`${d.classes.length - pending.length} / ${d.classes.length}반`} sub={pending.length ? `미완료 ${pending.length}개 반` : "모든 반 완료"} icon="calendar" tone={pending.length ? "warm" : "success"} />
-        <Kpi label="교사 출석 완료" value={`${teacherDone.length} / 2부서`} sub={teacherDone.length === 2 ? "모든 부서 완료" : `${[1, 2].filter((g) => !teacherDone.includes(g as 1 | 2)).join("·")}부 교사 출석 미완료`} icon="user" tone={teacherDone.length === 2 ? "success" : "warm"} />
       </div>
       <div className="grid cols-2">
         <section className="panel">
