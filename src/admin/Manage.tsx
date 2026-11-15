@@ -111,16 +111,6 @@ export function Dashboard() {
   const staff = d.users.filter((u) => u.roles.includes("teacher") && u.group !== null);
   const pending = incompleteClasses(d, date);
   const dates = yearSundays(d).filter((x) => x <= date).slice(-6);
-  const feed = Object.entries(d.sessions)
-    .filter(([k]) => k.startsWith(date))
-    .map(([k, v]) => ({ target: k.split("|")[1], ...v }))
-    .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
-    .slice(0, 5);
-  const targetLabel = (t: string) => {
-    if (t.startsWith("group:")) return `${t.slice(6)}부 교사 출석`;
-    const c = d.classes.find((x) => x.id === t.slice(6));
-    return c ? `${classLabel(c)} 출석` : "출석";
-  };
   const logs = d.notifLogs.filter((l) => l.at.slice(0, 10) >= date);
   const noPush = staff.filter((u) => !u.pushAllowed && u.active);
   return (
@@ -139,7 +129,6 @@ export function Dashboard() {
           {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={false} />)}
         </section>
       </div>
-      <div className="grid split">
         <section className="panel">
           <div className="row between">
             <h2>학생 출석 미완료 반</h2>
@@ -166,24 +155,6 @@ export function Dashboard() {
             {!pending.length && <p className="empty">모든 반이 출석을 완료했습니다.</p>}
           </div>
         </section>
-        <section className="panel">
-          <div className="row between"><h2>실시간 등록 상태</h2><span className="t-xs muted">최근 5건</span></div>
-          {feed.length === 0 && <p className="empty">이 주일에 입력된 출석부가 없습니다.</p>}
-          {feed.map((f) => {
-            const by = d.users.find((u) => u.id === f.savedBy);
-            return (
-              <div key={f.target} className="row g10">
-                <Avatar name={by?.name ?? "?"} size={32} />
-                <div className="col g2 grow">
-                  <strong className="sb">{by?.name ?? "알 수 없음"}</strong>
-                  <span className="t-xs muted">{targetLabel(f.target)} {f.completed ? "완료" : "임시저장"}</span>
-                </div>
-                <span className="t-xs muted">{fmtRelDay(f.savedAt)}</span>
-              </div>
-            );
-          })}
-        </section>
-      </div>
       <div className="grid split">
         <section className="panel">
           <h2>최근 학생 출석률</h2>
