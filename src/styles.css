@@ -88,6 +88,8 @@ h1, h2, h3, p { margin: 0; }
 .badge.neutral { background: var(--neutral-soft); color: var(--neutral); }
 .badge.warning { background: var(--warm); color: var(--secondary); }
 .badge.info { background: var(--soft); color: var(--primary); }
+/* 새친구 상태 */
+.badge.fresh { background: #fce7f3; color: #be185d; }
 .avatar { border-radius: 50%; background: var(--soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; font-weight: 600; flex: none; overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 

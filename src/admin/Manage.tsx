@@ -215,7 +215,7 @@ export function Dashboard() {
 
 // ───────── A02 학생 목록 및 관리 ─────────
 const STATUSES: StudentStatus[] = ["등록", "새친구", "장결자", "교회이동", "졸업"];
-const statusTone = (s: StudentStatus) => (s === "등록" ? "success" : s === "새친구" ? "info" : s === "장결자" ? "warning" : "neutral");
+const statusTone = (s: StudentStatus) => (s === "등록" ? "success" : s === "새친구" ? "fresh" : s === "장결자" ? "warning" : "neutral");
 
 function StudentForm({ student, onClose }: { student: Student | null; onClose: () => void }) {
   const d = useData();

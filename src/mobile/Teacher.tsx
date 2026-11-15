@@ -322,7 +322,7 @@ export function StudentDetail() {
           <strong className="t-xl b">{s.name}</strong>
           <div className="row g6">
             <Badge tone="info">{classLabel(cls)}</Badge>
-            <Badge tone={s.status === "등록" ? "success" : s.status === "새친구" ? "info" : s.status === "장결자" ? "warning" : "neutral"}>{s.status}</Badge>
+            <Badge tone={s.status === "등록" ? "success" : s.status === "새친구" ? "fresh" : s.status === "장결자" ? "warning" : "neutral"}>{s.status}</Badge>
           </div>
           <div className="row g8">
             <Button variant="outline" size="s" onClick={() => file.current?.click()}><Icon name="camera" size={14} />{s.photo ? "사진 변경" : "사진 등록"}</Button>

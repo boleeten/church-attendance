@@ -72,7 +72,7 @@ export function PasswordInput({ label, ...rest }: React.InputHTMLAttributes<HTML
   );
 }
 
-export function Badge({ tone = "neutral", children }: { tone?: "success" | "error" | "neutral" | "warning" | "info"; children: ReactNode }) {
+export function Badge({ tone = "neutral", children }: { tone?: "success" | "error" | "neutral" | "warning" | "info" | "fresh"; children: ReactNode }) {
   return <span className={`badge ${tone}`}>{children}</span>;
 }
 
