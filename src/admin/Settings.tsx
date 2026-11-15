@@ -20,7 +20,7 @@ function monthlyRates(marks: Record<string, Mark>, id: string, dates: string[]) 
 const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 
 const SHARED: SheetDef[] = [
-  { name: "전체 학생 명부", rows: (d) => [["이름", "성별", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, s.gender ?? "", c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.status]; })] },
+  { name: "전체 학생 명부", rows: (d) => [["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.status]; })] },
   { name: "학생 주일 출석 원본", rows: (d) => [["주일", "학생", "반", "출석 상태"], ...yearSundays(d).flatMap((dt) => activeStudents(d).map((s) => { const c = classOf(d, s); return [dt, s.name, c ? classLabel(c) : "", markText(d.studentMarks[`${dt}|${s.id}`])]; }))] },
   { name: "반별 출석현황", rows: (d) => [["주일", "반", "전체", "출석", "결석", "미확인", "출석률", "완료"], ...yearSundays(d).flatMap((dt) => d.classes.map((c) => { const s = classSummary(d, dt, c.id); return [dt, classLabel(c), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; }))] },
   { name: "학생 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["학생", "반", ...MONTHS, "연간"], ...activeStudents(d).map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", ...monthlyRates(d.studentMarks, s.id, dates), pctText(personRate(d.studentMarks, s.id, dates).rate)]; })]; } },
@@ -114,7 +114,7 @@ export function Sheets() {
       </section>
       <section className="panel">
         <h2>동기화할 파일</h2>
-        <SheetFileField label="교사 공유용 출석대장" desc="학생·교사 명부와 출석 기록 7개 시트가 들어갑니다. 연락처와 심방노트는 들어가지 않습니다." value={s.sheetSharedId} onSave={(id) => updateSettings({ sheetSharedId: id })} />
+        <SheetFileField label="교사 공유용 출석대장" desc="학생(생년월일 포함)·교사 명부와 출석 기록 7개 시트가 들어갑니다. 연락처와 심방노트는 들어가지 않습니다." value={s.sheetSharedId} onSave={(id) => updateSettings({ sheetSharedId: id })} />
         <SheetFileField label="관리자 전용 관리자료" desc="학생·보호자 연락처와 심방노트가 들어갑니다. 지정하지 않으면 이 두 시트는 보내지 않습니다." value={s.sheetPrivateId} onSave={(id) => updateSettings({ sheetPrivateId: id })} />
         {remoteEnabled && (sa?.email ? (
           <Note icon="info">각 구글 시트의 <b>공유</b>에서 <b className="num">{sa.email}</b> 을(를) <b>편집자</b>로 추가해야 앱이 시트에 쓸 수 있습니다.</Note>
