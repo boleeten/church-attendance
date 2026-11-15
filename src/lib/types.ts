@@ -1,7 +1,9 @@
 export type Role = "teacher" | "head" | "admin" | "super" | "owner";
 export type Mark = "P" | "A"; // 출석 / 결석 (값이 없으면 미확인)
 export type Gender = "남" | "여";
-export type StudentStatus = "등록" | "장결자" | "교회이동" | "졸업";
+export type StudentStatus = "등록" | "새친구" | "장결자" | "교회이동" | "졸업";
+/** 지금 다니는 학생(출석부·통계 대상): 등록 + 새친구 */
+export const isEnrolled = (s: StudentStatus) => s === "등록" || s === "새친구";
 export type AssignKind = "담임" | "보조";
 
 export interface User {

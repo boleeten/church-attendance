@@ -38,7 +38,7 @@ create table if not exists public.students (
   gender text check (gender in ('남', '여')),
   birth_date date, -- 생년월일. 관리자와 그 반 교사가 입력·수정
   class_id text references public.classes (id), -- 비어 있으면 반 미배정
-  status text not null default '등록' check (status in ('등록', '장결자', '교회이동', '졸업')),
+  status text not null default '등록' check (status in ('등록', '새친구', '장결자', '교회이동', '졸업')),
   phone text not null default '',
   guardian_phone text not null default '',
   guardian_rel text not null default '모',
@@ -348,3 +348,8 @@ begin
 end $$;
 alter table public.classes add constraint classes_grade_check check (grade = 0 or grade between 4 and 6);
 insert into public.classes (id, "group", grade, no, capacity) values ('g1-new', 1, 0, 1, 10), ('g2-new', 2, 0, 1, 10) on conflict (id) do nothing;
+
+-- 학생 상태 '새친구' (새친구반 학생). 새친구반에 있던 '등록' 학생은 '새친구'로 바꾼다.
+alter table public.students drop constraint if exists students_status_check;
+alter table public.students add constraint students_status_check check (status in ('등록', '새친구', '장결자', '교회이동', '졸업'));
+update public.students set status = '새친구' where status = '등록' and class_id in (select id from public.classes where grade = 0);

@@ -107,7 +107,7 @@ export function buildSeed(): Data {
         gender: sid % 2 ? "남" : "여",
         birthDate: r() < 0.1 ? null : `${+cur.slice(0, 4) - 6 - (c.grade || 5)}-${String(1 + Math.floor(r() * 12)).padStart(2, "0")}-${String(1 + Math.floor(r() * 28)).padStart(2, "0")}`,
         classId: c.id,
-        status: "등록",
+        status: c.grade === 0 ? "새친구" : "등록",
         phone: r() < 0.15 ? "" : phone("2345"),
         guardianPhone: phone("9876"),
         guardianRel: r() < 0.7 ? "모" : "부",

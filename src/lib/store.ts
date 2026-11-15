@@ -2,9 +2,9 @@ import { useSyncExternalStore } from "react";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
-import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
+import { isEnrolled, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
-const DATA_KEY = "ca-demo-v8";
+const DATA_KEY = "ca-demo-v9";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -340,7 +340,16 @@ export function sendTeacherReminders(date: string): number {
 }
 
 // ───────── 학생 ─────────
-export function upsertStudent(s: Omit<Student, "id"> & { id?: string }) {
+/** 새친구반 학생은 '새친구', 새친구반을 떠나면 '등록'. 장결자·교회이동·졸업은 그대로 둔다. */
+export function statusForClass(classId: string, status: StudentStatus): StudentStatus {
+  const nf = data.classes.find((c) => c.id === classId)?.grade === 0;
+  if (nf && status === "등록") return "새친구";
+  if (!nf && status === "새친구") return "등록";
+  return status;
+}
+
+export function upsertStudent(input: Omit<Student, "id"> & { id?: string }) {
+  const s = { ...input, status: statusForClass(input.classId, input.status) };
   const cls = (id: string) => {
     const c = data.classes.find((x) => x.id === id);
     return c ? classLabel(c) : "-";
@@ -361,7 +370,7 @@ export function upsertStudent(s: Omit<Student, "id"> & { id?: string }) {
 }
 
 export function classCount(classId: string) {
-  return data.students.filter((s) => s.classId === classId && s.status === "등록").length;
+  return data.students.filter((s) => s.classId === classId && isEnrolled(s.status)).length;
 }
 
 /** 장결자반: 부마다 하나. 따로 반을 만들지 않고 상태가 '장결자'인 학생을 그 부의 장결자반으로 본다.
@@ -396,6 +405,8 @@ export function moveStudents(ids: string[], classId: string): string | null {
       s.status = "등록";
     } else audit("반 이동", s.name, from ? classLabel(from) : "-", classLabel(c));
     s.classId = classId;
+    const next = statusForClass(classId, s.status);
+    if (next !== s.status) { audit("학생 상태", s.name, s.status, next); s.status = next; }
     remote.upsert("students", s);
   }
   emit();
