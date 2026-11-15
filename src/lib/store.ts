@@ -422,21 +422,6 @@ export function setStudentBirth(id: string, birthDate: string | null): string | 
   return null;
 }
 
-/** 엑셀로 받은 생년월일을 기존 학생들에게 한꺼번에 넣는다. 바뀐 학생 수를 돌려준다. */
-export function setStudentBirths(pairs: { id: string; birthDate: string }[]): number {
-  let n = 0;
-  for (const { id, birthDate } of pairs) {
-    const s = data.students.find((x) => x.id === id);
-    if (!s || s.birthDate === birthDate) continue;
-    s.birthDate = birthDate;
-    remote.update("students", { id: s.id }, { birthDate });
-    n++;
-  }
-  if (n) audit("생년월일 일괄 입력", `${n}명`, "-", "입력");
-  emit();
-  return n;
-}
-
 // ───────── 반·교사 ─────────
 export function addClass(group: 1 | 2, grade: number): string | null {
   const nos = data.classes.filter((c) => c.group === group && c.grade === grade).map((c) => c.no);

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, monthBirthdays, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { deleteStudent, deleteStudents, setStudentBirths, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { deleteStudent, deleteStudents, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -265,66 +265,6 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
   );
 }
 
-/** 기존 학생 생년월일 일괄 입력: 명단을 내려받아 생년월일 칸만 채워 다시 올린다. 학생ID로 짝지으므로 새 학생이 생기지 않는다. */
-function BirthBulkModal({ onClose }: { onClose: () => void }) {
-  const d = useData();
-  const file = useRef<HTMLInputElement>(null);
-  const [result, setResult] = useState<{ updated: number; same: number; bad: string[]; missing: string[] } | null>(null);
-  const targets = d.students.filter((s) => s.status !== "졸업").map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : a.c ? -1 : 1) || a.s.name.localeCompare(b.s.name, "ko"));
-  const empty = targets.filter(({ s }) => !s.birthDate).length;
-  const downloadList = () => download("학생_생년월일_입력.csv", toCSV([["학생ID", "이름", "그룹", "학년", "반", "생년월일"], ...targets.map(({ s, c }) => [s.id, s.name, c ? `${c.group}부` : "", c?.grade ?? "", c?.no ?? "", s.birthDate ?? ""])]));
-  const upload = async (f: File) => {
-    const all = parseCSV(await f.text());
-    const head = (all[0] ?? []).map((h) => h.replace(/\s/g, ""));
-    const iId = head.findIndex((h) => /학생ID|ID/i.test(h));
-    const iName = Math.max(0, head.findIndex((h) => /^이름/.test(h)));
-    const iBirth = head.findIndex((h) => /생년월일|생일/.test(h));
-    if (iBirth < 0) return toast("'생년월일' 칸을 찾지 못했습니다. 내려받은 명단 파일에 입력해 주세요.", "error");
-    const byName = new Map<string, Student[]>();
-    for (const s of d.students) byName.set(s.name, [...(byName.get(s.name) ?? []), s]);
-    const pairs: { id: string; birthDate: string }[] = [];
-    const bad: string[] = [];
-    const missing: string[] = [];
-    let same = 0;
-    for (const r of all.slice(1)) {
-      const raw = (r[iBirth] ?? "").trim();
-      const name = (r[iName] ?? "").trim();
-      if (!raw) continue;
-      const st = d.students.find((s) => iId >= 0 && s.id === (r[iId] ?? "").trim()) ?? (byName.get(name)?.length === 1 ? byName.get(name)![0] : undefined);
-      if (!st) { missing.push(name || "(이름 없음)"); continue; }
-      const birth = parseBirth(raw);
-      if (!birth) { bad.push(`${st.name}(${raw})`); continue; }
-      if (st.birthDate === birth) { same++; continue; }
-      pairs.push({ id: st.id, birthDate: birth });
-    }
-    setResult({ updated: setStudentBirths(pairs), same, bad, missing });
-  };
-  const list = (t: string, xs: string[]) => xs.length > 0 && <p className="t-sm"><strong className="sb c-error">{t} {xs.length}명</strong> · {xs.slice(0, 8).join(", ")}{xs.length > 8 ? " 등" : ""}</p>;
-  return (
-    <Modal title="생년월일 일괄 입력" onClose={onClose} footer={<Button onClick={onClose}>닫기</Button>}>
-      <p className="muted t-sm">등록된 학생 {targets.length}명 중 생년월일이 비어 있는 학생 {empty}명</p>
-      <div className="card pad col g8">
-        <strong className="sb">1. 명단 내려받기</strong>
-        <span className="t-sm muted">현재 학생 명단이 담긴 파일입니다. 맨 오른쪽 <b>생년월일</b> 칸만 채워 주세요. 학생ID·이름 칸은 고치지 마세요.</span>
-        <Button variant="outline" size="s" style={{ alignSelf: "flex-start" }} onClick={downloadList}><Icon name="download" size={14} />학생 명단 내려받기</Button>
-      </div>
-      <div className="card pad col g8">
-        <strong className="sb">2. 채운 파일 올리기</strong>
-        <span className="t-sm muted">2016-03-07, 2016.3.7, 20160307 형식 모두 됩니다. 빈 칸인 학생은 그대로 둡니다. Excel에서는 'CSV UTF-8'로 저장해 주세요.</span>
-        <Button size="s" style={{ alignSelf: "flex-start" }} onClick={() => file.current?.click()}>파일 올리기</Button>
-        <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
-      </div>
-      {result && (
-        <div className="col g6">
-          <p className="t-base"><strong className="sb">{result.updated}명</strong> 입력했습니다.{result.same ? ` (이미 같은 값 ${result.same}명)` : ""}</p>
-          {list("날짜를 읽지 못함", result.bad)}
-          {list("학생을 찾지 못함", result.missing)}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
 export function StudentDetailModal({ student, onClose }: { student: Student; onClose: () => void }) {
   const d = useData();
   const dates = yearSundays(d);
@@ -395,7 +335,6 @@ export function Students() {
   const [edit, setEdit] = useState<Student | null | "new">(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const [moving, setMoving] = useState(false);
-  const [birthBulk, setBirthBulk] = useState(false);
   const [moveTo, setMoveTo] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const dates = useMemo(() => yearSundays(d), [d]);
@@ -534,7 +473,6 @@ export function Students() {
             {canDeleteStudent && <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void removeSelected()}><Icon name="trash" size={14} />선택 학생 삭제</Button>}
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
-            <Button variant="outline" size="s" onClick={() => setBirthBulk(true)}>생년월일 일괄 입력</Button>
             <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "2016-03-07", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2015-11-21", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
             <Button size="s" onClick={() => setEdit("new")}><Icon name="plus" size={14} />학생 등록</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }} />
@@ -565,7 +503,6 @@ export function Students() {
       </section>
       {edit && <StudentForm student={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}
       {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
-      {birthBulk && <BirthBulkModal onClose={() => setBirthBulk(false)} />}
       {moving && (
         <Modal title={`선택 학생 ${sel.size}명 반 이동`} onClose={() => setMoving(false)} footer={<><Button variant="outline" onClick={() => setMoving(false)}>취소</Button><Button disabled={!moveTo} onClick={() => { const e = moveStudents([...sel], moveTo); if (e) return toast(e, "error"); toast("반을 이동했습니다. 이전 출석 기록은 그대로 보존됩니다."); setSel(new Set()); setMoving(false); }}>이동</Button></>}>
           <SelectBox label="이동할 반" value={moveTo} onChange={setMoveTo}>
