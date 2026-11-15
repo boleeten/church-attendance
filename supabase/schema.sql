@@ -36,6 +36,7 @@ create table if not exists public.students (
   id text primary key,
   name text not null,
   gender text check (gender in ('남', '여')),
+  birth_date date, -- 생년월일. 관리자와 그 반 교사가 입력·수정
   class_id text references public.classes (id), -- 비어 있으면 반 미배정
   status text not null default '등록' check (status in ('등록', '장결자', '교회이동', '졸업')),
   phone text not null default '',
@@ -333,3 +334,6 @@ alter table public.students add constraint students_gender_check check (gender i
 
 -- 학생 반 미배정 허용(엑셀 일괄 등록 시 이름만 있어도 등록)
 alter table public.students alter column class_id drop not null;
+
+-- 학생 생년월일 (관리자·담당 교사 입력)
+alter table public.students add column if not exists birth_date date;

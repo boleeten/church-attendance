@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym } from "../lib/date";
+import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym, fmtBirth } from "../lib/date";
 import { remote, remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
 import { audit, canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, pendingGraduates, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
@@ -29,7 +29,7 @@ const SHARED: SheetDef[] = [
   { name: "교사 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["교사", "소속", ...MONTHS, "연간"], ...allStaff(d).map((u) => [u.name, `${u.group}부`, ...monthlyRates(d.teacherMarks, u.id, dates), pctText(personRate(d.teacherMarks, u.id, dates).rate)])]; } },
 ];
 const PRIVATE: SheetDef[] = [
-  { name: "학생·보호자 연락처", rows: (d) => [["이름", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", s.phone, s.guardianPhone, s.guardianRel]; })] },
+  { name: "학생·보호자 연락처", rows: (d) => [["이름", "생년월일", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, fmtBirth(s.birthDate), c ? classLabel(c) : "", s.phone, s.guardianPhone, s.guardianRel]; })] },
   { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""]; })] },
 ];
 

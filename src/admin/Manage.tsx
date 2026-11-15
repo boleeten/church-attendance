@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { currentSunday, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
+import { currentSunday, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
 import { activeStudents, classSummary, consecutiveAbsences, download, groupTeachers, homeroomName, parseCSV, pctText, personRate, roster, studentsSummary, teacherDuty, teacherSummary, toCSV, yearSundays, type Summary } from "../lib/stats";
-import { deleteStudent, deleteStudents, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
+import { deleteStudent, deleteStudents, setStudentBirths, graduateStudents, longClassId, longGroupOf, longLabel, accountClasses, accountRecords, addClass, assignmentViolations, sameGroupClass, canDeleteAccounts, deleteAccount, deleteClass, canManageAccount, getData, canResetPassword, classCount, classLabel, classShort, moveStudents, resetPassword, sendStudentReminders, setAssignment, setUserActive, upsertStudent, upsertUser, useData, useMe } from "../lib/store";
 import type { ClassRoom, Data, Gender, Role, Student, StudentStatus, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
@@ -207,6 +207,7 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
             ))}
           </div>
         </div>
+        <div className="field"><label>생년월일</label><div className="input m"><input type="date" value={f.birthDate ?? ""} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value || null)} aria-label="생년월일" /></div></div>
         <div className="field"><label>{f.status === "장결자" ? "원래 반 (복귀할 반)" : "반"}</label>
           <SelectBox label="반" value={f.classId} onChange={(v) => set("classId", v)}>
             <option value="">반 미배정</option>
@@ -221,6 +222,66 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
         {inp("보호자 관계", "guardianRel", "모 / 부 / 조모 등")}
       </div>
       {err && <p className="c-error t-xs sb" role="alert">{err}</p>}
+    </Modal>
+  );
+}
+
+/** 기존 학생 생년월일 일괄 입력: 명단을 내려받아 생년월일 칸만 채워 다시 올린다. 학생ID로 짝지으므로 새 학생이 생기지 않는다. */
+function BirthBulkModal({ onClose }: { onClose: () => void }) {
+  const d = useData();
+  const file = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<{ updated: number; same: number; bad: string[]; missing: string[] } | null>(null);
+  const targets = d.students.filter((s) => s.status !== "졸업").map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : a.c ? -1 : 1) || a.s.name.localeCompare(b.s.name, "ko"));
+  const empty = targets.filter(({ s }) => !s.birthDate).length;
+  const downloadList = () => download("학생_생년월일_입력.csv", toCSV([["학생ID", "이름", "그룹", "학년", "반", "생년월일"], ...targets.map(({ s, c }) => [s.id, s.name, c ? `${c.group}부` : "", c?.grade ?? "", c?.no ?? "", s.birthDate ?? ""])]));
+  const upload = async (f: File) => {
+    const all = parseCSV(await f.text());
+    const head = (all[0] ?? []).map((h) => h.replace(/\s/g, ""));
+    const iId = head.findIndex((h) => /학생ID|ID/i.test(h));
+    const iName = Math.max(0, head.findIndex((h) => /^이름/.test(h)));
+    const iBirth = head.findIndex((h) => /생년월일|생일/.test(h));
+    if (iBirth < 0) return toast("'생년월일' 칸을 찾지 못했습니다. 내려받은 명단 파일에 입력해 주세요.", "error");
+    const byName = new Map<string, Student[]>();
+    for (const s of d.students) byName.set(s.name, [...(byName.get(s.name) ?? []), s]);
+    const pairs: { id: string; birthDate: string }[] = [];
+    const bad: string[] = [];
+    const missing: string[] = [];
+    let same = 0;
+    for (const r of all.slice(1)) {
+      const raw = (r[iBirth] ?? "").trim();
+      const name = (r[iName] ?? "").trim();
+      if (!raw) continue;
+      const st = d.students.find((s) => iId >= 0 && s.id === (r[iId] ?? "").trim()) ?? (byName.get(name)?.length === 1 ? byName.get(name)![0] : undefined);
+      if (!st) { missing.push(name || "(이름 없음)"); continue; }
+      const birth = parseBirth(raw);
+      if (!birth) { bad.push(`${st.name}(${raw})`); continue; }
+      if (st.birthDate === birth) { same++; continue; }
+      pairs.push({ id: st.id, birthDate: birth });
+    }
+    setResult({ updated: setStudentBirths(pairs), same, bad, missing });
+  };
+  const list = (t: string, xs: string[]) => xs.length > 0 && <p className="t-sm"><strong className="sb c-error">{t} {xs.length}명</strong> · {xs.slice(0, 8).join(", ")}{xs.length > 8 ? " 등" : ""}</p>;
+  return (
+    <Modal title="생년월일 일괄 입력" onClose={onClose} footer={<Button onClick={onClose}>닫기</Button>}>
+      <p className="muted t-sm">등록된 학생 {targets.length}명 중 생년월일이 비어 있는 학생 {empty}명</p>
+      <div className="card pad col g8">
+        <strong className="sb">1. 명단 내려받기</strong>
+        <span className="t-sm muted">현재 학생 명단이 담긴 파일입니다. 맨 오른쪽 <b>생년월일</b> 칸만 채워 주세요. 학생ID·이름 칸은 고치지 마세요.</span>
+        <Button variant="outline" size="s" style={{ alignSelf: "flex-start" }} onClick={downloadList}><Icon name="download" size={14} />학생 명단 내려받기</Button>
+      </div>
+      <div className="card pad col g8">
+        <strong className="sb">2. 채운 파일 올리기</strong>
+        <span className="t-sm muted">2016-03-07, 2016.3.7, 20160307 형식 모두 됩니다. 빈 칸인 학생은 그대로 둡니다. Excel에서는 'CSV UTF-8'로 저장해 주세요.</span>
+        <Button size="s" style={{ alignSelf: "flex-start" }} onClick={() => file.current?.click()}>파일 올리기</Button>
+        <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
+      </div>
+      {result && (
+        <div className="col g6">
+          <p className="t-base"><strong className="sb">{result.updated}명</strong> 입력했습니다.{result.same ? ` (이미 같은 값 ${result.same}명)` : ""}</p>
+          {list("날짜를 읽지 못함", result.bad)}
+          {list("학생을 찾지 못함", result.missing)}
+        </div>
+      )}
     </Modal>
   );
 }
@@ -251,7 +312,8 @@ export function StudentDetailModal({ student, onClose }: { student: Student; onC
           <span className="t-xs muted">{year.p} / {year.p + year.a}주</span>
         </div>
       </div>
-      <div className="grid cols-3" style={{ gap: 12 }}>
+      <div className="grid cols-4" style={{ gap: 12 }}>
+        <div className="col g4"><span className="t-xs muted">생년월일</span><strong className="sb num">{fmtBirth(student.birthDate) || "-"}</strong></div>
         <div className="col g4"><span className="t-xs muted">담임교사</span><strong className="sb">{c ? homeroomName(d, c.id) : "-"}</strong></div>
         <div className="col g4"><span className="t-xs muted">학생 연락처</span><strong className="sb num">{student.phone || "-"}</strong></div>
         <div className="col g4"><span className="t-xs muted">보호자 ({student.guardianRel})</span><strong className="sb num">{student.guardianPhone || "-"}</strong></div>
@@ -292,6 +354,7 @@ export function Students() {
   const [edit, setEdit] = useState<Student | null | "new">(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const [moving, setMoving] = useState(false);
+  const [birthBulk, setBirthBulk] = useState(false);
   const [moveTo, setMoveTo] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const dates = useMemo(() => yearSundays(d), [d]);
@@ -350,11 +413,11 @@ export function Students() {
     const picked = d.students.filter((s) => sel.has(s.id)).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c && b.c ? d.classes.indexOf(a.c) - d.classes.indexOf(b.c) : 0) || a.s.name.localeCompare(b.s.name, "ko"));
     const uname = (id?: string | null) => d.users.find((u) => u.id === id)?.name ?? "";
     const lines = picked.flatMap(({ s, c }) => {
-      const info = [s.name, s.gender ?? "", c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
+      const info = [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c?.grade, c?.no, homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
       const notes = d.notes.filter((n) => n.studentId === s.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
       return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), n.reply ?? "", uname(n.replyBy), fmtAt(n.replyAt)]) : [[...info, 0, "", "", "", "", "", "", ""]];
     });
-    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "성별", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
+    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
     toast(`${picked.length}명의 명부와 심방노트를 내려받았습니다.`);
   };
   const graduate = async () => {
@@ -369,25 +432,30 @@ export function Students() {
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(rows.map(({ s }) => s.id)));
 
   const exportCsv = () =>
-    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
+    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c?.grade, c?.no, teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
 
   const importCsv = async (file: File) => {
     const all = parseCSV(await file.text());
-    // 새 양식은 둘째 칸이 '성별'. 성별 칸이 없는 예전 양식도 받는다
-    const hasGender = /성별/.test(all[0]?.[1] ?? "");
-    const lines = all.slice(1).map((r) => (hasGender ? r : [r[0], "", ...r.slice(1)]));
+    // 첫 줄 제목으로 칸을 찾는다. 성별·생년월일 칸이 없는 예전 양식도 받는다
+    const head = (all[0] ?? []).map((h) => h.replace(/\s/g, ""));
+    const col = (re: RegExp, fallback: number) => { const i = head.findIndex((h) => re.test(h)); return i >= 0 ? i : fallback; };
+    const hasGender = head.some((h) => /성별/.test(h));
+    const hasBirth = head.some((h) => /생년월일|생일/.test(h));
+    const base = 1 + (hasGender ? 1 : 0) + (hasBirth ? 1 : 0);
+    const idx = { name: col(/^이름/, 0), sex: hasGender ? col(/성별/, 1) : -1, birth: hasBirth ? col(/생년월일|생일/, 2) : -1, g: col(/그룹|부$/, base), gr: col(/학년/, base + 1), no: col(/^반$/, base + 2), phone: col(/학생연락처/, base + 3), guardian: col(/보호자연락처/, base + 4), rel: col(/보호자관계/, base + 5) };
+    const lines = all.slice(1).map((r) => { const at = (i: number) => (i >= 0 ? r[i] ?? "" : ""); return [at(idx.name), at(idx.sex), at(idx.g), at(idx.gr), at(idx.no), at(idx.phone), at(idx.guardian), at(idx.rel), at(idx.birth)]; });
     // 이름만 있으면 등록한다. 그룹·학년·반이 비었거나 맞는 반이 없으면 '반 미배정'으로 등록
     let ok = 0;
     const unassigned: string[] = [];
     const clean = (v?: string) => (v ?? "").trim();
-    for (const [rawName, sex, g, gr, no, phone, guardian, rel] of lines) {
+    for (const [rawName, sex, g, gr, no, phone, guardian, rel, birth] of lines) {
       const name = clean(rawName);
       if (!name) continue;
       const gender: Gender | null = /^\s*(남|남자|M)\s*$/i.test(sex ?? "") ? "남" : /^\s*(여|여자|F)\s*$/i.test(sex ?? "") ? "여" : null;
       const num = (v?: string) => clean(v).replace(/[^0-9]/g, "");
       const c = d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
       if (!c) unassigned.push(name);
-      upsertStudent({ name, gender, classId: c ? c.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
+      upsertStudent({ name, gender, birthDate: parseBirth(birth), classId: c ? c.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
       ok++;
     }
     if (!ok) return toast("등록할 학생이 없습니다. 첫 칸에 학생 이름이 있는지 확인해 주세요.", "error");
@@ -423,26 +491,28 @@ export function Students() {
             {canDeleteStudent && <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void removeSelected()}><Icon name="trash" size={14} />선택 학생 삭제</Button>}
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
-            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
+            <Button variant="outline" size="s" onClick={() => setBirthBulk(true)}>생년월일 일괄 입력</Button>
+            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "2016-03-07", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2015-11-21", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
             <Button size="s" onClick={() => setEdit("new")}><Icon name="plus" size={14} />학생 등록</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }} />
           </div>
         </div>
         <div className="tablewrap">
           <table className="tbl">
-            <thead><tr><th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="검색 결과 전체 선택" title="검색 결과 전체 선택" /></th><th>학생</th><th>성별</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
+            <thead><tr><th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="검색 결과 전체 선택" title="검색 결과 전체 선택" /></th><th>학생</th><th>성별</th><th>생년월일</th><th>그룹</th><th>학년</th><th>반</th><th>담임교사</th><th>학생 연락처</th><th>보호자 연락처</th><th>상태</th><th>출석률</th><th>관리</th></tr></thead>
             <tbody>
               {view.map(({ s, c, teacher }) => (
                 <tr key={s.id}>
                   <td><input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} aria-label={`${s.name} 선택`} /></td>
                   <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
                   <td>{s.gender ?? "-"}</td>
+                  <td className="num">{fmtBirth(s.birthDate) || "-"}</td>
                   <td>{c ? `${c.group}부` : "-"}</td><td>{c ? `${c.grade}학년` : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? `${c.no}반` : <span className="sb c-warning">미배정</span>}</td>
                   <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
                   <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
-                  <td><span className="row g6"><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button><Button variant="secondary" size="s" onClick={() => setEdit(s)}>수정</Button>{canDeleteStudent && <RowMenu label={`${s.name} 더보기`} items={[{ icon: "trash", label: "삭제", danger: true, onSelect: () => void removeStudent(s) }]} />}</span></td>
+                  <td><span className="row g6"><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button><RowMenu label={`${s.name} 더보기`} items={[{ icon: "edit", label: "수정", onSelect: () => setEdit(s) }, ...(canDeleteStudent ? [{ icon: "trash", label: "삭제", danger: true, onSelect: () => void removeStudent(s) }] : [])]} /></span></td>
                 </tr>
               ))}
             </tbody>
@@ -452,6 +522,7 @@ export function Students() {
       </section>
       {edit && <StudentForm student={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}
       {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
+      {birthBulk && <BirthBulkModal onClose={() => setBirthBulk(false)} />}
       {moving && (
         <Modal title={`선택 학생 ${sel.size}명 반 이동`} onClose={() => setMoving(false)} footer={<><Button variant="outline" onClick={() => setMoving(false)}>취소</Button><Button disabled={!moveTo} onClick={() => { const e = moveStudents([...sel], moveTo); if (e) return toast(e, "error"); toast("반을 이동했습니다. 이전 출석 기록은 그대로 보존됩니다."); setSel(new Set()); setMoving(false); }}>이동</Button></>}>
           <SelectBox label="이동할 반" value={moveTo} onChange={setMoveTo}>

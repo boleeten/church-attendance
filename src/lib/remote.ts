@@ -93,6 +93,7 @@ export const remote = {
     if (!sb) return;
     const r = mapKeys(row as Record<string, unknown>, snake);
     if (table === "students" && r.class_id === "") r.class_id = null; // 반 미배정
+    if (table === "students" && r.birth_date === "") r.birth_date = null;
     queue(table, () => sb!.from(table).upsert(r));
   },
   /** 새 줄만 추가한다. 본인이 읽을 권한이 없는 테이블(감사 로그)은 upsert 대신 이것을 쓴다. */

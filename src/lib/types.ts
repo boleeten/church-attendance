@@ -37,6 +37,8 @@ export interface Student {
   name: string;
   /** 성별. 예전에 등록한 학생은 비어 있을 수 있다 */
   gender?: Gender | null;
+  /** 생년월일 YYYY-MM-DD. 비어 있을 수 있다 */
+  birthDate?: string | null;
   classId: string;
   status: StudentStatus;
   phone: string;

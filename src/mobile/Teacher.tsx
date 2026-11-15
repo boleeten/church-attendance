@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { currentSunday, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
+import { currentSunday, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
 import { classSummary, consecutiveAbsences, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
-import { logout, markAllRead, markRead, setPushAllowed, setStudentPhoto, useData, useMe } from "../lib/store";
+import { logout, markAllRead, markRead, setPushAllowed, setStudentBirth, setStudentPhoto, useData, useMe } from "../lib/store";
 import type { Student } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../ui";
 import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
@@ -244,6 +244,7 @@ export function StudentDetail() {
   const file = useRef<HTMLInputElement>(null);
   const [noteFor, setNoteFor] = useState<Student | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [birthEdit, setBirthEdit] = useState<string | null>(null);
   const s = d.students.find((x) => x.id === id);
   const u = useMe()!;
   const allowed = s && (isAdmin(u) || d.assignments.some((a) => a.userId === u.id && a.classId === s.classId));
@@ -306,6 +307,24 @@ export function StudentDetail() {
               setCropFile(f);
             }}
           />
+        </div>
+        <div className="card pad row between g12">
+          <div className="col g4 grow">
+            <span className="t-xs muted">생년월일</span>
+            {birthEdit === null ? (
+              <strong className="t-base sb num">{fmtBirth(s.birthDate) || "등록된 생년월일 없음"}</strong>
+            ) : (
+              <div className="input m"><input type="date" value={birthEdit} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBirthEdit(e.target.value)} aria-label="생년월일" /></div>
+            )}
+          </div>
+          {birthEdit === null ? (
+            <Button variant="secondary" size="s" onClick={() => setBirthEdit(s.birthDate ?? "")}>{s.birthDate ? "수정" : "입력"}</Button>
+          ) : (
+            <div className="row g6">
+              <Button variant="outline" size="s" onClick={() => setBirthEdit(null)}>취소</Button>
+              <Button size="s" onClick={() => { const err = setStudentBirth(s.id, birthEdit || null); toast(err ?? "생년월일을 저장했습니다.", err ? "error" : "info"); if (!err) setBirthEdit(null); }}>저장</Button>
+            </div>
+          )}
         </div>
         <div className="card list">
           {contact("학생", s.phone)}

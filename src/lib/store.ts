@@ -4,7 +4,7 @@ import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
 import type { AppNotification, AssignKind, ClassRoom, Data, Mark, Note, Role, Student, User } from "./types";
 
-const DATA_KEY = "ca-demo-v6";
+const DATA_KEY = "ca-demo-v7";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -410,6 +410,31 @@ export function setStudentPhoto(id: string, photo: string | null): string | null
   remote.update("students", { id: s.id }, { photo });
   emit();
   return null;
+}
+
+/** 생년월일 저장. 관리자와 그 반 교사가 고칠 수 있다(교사 권한은 DB 정책·트리거가 허용). */
+export function setStudentBirth(id: string, birthDate: string | null): string | null {
+  const s = data.students.find((x) => x.id === id);
+  if (!s) return "학생을 찾을 수 없습니다.";
+  s.birthDate = birthDate;
+  remote.update("students", { id: s.id }, { birthDate });
+  emit();
+  return null;
+}
+
+/** 엑셀로 받은 생년월일을 기존 학생들에게 한꺼번에 넣는다. 바뀐 학생 수를 돌려준다. */
+export function setStudentBirths(pairs: { id: string; birthDate: string }[]): number {
+  let n = 0;
+  for (const { id, birthDate } of pairs) {
+    const s = data.students.find((x) => x.id === id);
+    if (!s || s.birthDate === birthDate) continue;
+    s.birthDate = birthDate;
+    remote.update("students", { id: s.id }, { birthDate });
+    n++;
+  }
+  if (n) audit("생년월일 일괄 입력", `${n}명`, "-", "입력");
+  emit();
+  return n;
 }
 
 // ───────── 반·교사 ─────────

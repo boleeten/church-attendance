@@ -87,3 +87,22 @@ export function fmtTime12(hm: string): string {
   const [h, m] = hm.split(":").map(Number);
   return `${h < 12 ? "오전" : "오후"} ${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")}`;
 }
+
+/** 생년월일 입력값을 YYYY-MM-DD로 바꾼다. 2015-03-07, 2015.3.7, 2015. 3. 7., 2015/3/7, 20150307, 3/7/2015(엑셀 미국식) 모두 받는다. 못 읽으면 null */
+export function parseBirth(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  let y: number, m: number, d: number;
+  const nums: string[] = v.match(/\d+/g) ?? [];
+  const [a = "", b = "", c = ""] = nums;
+  if (nums.length === 1 && /^\d{8}$/.test(a)) [y, m, d] = [+a.slice(0, 4), +a.slice(4, 6), +a.slice(6, 8)];
+  else if (nums.length >= 3 && a.length === 4) [y, m, d] = [+a, +b, +c];
+  else if (nums.length >= 3 && c.length === 4) [m, d, y] = [+a, +b, +c];
+  else return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (y < 1990 || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d || toISO(dt) > todayISO()) return null;
+  return toISO(dt);
+}
+
+/** 2015-03-07 → 2015.03.07 */
+export const fmtBirth = (iso?: string | null) => (iso ? iso.replaceAll("-", ".") : "");
