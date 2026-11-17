@@ -142,6 +142,12 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from profiles where id = auth.uid() and active and roles && array['admin', 'super']);
 $$;
 
+-- 관리자가 발급한 활성 계정(프로필이 있는 교사)인지. 스스로 가입한 계정은 프로필이 없으므로 false
+create or replace function public.is_member() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from profiles where id = auth.uid() and active);
+$$;
+
 create or replace function public.my_group() returns int
 language sql stable security definer set search_path = public as $$
   select "group" from profiles where id = auth.uid();
@@ -149,12 +155,12 @@ $$;
 
 create or replace function public.teaches(cid text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from teacher_assignments where user_id = auth.uid() and class_id = cid);
+  select exists (select 1 from teacher_assignments a join profiles p on p.id = a.user_id where a.user_id = auth.uid() and p.active and a.class_id = cid);
 $$;
 
 create or replace function public.teaches_student(sid text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from students s join teacher_assignments a on a.class_id = s.class_id where s.id = sid and a.user_id = auth.uid());
+  select exists (select 1 from students s join teacher_assignments a on a.class_id = s.class_id join profiles p on p.id = a.user_id where s.id = sid and a.user_id = auth.uid() and p.active);
 $$;
 
 -- ───────── 계정 보호 트리거 ─────────
@@ -238,19 +244,19 @@ alter table public.audit_logs enable row level security;
 alter table public.settings enable row level security;
 alter table public.push_subscriptions enable row level security;
 
--- 이름·담당 표시를 위해 로그인한 사용자는 프로필·반·배정을 읽을 수 있다.
+-- 이름·담당 표시를 위해 등록된 교사는 프로필·반·배정을 읽을 수 있다. (본인 프로필은 비활성이어도 읽어서 '사용 중지' 안내를 띄운다)
 drop policy if exists profiles_read on public.profiles;
-create policy profiles_read on public.profiles for select to authenticated using (true);
+create policy profiles_read on public.profiles for select to authenticated using (id = auth.uid() or is_member());
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update to authenticated using (id = auth.uid() or is_admin()) with check (id = auth.uid() or is_admin());
 
 drop policy if exists classes_read on public.classes;
-create policy classes_read on public.classes for select to authenticated using (true);
+create policy classes_read on public.classes for select to authenticated using (is_member());
 drop policy if exists classes_write on public.classes;
 create policy classes_write on public.classes for all to authenticated using (is_admin()) with check (is_admin());
 
 drop policy if exists assign_read on public.teacher_assignments;
-create policy assign_read on public.teacher_assignments for select to authenticated using (true);
+create policy assign_read on public.teacher_assignments for select to authenticated using (is_member());
 drop policy if exists assign_write on public.teacher_assignments;
 create policy assign_write on public.teacher_assignments for all to authenticated using (is_admin()) with check (is_admin());
 
@@ -278,7 +284,7 @@ create policy tmarks_write on public.teacher_marks for all to authenticated
   with check (is_admin() or (has_role('head') and teacher_id <> auth.uid() and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
 
 drop policy if exists sessions_read on public.sessions;
-create policy sessions_read on public.sessions for select to authenticated using (true);
+create policy sessions_read on public.sessions for select to authenticated using (is_member());
 drop policy if exists sessions_write on public.sessions;
 create policy sessions_write on public.sessions for all to authenticated
   using (is_admin() or (target like 'class:%' and teaches(substr(target, 7))) or (has_role('head') and target = 'group:' || my_group()))
@@ -304,12 +310,12 @@ create policy nlogs_all on public.notification_logs for all to authenticated usi
 drop policy if exists audit_read on public.audit_logs;
 create policy audit_read on public.audit_logs for select to authenticated using (is_admin());
 drop policy if exists audit_insert on public.audit_logs;
-create policy audit_insert on public.audit_logs for insert to authenticated with check (actor_id = auth.uid()::text);
+create policy audit_insert on public.audit_logs for insert to authenticated with check (actor_id = auth.uid()::text and is_member());
 drop policy if exists audit_update on public.audit_logs;
 create policy audit_update on public.audit_logs for update to authenticated using (false);
 
 drop policy if exists settings_read on public.settings;
-create policy settings_read on public.settings for select to authenticated using (true);
+create policy settings_read on public.settings for select to authenticated using (is_member());
 drop policy if exists settings_write on public.settings;
 create policy settings_write on public.settings for all to authenticated using (is_admin()) with check (is_admin());
 
