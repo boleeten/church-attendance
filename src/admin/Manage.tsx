@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { currentSunday, todayISO, fmtBirth, parseBirth, fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12 } from "../lib/date";
 import { toast } from "../lib/remote";
@@ -55,16 +56,88 @@ export const incompleteClasses = (d: Data, date: string, g?: 1 | 2) => d.classes
 export const classOf = (d: Data, s: Student) => d.classes.find((c) => c.id === s.classId);
 /** 필터 선택 상자: 높이 40, 테두리, 오른쪽 꺾쇠(14px) */
 /** 필터 선택 상자: 높이 40, 테두리, 오른쪽 꺾쇠(14px). 폭은 선택된 글자에 맞춘다(디자인의 hug). */
+type SelOpt = { value: string; text: string };
+const optText = (n: ReactNode): string => Children.toArray(n).map((c) => (typeof c === "string" || typeof c === "number" ? String(c) : isValidElement<{ children?: ReactNode }>(c) ? optText(c.props.children) : "")).join("");
+/**
+ * 필터·폼 선택 상자. 기본 <select> 목록은 모바일에서 화면 전체를 덮고 높이를 정할 수 없어서,
+ * 버튼 + 높이 제한(최대 280px)·스크롤 되는 목록으로 직접 그린다. 사용법은 <select> 와 같다(<option> 자식).
+ */
 function SelectBox({ value, onChange, children, label }: { value: string; onChange: (v: string) => void; children: ReactNode; label: string }) {
-  const ref = useRef<HTMLSelectElement>(null);
-  const [text, setText] = useState("");
-  useLayoutEffect(() => setText(ref.current?.selectedOptions[0]?.text ?? ""));
+  const opts: SelOpt[] = Children.toArray(children).filter(isValidElement).map((c) => {
+    const p = (c as ReactElement<{ value?: string | number; children?: ReactNode }>).props;
+    const text = optText(p.children);
+    return { value: p.value === undefined ? text : String(p.value), text };
+  });
+  const cur = opts.find((o) => o.value === value) ?? opts[0];
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<CSSProperties>({});
+  const btn = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  const place = () => {
+    const r = btn.current!.getBoundingClientRect();
+    const width = Math.min(Math.max(r.width, 180), window.innerWidth - 16);
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    const below = window.innerHeight - r.bottom - 12;
+    const maxHeight = Math.min(280, Math.max(below, r.top - 12));
+    setPos(below >= Math.min(200, maxHeight) || below >= r.top ? { top: r.bottom + 4, left, width, maxHeight } : { bottom: window.innerHeight - r.top + 4, left, width, maxHeight });
+  };
+  useLayoutEffect(() => {
+    if (!open) return;
+    pop.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView({ block: "nearest" });
+    pop.current?.querySelector<HTMLElement>("[aria-selected=true]")?.focus({ preventScroll: true });
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: Event) => {
+      const t = e.target as Node;
+      if (!pop.current?.contains(t) && !btn.current?.contains(t)) setOpen(false);
+    };
+    const scroll = (e: Event) => { if (!pop.current?.contains(e.target as Node)) setOpen(false); };
+    const close = () => setOpen(false);
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("touchstart", outside);
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("touchstart", outside);
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  const pick = (v: string) => {
+    setOpen(false);
+    btn.current?.focus();
+    if (v !== value) onChange(v);
+  };
+  const keys = (e: React.KeyboardEvent) => {
+    const items = [...(pop.current?.querySelectorAll<HTMLElement>("[role=option]") ?? [])];
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setOpen(false); btn.current?.focus(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); items[Math.min(items.length - 1, i + 1)]?.focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[Math.max(0, i - 1)]?.focus(); }
+    else if (e.key === "Home") { e.preventDefault(); items[0]?.focus(); }
+    else if (e.key === "End") { e.preventDefault(); items[items.length - 1]?.focus(); }
+  };
   return (
-    <label className="selbox">
-      <span className="selbox-text" aria-hidden="true">{text}</span>
-      <Icon name="down" size={14} />
-      <select ref={ref} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>{children}</select>
-    </label>
+    <>
+      <button ref={btn} type="button" className="selbox" aria-haspopup="listbox" aria-expanded={open} aria-label={cur?.text.startsWith(label) ? cur.text : `${label}: ${cur?.text ?? ""}`}
+        onClick={() => { if (!open) place(); setOpen(!open); }}
+        onKeyDown={(e) => { if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !open) { e.preventDefault(); place(); setOpen(true); } }}>
+        <span className="selbox-text">{cur?.text}</span>
+        <Icon name="down" size={14} />
+      </button>
+      {open && createPortal(
+        <div ref={pop} className="sel-pop" role="listbox" aria-label={label} style={pos} onKeyDown={keys}>
+          {opts.map((o) => (
+            <button key={o.value} type="button" role="option" aria-selected={o.value === value} className={o.value === value ? "on" : ""} onClick={() => pick(o.value)}>
+              {o.text}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 export { SelectBox };
@@ -637,7 +710,7 @@ export function Classes() {
                       <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, disabled: c.grade === 0, onSelect: () => removeClass(c) }]} />
                     </div>
                     <p className="cc-teachers">
-                      {teacherName(c.id, "담임")} / {teacherName(c.id, "보조")}
+                      {teacherName(c.id, "담임")} {names(c.id, "보조") === "미배정" ? <span className="cc-none">/ 보조교사 미배정</span> : <span className="cc-sub">/ {names(c.id, "보조")}</span>}
                     </p>
                   </div>
                   <div className="cc-bottom">
