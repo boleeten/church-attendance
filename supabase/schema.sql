@@ -274,14 +274,14 @@ drop policy if exists smarks_all on public.student_marks;
 create policy smarks_all on public.student_marks for all to authenticated
   using (is_admin() or teaches_student(student_id)) with check (is_admin() or teaches_student(student_id));
 
--- 부장교사는 자기 부서 교사만, 교사는 본인 기록만 읽는다.
+-- 부장교사는 자기 부서 교사(본인 포함)만, 교사는 본인 기록만 읽는다.
 drop policy if exists tmarks_read on public.teacher_marks;
 create policy tmarks_read on public.teacher_marks for select to authenticated
   using (is_admin() or teacher_id = auth.uid() or (has_role('head') and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
 drop policy if exists tmarks_write on public.teacher_marks;
 create policy tmarks_write on public.teacher_marks for all to authenticated
-  using (is_admin() or (has_role('head') and teacher_id <> auth.uid() and (select "group" from public.profiles p where p.id = teacher_id) = my_group()))
-  with check (is_admin() or (has_role('head') and teacher_id <> auth.uid() and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
+  using (is_admin() or (has_role('head') and (select "group" from public.profiles p where p.id = teacher_id) = my_group()))
+  with check (is_admin() or (has_role('head') and (select "group" from public.profiles p where p.id = teacher_id) = my_group()));
 
 drop policy if exists sessions_read on public.sessions;
 create policy sessions_read on public.sessions for select to authenticated using (is_member());

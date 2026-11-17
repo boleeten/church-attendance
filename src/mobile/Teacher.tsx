@@ -154,7 +154,7 @@ export function HeadHome() {
       </header>
       <div className="mbody">
         <Hero tone="head" label={`${g}부 교사 출석 · 이번 주 주일`} date={date} sum={teacherSummary(d, date, g)} unit="전체 교사" cta="교사 출석체크 하기" to="/h/check" />
-        <Note>부장교사 본인의 출석은 관리자가 입력합니다. {g}부 소속 교사만 체크할 수 있습니다.</Note>
+        <Note>부장님 본인과 {g}부 소속 교사의 출석을 체크할 수 있습니다.</Note>
         <div className="row between">
           <h2 className="t-base b">미확인 교사</h2>
           <strong className="muted">{pending.length}명</strong>

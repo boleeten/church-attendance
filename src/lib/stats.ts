@@ -47,11 +47,12 @@ export function studentsSummary(d: Data, date: string, list: Student[]): Summary
   );
 }
 
-/** 부장교사가 체크하는 소속 교사 (부장교사 본인 제외) */
+/** 부장교사가 체크하는 소속 교사 (부장교사 본인 포함, 맨 위) */
 export const groupTeachers = (d: Data, g: 1 | 2): User[] =>
-  d.users.filter((u) => u.roles.includes("teacher") && u.group === g && u.active).sort((a, b) => teacherOrder(d, a) - teacherOrder(d, b) || a.name.localeCompare(b.name, "ko"));
+  d.users.filter((u) => (u.roles.includes("teacher") || u.roles.includes("head")) && u.group === g && u.active).sort((a, b) => teacherOrder(d, a) - teacherOrder(d, b) || a.name.localeCompare(b.name, "ko"));
 
 function teacherOrder(d: Data, u: User): number {
+  if (u.roles.includes("head")) return -1;
   const as = d.assignments.filter((a) => a.userId === u.id);
   if (!as.length) return 9999;
   const idx = Math.min(...as.map((a) => d.classes.findIndex((c) => c.id === a.classId)));

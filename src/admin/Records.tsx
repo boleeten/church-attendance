@@ -513,7 +513,7 @@ export function TeacherAttendance() {
           </table>
           {!rows.length && <p className="empty">조건에 맞는 교사가 없습니다.</p>}
         </div>
-        <Note>부장교사 본인의 출석은 관리자가 이 화면에서 입력합니다. 교사 출석과 학생 출석은 서로 독립적으로 집계됩니다.</Note>
+        <Note>부장교사 본인의 출석은 부장교사가 직접 체크하거나 관리자가 이 화면에서 입력합니다. 교사 출석과 학생 출석은 서로 독립적으로 집계됩니다.</Note>
       </section>
       {edit && (
         <Modal title={`${edit.name} · ${m}월 출석 기록`} onClose={() => setEdit(null)} footer={<Button onClick={() => setEdit(null)}>닫기</Button>}>
