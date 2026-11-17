@@ -1,0 +1,28 @@
+# Dependabot: 라이브러리 버전·보안 업데이트를 PR로 알려 준다.
+# - 보안 취약점 수정 PR은 이 일정과 상관없이 바로 온다(저장소 Settings에서 security updates를 켜 둔 경우).
+# - 일반 버전 업데이트는 한 달에 한 번, 작은 업데이트(minor·patch)를 PR 하나로 묶어서 받는다.
+# - 빌드 도구(vite, @vitejs/plugin-react, typescript)의 큰 버전(major) 업그레이드는 빌드가 깨질 수 있어 제외한다.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
