@@ -17,6 +17,7 @@
   --neutral-soft: #f3f4f6;
   --neutral: #6d7280;
   --track: #e5e7eb;
+  --subtle: #e5e7eb; /* Figma Color/Border/subtle */
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px 0 rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px 0 rgba(0, 0, 0, 0.04);
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -434,3 +435,27 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .nf-alert { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; background: #fff7ed; box-shadow: inset 0 0 0 1px #fed7aa; color: #9a3412; }
 .nf-alert .btn { flex: none; }
 @media (max-width: 600px) { .nf-alert { flex-wrap: wrap; } }
+
+/* 관리자 모바일 날짜 바 (Figma 170:2326 '날짜 선택'): 처음엔 헤더 아래, 스크롤하면 헤더에 합쳐짐 */
+.week-bar-wrap { display: none; }
+.kpi-of { display: none; }
+@media (max-width: 860px) {
+  .week-bar-wrap { display: block; }
+  .topbar .week-picker { display: none; }
+  .topbar.compact .week-picker { display: flex; animation: wp-in .18s ease-out; }
+  .week-picker.week-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 8px; }
+  .week-picker.week-bar .wb-arrow { width: 36px; height: 36px; padding: 0; border: 0; border-radius: 18px; background: #fff; color: var(--text); }
+  .week-picker.week-bar .wb-arrow:disabled { opacity: 1; color: #d2d5da; }
+  .week-picker.week-bar .wb-date { height: auto; flex-direction: column; gap: 2px; padding: 0 8px; border: 0; background: none; text-align: center; }
+  .week-picker.week-bar .wb-date:hover { background: none; }
+  .week-picker.week-bar .wb-date strong { font-size: 18px; font-weight: 700; line-height: 1.5; color: var(--text); }
+  .week-picker.week-bar .wb-date span { font-size: 12px; line-height: 1.33; color: var(--muted); }
+  .week-picker.week-bar .wp-pop { position: absolute; top: calc(100% + 4px); left: 0; right: 0; width: auto; }
+  /* 흰 박스 테두리는 subtle 색 */
+  .amain .panel, .amain .kpi { box-shadow: inset 0 0 0 1px var(--subtle); }
+  /* 학생 출결현황: 출석 카드만 */
+  .kpis-attend { grid-template-columns: minmax(0, 1fr); }
+  .kpis-attend .hide-m { display: none; }
+  .kpi-of { display: inline; color: var(--muted); }
+}
+@keyframes wp-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

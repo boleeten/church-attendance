@@ -36,9 +36,19 @@ export function Page({ title, sub, children }: { title: string; sub: string; chi
   const u = useMe()!;
   const { date, setDate } = useAdminDate();
   const role = u.roles.includes("owner") ? "계정 총괄" : u.roles.includes("super") ? "최고 관리자" : "일반 관리자";
+  // 모바일: 처음에는 헤더 아래 날짜 바를 보여 주고, 날짜 바가 스크롤로 헤더 뒤로 사라지면 헤더 안에 날짜 선택을 합쳐 보여 준다.
+  const bar = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = bar.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { rootMargin: "-72px 0px 0px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
     <div className="amain">
-      <header className="topbar">
+      <header className={`topbar ${compact ? "compact" : ""}`}>
         <button type="button" className="icon-btn menu-btn" aria-label="메뉴 열기" onClick={() => openSidebar?.()}><Icon name="menu" /></button>
         <div className="col g2 grow">
           <h1 className="ellipsis">{title}</h1>
@@ -50,7 +60,10 @@ export function Page({ title, sub, children }: { title: string; sub: string; chi
         </Link>
         <UserMenu name={u.name} role={role} />
       </header>
-      <main className="content">{children}</main>
+      <main className="content">
+        <div ref={bar} className="week-bar-wrap"><WeekPicker date={date} setDate={setDate} variant="bar" /></div>
+        {children}
+      </main>
     </div>
   );
 }
@@ -67,7 +80,7 @@ function weekStatus(d: Data, dt: string): { text: string; tone: "done" | "doing"
 }
 
 /** 기준 주일 선택: ‹ › 로 한 주씩, '이번 주'로 복귀, 가운데 날짜를 누르면 월별 주일 목록 */
-function WeekPicker({ date, setDate }: { date: string; setDate: (d: string) => void }) {
+function WeekPicker({ date, setDate, variant = "header" }: { date: string; setDate: (d: string) => void; variant?: "header" | "bar" }) {
   const d = useData();
   const weeks = [...yearSundays(d)].reverse(); // 최근 주일이 먼저
   const thisWeek = weeks[0] ?? currentSunday();
@@ -100,6 +113,42 @@ function WeekPicker({ date, setDate }: { date: string; setDate: (d: string) => v
     return { m, dd };
   };
   let month = "";
+  const pop = open && (
+    <div className="wp-pop" role="listbox" aria-label="기준 주일 선택" ref={list}>
+      {weeks.map((dt) => {
+        const { m, dd } = md(dt);
+        const head = dt.slice(0, 7) !== month;
+        month = dt.slice(0, 7);
+        const st = weekStatus(d, dt);
+        return (
+          <div key={dt}>
+            {head && <div className="wp-month">{dt.slice(0, 4)}년 {m}월</div>}
+            <button type="button" role="option" aria-selected={dt === date} className={`wp-item ${dt === date ? "on" : ""}`} onClick={() => { setDate(dt); setOpen(false); }}>
+              <span className={`wp-dot ${st.tone}`} />
+              <span>{m}월 {dd}일 주일</span>
+              {dt === thisWeek && <span className="wp-tag">이번 주</span>}
+              <span className="wp-st">{st.text}</span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+  if (variant === "bar") {
+    const [y, m, dd] = date.split("-").map(Number);
+    const ago = Math.round((Date.parse(thisWeek) - Date.parse(date)) / (7 * 864e5));
+    return (
+      <div className="week-picker week-bar" ref={box}>
+        <button type="button" className="wb-arrow" aria-label="이전 주일" disabled={idx >= weeks.length - 1} onClick={() => go(idx + 1)}><Icon name="left" size={16} /></button>
+        <button type="button" className="wb-date" aria-haspopup="listbox" aria-expanded={open} aria-label="기준 주일 선택" onClick={() => setOpen(!open)}>
+          <strong className="num">{y}년 {m}월 {dd}일 (일)</strong>
+          <span>{ago <= 0 ? "이번 주 주일" : `${ago}주 전 주일`}</span>
+        </button>
+        <button type="button" className="wb-arrow" aria-label="다음 주일" disabled={idx === 0} onClick={() => go(idx - 1)}><Icon name="right" size={16} /></button>
+        {pop}
+      </div>
+    );
+  }
   return (
     <div className="week-picker" ref={box}>
       <button type="button" className="wp-date" aria-haspopup="listbox" aria-expanded={open} aria-label="기준 주일 선택" onClick={() => setOpen(!open)}>
@@ -112,27 +161,7 @@ function WeekPicker({ date, setDate }: { date: string; setDate: (d: string) => v
         <button type="button" aria-label="다음 주일" disabled={idx === 0} onClick={() => go(idx - 1)}><Icon name="right" size={14} /></button>
       </div>
       <button type="button" className="wp-now" disabled={date === thisWeek} onClick={() => setDate(thisWeek)}>이번주</button>
-      {open && (
-        <div className="wp-pop" role="listbox" aria-label="기준 주일 선택" ref={list}>
-          {weeks.map((dt) => {
-            const { m, dd } = md(dt);
-            const head = dt.slice(0, 7) !== month;
-            month = dt.slice(0, 7);
-            const st = weekStatus(d, dt);
-            return (
-              <div key={dt}>
-                {head && <div className="wp-month">{dt.slice(0, 4)}년 {m}월</div>}
-                <button type="button" role="option" aria-selected={dt === date} className={`wp-item ${dt === date ? "on" : ""}`} onClick={() => { setDate(dt); setOpen(false); }}>
-                  <span className={`wp-dot ${st.tone}`} />
-                  <span>{m}월 {dd}일 주일</span>
-                  {dt === thisWeek && <span className="wp-tag">이번 주</span>}
-                  <span className="wp-st">{st.text}</span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {pop}
     </div>
   );
 }

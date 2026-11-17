@@ -69,11 +69,12 @@ export function StudentAttendance() {
   const cols = dates.slice(-5);
   return (
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
-      <div className="grid cols-4">
-        <Kpi label="출석 대상" value={`${all.total}명`} sub={`${d.classes.length}개 반`} icon="users" />
-        <Kpi label="출석" value={`${all.p}명`} sub={`출석률 ${pctText(all.rate)}`} icon="check" tone="success" />
-        <Kpi label="결석" value={`${all.a}명`} sub={`연속 결석 ${[...streaks.values()].filter((n) => n >= 2).length}명 포함`} icon="x" tone="error" />
-        <Kpi label="미확인" value={`${all.u}명`} sub={`미완료 ${pending.length}개 반`} icon="info" tone="warm" />
+      {/* 모바일에서는 출석 카드 하나만 폭에 맞춰 보여 준다 (Figma 170:2326) */}
+      <div className="grid cols-4 kpis-attend">
+        <Kpi className="hide-m" label="출석 대상" value={`${all.total}명`} sub={`${d.classes.length}개 반`} icon="users" />
+        <Kpi label="출석" value={<>{all.p}명<span className="kpi-of"> / {all.total}명</span></>} sub={`출석률 ${pctText(all.rate)}`} icon="check" tone="success" />
+        <Kpi className="hide-m" label="결석" value={`${all.a}명`} sub={`연속 결석 ${[...streaks.values()].filter((n) => n >= 2).length}명 포함`} icon="x" tone="error" />
+        <Kpi className="hide-m" label="미확인" value={`${all.u}명`} sub={`미완료 ${pending.length}개 반`} icon="info" tone="warm" />
       </div>
       <div className="grid cols-2">
         {([1, 2] as const).map((g) => {

@@ -9,9 +9,9 @@ import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progres
 import { Page, useAdminDate } from "./AdminApp";
 
 // ───────── 공용 조각 ─────────
-export function Kpi({ label, value, sub, icon, tone }: { label: string; value: ReactNode; sub: string; icon: string; tone?: "success" | "error" | "warm" }) {
+export function Kpi({ label, value, sub, icon, tone, className }: { label: string; value: ReactNode; sub: string; icon: string; tone?: "success" | "error" | "warm"; className?: string }) {
   return (
-    <div className="kpi">
+    <div className={`kpi ${className ?? ""}`}>
       <div className="row between">
         <span className="muted">{label}</span>
         <span className={`ico ${tone ?? ""}`}><Icon name={icon} size={18} /></span>
