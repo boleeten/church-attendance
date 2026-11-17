@@ -459,3 +459,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .kpi-of { display: inline; color: var(--muted); }
 }
 @keyframes wp-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* 모바일: 본문 검색 박스는 한 줄 전체 폭 (내용 길이·글자 크기에 따라 카드 밖으로 넘치지 않게) */
+@media (max-width: 860px) {
+  .content .input.m { flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0 !important; }
+  .content .input.m input { width: 0; }
+  .content .row.wrap > .filters { flex: 1 1 100%; min-width: 0; }
+}
