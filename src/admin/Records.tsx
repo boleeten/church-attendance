@@ -475,11 +475,11 @@ export function TeacherAttendance() {
   const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.p + mo.a}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
   return (
     <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
-      <div className="grid cols-4">
-        <Kpi label="전체 교사" value={`${sum.total}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명 (부장교사 포함)`} icon="badge" />
-        <Kpi label="출석" value={`${sum.p}명`} sub={`출석률 ${pctText(sum.rate)}`} icon="check" tone="success" />
-        <Kpi label="결석" value={`${sum.a}명`} sub={`${fmtDot(date)} 기준`} icon="x" tone="error" />
-        <Kpi label="미확인" value={`${sum.u}명`} sub={pendingGroups.length ? `${pendingGroups.join("·")}부 교사 출석 미완료` : "모든 부서 완료"} icon="info" tone="warm" />
+      <div className="grid cols-4 kpis-attend">
+        <Kpi className="hide-m" label="전체 교사" value={`${sum.total}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명 (부장교사 포함)`} icon="badge" />
+        <Kpi label="출석" value={<>{sum.p}명<span className="kpi-of"> / {sum.total}명</span></>} sub={`출석률 ${pctText(sum.rate)}`} icon="check" tone="success" />
+        <Kpi className="hide-m" label="결석" value={`${sum.a}명`} sub={`${fmtDot(date)} 기준`} icon="x" tone="error" />
+        <Kpi className="hide-m" label="미확인" value={`${sum.u}명`} sub={pendingGroups.length ? `${pendingGroups.join("·")}부 교사 출석 미완료` : "모든 부서 완료"} icon="info" tone="warm" />
       </div>
       <section className="panel">
         <div className="row between wrap g8">
