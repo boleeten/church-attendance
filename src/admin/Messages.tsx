@@ -24,6 +24,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
   const d = useData();
   const teachers = useMemo(() => msgTeachers(d), [d]);
   const [to, setTo] = useState<string[]>(initial);
+  const [pickGroup, setPickGroup] = useState("1");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [pics, setPics] = useState<Pic[]>([]);
@@ -59,7 +60,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
     setTitle(""); setBody(""); setPics([]); setLinks([]);
     document.querySelector(".modal")?.scrollTo({ top: 0, behavior: "smooth" }); // 보냈다는 안내가 보이도록
   };
-  const rest = teachers.filter((t) => !to.includes(t.id));
+  const rest = teachers.filter((t) => !to.includes(t.id) && (!pickGroup || String(t.group) === pickGroup));
   return (
     <Modal wide title="메세지 보내기" onClose={onClose} footer={<>
       <Button variant="outline" onClick={onClose}>닫기</Button>
@@ -74,11 +75,18 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
           ))}
           {!to.length && <span className="t-xs muted">아래에서 받는 교사를 추가해 주세요.</span>}
         </div>
-        <div className="row g8 wrap">
-          <SelectBox label="교사 추가" value="" onChange={(v) => v && add([v])}>
-            <option value="">교사 추가</option>
-            {rest.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.group}부)</option>)}
+        <div className="msg-pick">
+          <SelectBox label="부서" value={pickGroup} onChange={setPickGroup}>
+            <option value="1">1부</option>
+            <option value="2">2부</option>
+            <option value="">전체</option>
           </SelectBox>
+          <SelectBox label="교사 추가" value="" onChange={(v) => v && add([v])}>
+            <option value="">{rest.length ? `교사 추가 (${rest.length}명)` : "추가할 교사가 없습니다"}</option>
+            {rest.map((t) => <option key={t.id} value={t.id}>{pickGroup ? t.name : `${t.name} (${t.group}부)`}</option>)}
+          </SelectBox>
+        </div>
+        <div className="row g8 wrap">
           <Button variant="outline" size="s" onClick={() => add(teachers.filter((t) => t.group === 1).map((t) => t.id))}>1부 전체</Button>
           <Button variant="outline" size="s" onClick={() => add(teachers.filter((t) => t.group === 2).map((t) => t.id))}>2부 전체</Button>
           {to.length > 0 && <Button variant="outline" size="s" onClick={() => setTo([])}>모두 빼기</Button>}

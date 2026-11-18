@@ -544,3 +544,4 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .msg-roll-count strong { color: var(--primary); font-weight: 700; }
 .msg-row-edit { cursor: pointer; align-items: center; }
 .msg-row-edit.on { background: #f5f9ff; }
+.msg-pick { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
