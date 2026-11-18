@@ -521,3 +521,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .msg-images.one { grid-template-columns: minmax(0, 1fr); }
 .msg-images.one .msg-img { aspect-ratio: auto; }
 .msg-images.one .msg-img img { height: auto; max-height: 520px; object-fit: contain; }
+.msg-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.msg-tag { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; white-space: nowrap; }
+.msg-tag strong { font-weight: 600; }
+.msg-tag.read { background: var(--success-soft); color: #137a40; }
+.msg-tag.unread { background: var(--neutral-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--subtle); }
+.msg-tag-sub { font-size: 12px; opacity: 0.75; }

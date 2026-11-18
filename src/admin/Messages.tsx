@@ -19,7 +19,7 @@ const msgTeachers = (d: Data): User[] =>
 const userName = (d: Data, id: string | null) => (id && d.users.find((u) => u.id === id)?.name) || "관리자";
 const unreadCount = (d: Data, userId: string) => (d.receipts ?? []).filter((r) => r.userId === userId && !r.readAt).length;
 
-type Pic = { id: string; blob: Blob; url: string };
+type Pic = { id: string; blob: Blob; url: string; orig: number };
 
 function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => void }) {
   const d = useData();
@@ -39,7 +39,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
     for (const f of files.slice(0, Math.max(0, room))) {
       const r = await fitImage(f);
       if (typeof r === "string") toast(r, "error");
-      else setPics((x) => [...x, { id: Math.random().toString(36).slice(2), blob: r, url: URL.createObjectURL(r) }]);
+      else setPics((x) => [...x, { id: Math.random().toString(36).slice(2), blob: r, url: URL.createObjectURL(r), orig: f.size }]);
     }
   };
   const send = async () => {
@@ -99,7 +99,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
           {pics.map((p) => (
             <div key={p.id} className="msg-img">
               <img src={p.url} alt="" />
-              <span className="msg-size">{kb(p.blob.size)}</span>
+              <span className="msg-size" title={`원본 ${kb(p.orig)} → 올릴 크기 ${kb(p.blob.size)}`}>{p.orig > p.blob.size ? `${kb(p.orig)} → ${kb(p.blob.size)}` : kb(p.blob.size)}</span>
               <button type="button" className="msg-x" aria-label="사진 빼기" onClick={() => { URL.revokeObjectURL(p.url); setPics((x) => x.filter((v) => v.id !== p.id)); }}><Icon name="x" size={14} /></button>
             </div>
           ))}
@@ -107,7 +107,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
             <button type="button" className="msg-img add" onClick={() => file.current?.click()}><Icon name="image" /><span className="t-xs">사진 추가</span></button>
           )}
         </div>
-        <span className="t-xs muted">500KB가 넘는 사진은 자동으로 줄여서 올립니다. 파일 첨부는 지원하지 않으니 문서는 링크로 보내 주세요.</span>
+        <span className="t-xs muted">올리는 사진은 자동으로 압축합니다(긴 변 1600px 이하, 장당 500KB 이하). 파일 첨부는 지원하지 않으니 문서는 링크로 보내 주세요.</span>
         <input ref={file} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/*" multiple hidden onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; void addPics(f); }} />
       </div>
       <div className="field">
@@ -141,7 +141,7 @@ function DetailModal({ m, onClose }: { m: TeacherMessage; onClose: () => void })
   };
   return (
     <Modal wide title="메세지 상세" onClose={onClose} footer={<>
-      <Button variant="danger" disabled={busy} onClick={() => void del()}><Icon name="trash" size={16} />{busy ? "삭제 중…" : "삭제"}</Button>
+      <Button variant="danger" disabled={busy} onClick={() => void del()}><Icon name="trash" size={16} />{busy ? "삭제 중…" : "보낸메세지 삭제"}</Button>
       <Button variant="outline" className="grow" onClick={onClose}>닫기</Button>
     </>}>
       <div className="col g4">
@@ -153,24 +153,28 @@ function DetailModal({ m, onClose }: { m: TeacherMessage; onClose: () => void })
         <strong className="sb">받는 사람 {rs.length}명</strong>
         <Badge tone={read === rs.length ? "success" : "warning"}>읽음 {read}/{rs.length}</Badge>
       </div>
-      <div className="tablewrap">
-        <table className="tbl">
-          <thead><tr><th>교사</th><th>소속</th><th>상태</th><th>읽은 시각</th></tr></thead>
-          <tbody>
-            {[...rs].sort((a, b) => Number(!!a.readAt) - Number(!!b.readAt)).map((r) => {
-              const u = d.users.find((x) => x.id === r.userId);
-              return (
-                <tr key={r.userId}>
-                  <td><span className="row g8"><Avatar name={u?.name ?? "?"} size={28} /><strong className="sb">{u?.name ?? "삭제된 계정"}</strong></span></td>
-                  <td>{u?.group ? `${u.group}부` : "-"}</td>
-                  <td><Badge tone={r.readAt ? "success" : "neutral"}>{r.readAt ? "읽음" : "안 읽음"}</Badge></td>
-                  <td className="muted">{r.readAt ? fmtStamp(r.readAt) : "-"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {(["unread", "read"] as const).map((k) => {
+        const group = rs.filter((r) => (k === "read" ? !!r.readAt : !r.readAt));
+        if (!group.length) return null;
+        return (
+          <div key={k} className="col g8">
+            <span className="t-xs sb muted">{k === "read" ? `읽음 ${group.length}명` : `안 읽음 ${group.length}명`}</span>
+            <div className="msg-tags">
+              {group.map((r) => {
+                const u = d.users.find((x) => x.id === r.userId);
+                return (
+                  <span key={r.userId} className={`msg-tag ${k}`} title={r.readAt ? `${fmtStamp(r.readAt)}에 읽음` : "아직 읽지 않음"}>
+                    {k === "read" && <Icon name="check" size={13} stroke={2.4} />}
+                    <strong>{u?.name ?? "삭제된 계정"}</strong>
+                    {u?.group && <span className="msg-tag-sub">{u.group}부</span>}
+                    {r.readAt && <span className="msg-tag-sub">{fmtStamp(r.readAt)}</span>}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </Modal>
   );
 }
