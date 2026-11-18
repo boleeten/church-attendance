@@ -3,6 +3,7 @@ import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled, toast } from "./remote";
 import { fmtDot, todayISO } from "./date";
 import { blobToDataUrl } from "./image";
+import { formatPhone } from "./phone";
 import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
 const DATA_KEY = "ca-demo-v14";
@@ -573,7 +574,7 @@ export type StudentInfo = Pick<Student, "birthDate" | "gender" | "phone" | "guar
 export function setStudentInfo(id: string, info: StudentInfo): string | null {
   const s = data.students.find((x) => x.id === id);
   if (!s) return "학생을 찾을 수 없습니다.";
-  const next: StudentInfo = { birthDate: info.birthDate || null, gender: info.gender ?? null, phone: info.phone.trim(), guardianPhone: info.guardianPhone.trim(), guardianRel: info.guardianRel.trim() || "모" };
+  const next: StudentInfo = { birthDate: info.birthDate || null, gender: info.gender ?? null, phone: formatPhone(info.phone), guardianPhone: formatPhone(info.guardianPhone), guardianRel: info.guardianRel.trim() || "모" };
   const show = (x: StudentInfo) => [x.gender ?? "성별 없음", x.birthDate || "생일 없음", x.phone || "-", `${x.guardianRel} ${x.guardianPhone || "-"}`].join(" / ");
   const before = show({ birthDate: s.birthDate ?? null, gender: s.gender ?? null, phone: s.phone, guardianPhone: s.guardianPhone, guardianRel: s.guardianRel });
   Object.assign(s, next);

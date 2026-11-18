@@ -12,6 +12,7 @@ import { NoteSheet } from "./Attendance";
 import { PasswordForm } from "./Auth";
 import { InboxMenuRow, MessagePopup } from "./Messages";
 import { visibleNotifications } from "../lib/messages";
+import { formatPhone } from "../lib/phone";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
@@ -440,11 +441,11 @@ export function StudentDetail() {
               </div>
             </div>
             <div className="field"><label htmlFor="si-phone">학생 연락처</label>
-              <div className="input m"><input id="si-phone" type="tel" inputMode="tel" placeholder="010-0000-0000" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></div>
+              <div className="input m"><input id="si-phone" type="tel" inputMode="numeric" placeholder="010-0000-0000" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: formatPhone(e.target.value) })} /></div>
             </div>
             <div className="row g8">
               <div className="field grow"><label htmlFor="si-gphone">보호자 연락처</label>
-                <div className="input m"><input id="si-gphone" type="tel" inputMode="tel" placeholder="010-0000-0000" value={edit.guardianPhone} onChange={(e) => setEdit({ ...edit, guardianPhone: e.target.value })} /></div>
+                <div className="input m"><input id="si-gphone" type="tel" inputMode="numeric" placeholder="010-0000-0000" value={edit.guardianPhone} onChange={(e) => setEdit({ ...edit, guardianPhone: formatPhone(e.target.value) })} /></div>
               </div>
               <div className="field" style={{ width: 96 }}><label htmlFor="si-rel">관계</label>
                 <div className="input m"><input id="si-rel" placeholder="모 / 부" value={edit.guardianRel} onChange={(e) => setEdit({ ...edit, guardianRel: e.target.value })} /></div>

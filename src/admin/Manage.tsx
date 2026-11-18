@@ -1,3 +1,4 @@
+import { formatPhone } from "../lib/phone";
 import { Children, Fragment, isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
@@ -303,9 +304,10 @@ function StudentForm({ student, onClose }: { student: Student | null; onClose: (
     toast(student ? "학생 정보를 수정했습니다." : "학생을 등록했습니다.");
     onClose();
   };
-  const inp = (label: string, k: "name" | "phone" | "guardianPhone" | "guardianRel", ph: string) => (
-    <div className="field"><label>{label}</label><div className="input m"><input value={f[k]} placeholder={ph} onChange={(e) => set(k, e.target.value)} aria-label={label} /></div></div>
-  );
+  const inp = (label: string, k: "name" | "phone" | "guardianPhone" | "guardianRel", ph: string) => {
+    const tel = k === "phone" || k === "guardianPhone";
+    return <div className="field"><label>{label}</label><div className="input m"><input value={f[k]} placeholder={ph} type={tel ? "tel" : "text"} inputMode={tel ? "numeric" : undefined} onChange={(e) => set(k, tel ? formatPhone(e.target.value) : e.target.value)} aria-label={label} /></div></div>;
+  };
   return (
     <Modal title={student ? "학생 정보 수정" : "학생 등록"} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={save}>저장</Button></>}>
       <div className="grid cols-2" style={{ gap: 12 }}>
