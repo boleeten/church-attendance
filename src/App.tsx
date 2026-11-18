@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Inbox, MessageDetail } from "./mobile/Messages";
 import AdminApp from "./admin/AdminApp";
 import { remoteEnabled } from "./lib/remote";
 import { syncAppBadge } from "./lib/push";
@@ -59,11 +60,15 @@ export default function App() {
         <Route path="/t/students/:id" element={T(<StudentDetail />)} />
         <Route path="/t/history" element={T(<History mode="student" />)} />
         <Route path="/t/me" element={T(<MyInfo base="/t" />)} />
+        <Route path="/t/messages" element={T(<Inbox base="/t" />)} />
+        <Route path="/t/messages/:id" element={T(<MessageDetail base="/t" />)} />
         <Route path="/h" element={H(<HeadHome />)} />
         <Route path="/h/notifications" element={H(<Notifications base="/h" />)} />
         <Route path="/h/check" element={H(<AttendanceCheck mode="teacher" />)} />
         <Route path="/h/history" element={H(<History mode="teacher" />)} />
         <Route path="/h/me" element={H(<MyInfo base="/h" />)} />
+        <Route path="/h/messages" element={H(<Inbox base="/h" />)} />
+        <Route path="/h/messages/:id" element={H(<MessageDetail base="/h" />)} />
         <Route path="/admin/*" element={<Guard roles={["admin", "super"]}><AdminApp /></Guard>} />
         <Route path="*" element={<Root />} />
       </Routes>

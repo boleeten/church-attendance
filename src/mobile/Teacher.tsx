@@ -10,6 +10,7 @@ import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../
 import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
 import { NoteSheet } from "./Attendance";
 import { PasswordForm } from "./Auth";
+import { InboxMenuRow, MessagePopup } from "./Messages";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
@@ -60,6 +61,7 @@ export function TeacherHome() {
       <Phone tabs={TEACHER_TABS}>
         <AppBar title={`${u.name} 선생님`} right={<Bell base="/t" />} />
         <div className="mbody"><p className="empty">배정된 담당 반이 없습니다. 관리자에게 문의해 주세요.</p></div>
+        <MessagePopup base="/t" />
       </Phone>
     );
   const dates = yearSundays(d);
@@ -133,6 +135,7 @@ export function TeacherHome() {
           ))}
         </div>
       </div>
+      <MessagePopup base="/t" />
     </Phone>
   );
 }
@@ -173,6 +176,7 @@ export function HeadHome() {
           ))}
         </div>
       </div>
+      <MessagePopup base="/h" />
     </Phone>
   );
 }
@@ -486,6 +490,7 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
               <Icon name="refresh" /><span className="grow sb">{g}부 담당 반으로 이동</span><Icon name="right" size={16} />
             </button>
           ))}
+          <InboxMenuRow base={base} />
           <button type="button" className="menu-row" onClick={() => setSheet("pw")}><Icon name="lock" /><span className="grow sb">비밀번호 변경</span><Icon name="right" size={16} /></button>
           <button type="button" className="menu-row" onClick={askPush}><Icon name="bell" /><span className="grow sb">푸시 알림</span><Badge tone={pushOn ? "success" : "neutral"}>{pushOn ? "허용됨" : "미허용"}</Badge></button>
           {pushOn && <button type="button" className="menu-row" onClick={testPush}><Icon name="check" /><span className="grow sb">테스트 알림 받아 보기</span><Icon name="right" size={16} /></button>}

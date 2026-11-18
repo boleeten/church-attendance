@@ -2,7 +2,7 @@
 // 로그인 아이디는 Supabase Auth의 이메일 `${아이디}@attendance.local` 로 매핑한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildSeed } from "./seed";
-import type { Data, Mark, User } from "./types";
+import type { Data, Mark, MessageReceipt, TeacherMessage, User } from "./types";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -10,6 +10,7 @@ export const remoteEnabled = Boolean(url && key);
 const sb: SupabaseClient | null = remoteEnabled ? createClient(url!, key!) : null;
 
 const EMAIL_DOMAIN = "attendance.local";
+const MSG_BUCKET = "message-images";
 const snake = (s: string) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
 const camel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 const mapKeys = (o: Record<string, unknown>, f: (k: string) => string) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => [f(k), v]));
@@ -57,6 +58,11 @@ async function loadAll(): Promise<Data> {
     fetchAll<Data["audits"][number]>("audit_logs"),
     fetchAll<{ id: number; data: Data["settings"] }>("settings"),
   ]);
+  // 메세지 표가 아직 없으면(SQL 실행 전) 빈 목록으로 두고 나머지 화면은 그대로 쓴다
+  const [messages, receipts] = await Promise.all([
+    fetchAll<TeacherMessage>("teacher_messages").catch(() => [] as TeacherMessage[]),
+    fetchAll<MessageReceipt>("teacher_message_recipients").catch(() => [] as MessageReceipt[]),
+  ]);
   const desc = <T,>(list: T[], k: keyof T) => list.sort((a, b) => String(b[k]).localeCompare(String(a[k])));
   return {
     version: 1,
@@ -71,6 +77,8 @@ async function loadAll(): Promise<Data> {
     notifications: desc(notifications, "createdAt"),
     notifLogs: desc(notifLogs, "at"),
     audits: desc(audits, "at"),
+    messages: desc(messages, "createdAt").map((m) => ({ ...m, images: m.images ?? [], links: m.links ?? [] })),
+    receipts,
     settings: { ...base.settings, ...(settings[0]?.data ?? {}) },
   };
 }
@@ -195,6 +203,47 @@ export const remote = {
     } catch {
       return "서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.";
     }
+  },
+  /** 메세지 사진을 비공개 저장소에 올린다. 성공하면 저장 경로 목록을 돌려준다 */
+  async uploadMessageImages(messageId: string, files: Blob[]): Promise<string[] | string> {
+    if (!sb) return [];
+    const paths: string[] = [];
+    for (const [i, f] of files.entries()) {
+      const ext = f.type === "image/png" ? "png" : f.type === "image/webp" ? "webp" : "jpg";
+      const path = `${messageId}/${i + 1}.${ext}`;
+      const { error } = await sb.storage.from(MSG_BUCKET).upload(path, f, { contentType: f.type, upsert: false });
+      if (error) {
+        if (paths.length) await sb.storage.from(MSG_BUCKET).remove(paths);
+        return `사진 업로드 실패: ${error.message}`;
+      }
+      paths.push(path);
+    }
+    return paths;
+  },
+  /** 저장소에서 사진 파일을 완전히 지운다 */
+  async removeMessageImages(paths: string[]): Promise<string | null> {
+    if (!sb || !paths.length) return null;
+    const { error } = await sb.storage.from(MSG_BUCKET).remove(paths);
+    return error ? error.message : null;
+  },
+  /** 비공개 사진을 잠시(1시간) 볼 수 있는 주소로 바꾼다 */
+  async messageImageUrls(paths: string[]): Promise<Record<string, string>> {
+    if (!sb || !paths.length) return {};
+    const { data } = await sb.storage.from(MSG_BUCKET).createSignedUrls(paths, 3600);
+    return Object.fromEntries((data ?? []).filter((x) => x.signedUrl && x.path).map((x) => [x.path!, x.signedUrl as string]));
+  },
+  /** 메세지와 받는 사람을 저장하고 결과를 기다린다 */
+  async sendMessage(m: TeacherMessage, userIds: string[]): Promise<string | null> {
+    if (!sb) return null;
+    await writes;
+    const a = await sb.from("teacher_messages").insert(mapKeys(m as unknown as Record<string, unknown>, snake));
+    if (a.error) return a.error.message;
+    const b = await sb.from("teacher_message_recipients").insert(userIds.map((u) => ({ message_id: m.id, user_id: u })));
+    if (b.error) {
+      await sb.from("teacher_messages").delete().eq("id", m.id);
+      return b.error.message;
+    }
+    return null;
   },
   async signOut() {
     await writes; // 로그아웃 전에 남은 저장을 마친다

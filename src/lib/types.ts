@@ -103,6 +103,30 @@ export interface AuditLog {
   after: string;
 }
 
+export interface MessageLink {
+  url: string;
+  label?: string;
+}
+
+/** 관리자가 교사에게 보내는 메세지. 여러 명에게 보내도 1건이다 */
+export interface TeacherMessage {
+  id: string;
+  title: string;
+  body: string;
+  /** Supabase 모드: 저장소 경로(`${id}/1.jpg`), 데모 모드: data URL */
+  images: string[];
+  links: MessageLink[];
+  senderId: string | null;
+  createdAt: string;
+}
+
+/** 받는 사람별 읽음 기록 */
+export interface MessageReceipt {
+  messageId: string;
+  userId: string;
+  readAt: string | null;
+}
+
 export interface Settings {
   year: number;
   studentNotifyTime: string;
@@ -137,6 +161,9 @@ export interface Data {
   notifications: AppNotification[];
   notifLogs: NotifLog[];
   audits: AuditLog[];
+  /** 교사별 메세지 (최신순) */
+  messages?: TeacherMessage[];
+  receipts?: MessageReceipt[];
   settings: Settings;
 }
 

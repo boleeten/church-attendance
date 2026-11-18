@@ -2,9 +2,10 @@ import { useSyncExternalStore } from "react";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled } from "./remote";
 import { fmtDot } from "./date";
-import { attendsClass, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
+import { blobToDataUrl } from "./image";
+import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
-const DATA_KEY = "ca-demo-v9";
+const DATA_KEY = "ca-demo-v10";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -169,6 +170,66 @@ export async function changePassword(current: string, next: string): Promise<str
 }
 
 const stripPw = (u: User) => ({ ...u, password: undefined });
+
+// ───────── 교사별 메세지 ─────────
+export const MSG_MAX_IMAGES = 5;
+export const MSG_MAX_LINKS = 5;
+
+/** 사진(500KB 이하로 줄인 것)과 링크를 담아 여러 교사에게 한 번에 보낸다 */
+export async function sendMessage(input: { title: string; body: string; images: Blob[]; links: MessageLink[]; userIds: string[] }): Promise<string | null> {
+  const title = input.title.trim();
+  if (!title) return "제목을 입력해 주세요.";
+  if (!input.userIds.length) return "받는 교사를 선택해 주세요.";
+  if (input.images.length > MSG_MAX_IMAGES) return `사진은 ${MSG_MAX_IMAGES}장까지 보낼 수 있습니다.`;
+  const id = `msg_${Date.now().toString(36)}${uid()}`;
+  let images: string[];
+  if (remoteEnabled) {
+    const up = await remote.uploadMessageImages(id, input.images);
+    if (typeof up === "string") return up;
+    images = up;
+  } else images = await Promise.all(input.images.map(blobToDataUrl));
+  const m: TeacherMessage = { id, title, body: input.body.trim(), images, links: input.links, senderId: userId, createdAt: now() };
+  if (remoteEnabled) {
+    const err = await remote.sendMessage(m, input.userIds);
+    if (err) {
+      await remote.removeMessageImages(images); // 저장에 실패하면 올린 사진도 남기지 않는다
+      return `보내지 못했습니다. ${err}`;
+    }
+  }
+  data.messages = [m, ...(data.messages ?? [])];
+  data.receipts = [...(data.receipts ?? []), ...input.userIds.map((u) => ({ messageId: id, userId: u, readAt: null }))];
+  const names = input.userIds.map((u) => data.users.find((x) => x.id === u)?.name ?? u);
+  audit("메세지 발송", title, "-", names.length > 3 ? `${names.slice(0, 3).join(", ")} 외 ${names.length - 3}명` : names.join(", "));
+  emit();
+  return null;
+}
+
+/** 메세지를 지운다. 첨부 사진은 저장소에서 완전히 삭제한다 */
+export async function deleteMessage(id: string): Promise<string | null> {
+  const m = data.messages?.find((x) => x.id === id);
+  if (!m) return "이미 삭제된 메세지입니다.";
+  if (remoteEnabled) {
+    const imgErr = await remote.removeMessageImages(m.images);
+    if (imgErr) return `사진을 지우지 못해 삭제를 멈췄습니다. ${imgErr}`;
+    const err = await remote.removeNow("teacher_messages", { id });
+    if (err) return err;
+  }
+  data.messages = (data.messages ?? []).filter((x) => x.id !== id);
+  data.receipts = (data.receipts ?? []).filter((r) => r.messageId !== id);
+  audit("메세지 삭제", m.title, `사진 ${m.images.length}장`, "삭제(사진 영구 삭제)");
+  emit();
+  return null;
+}
+
+/** 교사가 메세지를 열면 읽음으로 기록한다 */
+export function markMessageRead(messageId: string) {
+  const r = data.receipts?.find((x) => x.messageId === messageId && x.userId === userId);
+  if (!r || r.readAt) return;
+  r.readAt = now();
+  data.receipts = [...data.receipts!];
+  remote.update("teacher_message_recipients", { messageId, userId: r.userId }, { readAt: r.readAt });
+  emit();
+}
 
 // ───────── 감사 로그 ─────────
 export function audit(type: string, target: string, before: string, after: string) {
