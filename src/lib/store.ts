@@ -5,7 +5,7 @@ import { fmtDot } from "./date";
 import { blobToDataUrl } from "./image";
 import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
-const DATA_KEY = "ca-demo-v12";
+const DATA_KEY = "ca-demo-v13";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -204,27 +204,79 @@ export async function sendMessage(input: { title: string; body: string; images: 
   return null;
 }
 
-/** 메세지를 지운다. 첨부 사진은 저장소에서 완전히 삭제한다 */
-export const deleteMessage = (id: string) => deleteMessages([id]);
-
-/** 여러 메세지를 한 번에 지운다. 사진을 먼저 지우고, 실패하면 메세지는 남겨 둔다(사진만 남는 일이 없도록) */
-export async function deleteMessages(ids: string[]): Promise<string | null> {
+/** 메세지와 사진을 완전히 지운다 (내부용). 사진을 먼저 지우고, 실패하면 메세지는 남겨 둔다 */
+async function purgeMessages(ids: string[]): Promise<string | null> {
   const ms = (data.messages ?? []).filter((x) => ids.includes(x.id));
   if (!ms.length) return "이미 삭제된 메세지입니다.";
-  const images = ms.flatMap((m) => m.images);
   if (remoteEnabled) {
-    const imgErr = await remote.removeMessageImages(images);
-    if (imgErr) return `사진을 지우지 못해 삭제를 멈췄습니다. ${imgErr}`;
+    const imgErr = await remote.removeMessageImages(ms.flatMap((m) => m.images));
+    if (imgErr) return `사진을 지우지 못해 작업을 멈췄습니다. ${imgErr}`;
     const r = await remote.removeIn("teacher_messages", ms.map((m) => m.id));
     if (typeof r === "string") return r;
-    if (r < ms.length) return "삭제 권한이 없거나 일부가 이미 삭제되었습니다.";
+    if (r < ms.length) return "권한이 없거나 일부가 이미 삭제되었습니다.";
   }
   const gone = new Set(ms.map((m) => m.id));
   data.messages = (data.messages ?? []).filter((x) => !gone.has(x.id));
   data.receipts = (data.receipts ?? []).filter((r) => !gone.has(r.messageId));
-  audit("메세지 삭제", ms.length === 1 ? ms[0].title : `${ms[0].title} 외 ${ms.length - 1}건`, `사진 ${images.length}장`, "삭제(사진 영구 삭제)");
+  return null;
+}
+
+const titles = (ms: TeacherMessage[]) => (ms.length === 1 ? ms[0].title : `${ms[0].title} 외 ${ms.length - 1}건`);
+
+/** 관리자 '회수': 교사 메세지함에서도 사라지고, 첨부 사진은 저장소에서 완전히 삭제한다 */
+export async function recallMessages(ids: string[]): Promise<string | null> {
+  const ms = (data.messages ?? []).filter((x) => ids.includes(x.id));
+  const pics = ms.reduce((n, m) => n + m.images.length, 0);
+  const err = await purgeMessages(ids);
+  if (err) return err;
+  audit("메세지 회수", titles(ms), `사진 ${pics}장`, "회수(교사 메세지함에서도 삭제, 사진 영구 삭제)");
   emit();
   return null;
+}
+
+/** 관리자 '삭제': 관리자 목록에서만 지운다. 교사는 계속 볼 수 있다 */
+export async function hideMessages(ids: string[]): Promise<string | null> {
+  const ms = (data.messages ?? []).filter((x) => ids.includes(x.id) && !x.hiddenAt);
+  if (!ms.length) return "이미 삭제된 메세지입니다.";
+  const at = now();
+  if (remoteEnabled) {
+    const err = await remote.updateIn("teacher_messages", ms.map((m) => m.id), { hiddenAt: at });
+    if (err) return err;
+  }
+  const set = new Set(ms.map((m) => m.id));
+  data.messages = (data.messages ?? []).map((m) => (set.has(m.id) ? { ...m, hiddenAt: at } : m));
+  audit("메세지 삭제", titles(ms), "-", "관리자 목록에서 삭제(교사는 계속 보관)");
+  emit();
+  await purgeOrphanMessages();
+  return null;
+}
+
+/** 관리자도 지우고 받은 교사도 모두 지운 메세지는 아무도 볼 수 없으므로 사진까지 완전히 정리한다 (관리자 화면에서 실행) */
+export async function purgeOrphanMessages(): Promise<number> {
+  const orphan = (data.messages ?? []).filter((m) => {
+    if (!m.hiddenAt) return false;
+    const rs = (data.receipts ?? []).filter((r) => r.messageId === m.id);
+    return rs.every((r) => r.deletedAt);
+  });
+  if (!orphan.length) return 0;
+  const err = await purgeMessages(orphan.map((m) => m.id));
+  if (err) return 0;
+  emit();
+  return orphan.length;
+}
+
+/** 교사 '삭제': 자기 메세지함에서만 지운다. 관리자의 읽음 기록은 남는다 */
+export function deleteMyMessages(ids: string[]): number {
+  const at = now();
+  let n = 0;
+  data.receipts = (data.receipts ?? []).map((r) => {
+    if (r.userId !== userId || !ids.includes(r.messageId) || r.deletedAt) return r;
+    n++;
+    remote.update("teacher_message_recipients", { messageId: r.messageId, userId: r.userId }, { deletedAt: at });
+    return { ...r, deletedAt: at };
+  });
+  if (n) emit();
+  return n;
 }
 
 /** 교사가 메세지를 열면 읽음으로 기록한다 */

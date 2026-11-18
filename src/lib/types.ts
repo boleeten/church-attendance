@@ -118,6 +118,8 @@ export interface TeacherMessage {
   links: MessageLink[];
   senderId: string | null;
   createdAt: string;
+  /** 관리자가 '삭제'한 시각. 관리자 목록에서만 숨기고 교사는 계속 본다 */
+  hiddenAt?: string | null;
 }
 
 /** 받는 사람별 읽음 기록 */
@@ -125,6 +127,8 @@ export interface MessageReceipt {
   messageId: string;
   userId: string;
   readAt: string | null;
+  /** 교사가 자기 메세지함에서 지운 시각 */
+  deletedAt?: string | null;
 }
 
 export interface Settings {

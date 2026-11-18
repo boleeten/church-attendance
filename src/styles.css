@@ -542,3 +542,5 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .msg-roll-btn:active { background: var(--canvas); }
 .msg-roll-count { min-width: 48px; text-align: center; font-size: 14px; color: var(--muted); }
 .msg-roll-count strong { color: var(--primary); font-weight: 700; }
+.msg-row-edit { cursor: pointer; align-items: center; }
+.msg-row-edit.on { background: #f5f9ff; }

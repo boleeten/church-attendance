@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fmtDateTimeKo, todayISO } from "../lib/date";
 import { inboxOf } from "../lib/messages";
-import { markMessageRead, useData, useMe } from "../lib/store";
+import { deleteMyMessages, markMessageRead, useData, useMe } from "../lib/store";
+import { toast } from "../lib/remote";
 import { Badge, Button, Icon, Sheet } from "../ui";
 import { MessageBody } from "../ui/MessageBody";
 import { AppBar, HEAD_TABS, Phone, TEACHER_TABS } from "./Shell";
@@ -146,9 +147,22 @@ export function Inbox({ base }: { base: Base }) {
     return day >= start && day <= end && (!onlyUnread || !m.readAt);
   });
   const un = all.filter((m) => !m.readAt).length;
+  const [edit, setEdit] = useState(false);
+  const [sel, setSel] = useState<string[]>([]);
+  const chosen = sel.filter((id) => list.some((m) => m.id === id));
+  const allOn = list.length > 0 && list.every((m) => sel.includes(m.id));
+  const toggle = (id: string) => setSel((x) => (x.includes(id) ? x.filter((v) => v !== id) : [...x, id]));
+  const del = () => {
+    if (!chosen.length) return;
+    if (!window.confirm(`선택한 메세지 ${chosen.length}건을 내 메세지함에서 삭제할까요?\n삭제한 메세지는 다시 볼 수 없습니다.`)) return;
+    const n = deleteMyMessages(chosen);
+    toast(`메세지 ${n}건을 삭제했습니다.`);
+    setSel([]);
+    setEdit(false);
+  };
   return (
     <Phone tabs={base === "/t" ? TEACHER_TABS : HEAD_TABS}>
-      <AppBar back title="내 메세지함" right={un > 0 ? <Badge tone="error">안 읽음 {un}</Badge> : undefined} />
+      <AppBar back title="내 메세지함" right={all.length > 0 ? <button type="button" className="sb c-primary" onClick={() => { setEdit(!edit); setSel([]); }}>{edit ? "완료" : "편집"}</button> : un > 0 ? <Badge tone="error">안 읽음 {un}</Badge> : undefined} />
       <div className="mbody" style={{ gap: 12 }}>
         <div className="msg-filter">
           {RANGES.map(([v, l]) => (
@@ -162,13 +176,14 @@ export function Inbox({ base }: { base: Base }) {
           </div>
         )}
         <div className="row between">
-          <span className="t-xs muted">{list.length}건</span>
+          {edit ? <label className="chk t-xs"><input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? [] : list.map((m) => m.id))} />전체 선택</label> : <span className="t-xs muted">{list.length}건{un > 0 ? ` · 안 읽음 ${un}` : ""}</span>}
           <label className="chk t-xs"><input type="checkbox" checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} />안 읽은 메세지만</label>
         </div>
         {list.length > 0 ? (
           <div className="card list">
-            {list.map((m) => (
-              <Link key={m.id} to={`${base}/messages/${m.id}`} className="msg-row">
+            {list.map((m) => {
+              const inner = (
+                <>
                 <span className="icon-btn" style={{ width: 40, height: 40, borderRadius: 20, flex: "none", background: m.readAt ? "var(--soft)" : "var(--error-soft)", color: m.readAt ? "var(--muted)" : "var(--error)" }}><Icon name="mail" /></span>
                 <span className="col g4 grow" style={{ minWidth: 0 }}>
                   <span className="row g6">
@@ -182,13 +197,27 @@ export function Inbox({ base }: { base: Base }) {
                     {m.links.length > 0 && <span className="row g2"><Icon name="link" size={13} />{m.links.length}</span>}
                   </span>
                 </span>
-              </Link>
-            ))}
+                </>
+              );
+              return edit ? (
+                <label key={m.id} className={`msg-row msg-row-edit ${sel.includes(m.id) ? "on" : ""}`}>
+                  <span className="chk"><input type="checkbox" checked={sel.includes(m.id)} onChange={() => toggle(m.id)} aria-label={`${m.title} 선택`} /></span>
+                  {inner}
+                </label>
+              ) : (
+                <Link key={m.id} to={`${base}/messages/${m.id}`} className="msg-row">{inner}</Link>
+              );
+            })}
           </div>
         ) : (
           <p className="empty">{all.length ? "이 기간에 받은 메세지가 없습니다." : "받은 메세지가 없습니다."}</p>
         )}
       </div>
+      {edit && (
+        <div className="bottom-actions">
+          <Button variant="danger" size="l" block disabled={!chosen.length} onClick={del}><Icon name="trash" size={18} />{chosen.length ? `선택한 ${chosen.length}건 삭제` : "삭제할 메세지를 선택하세요"}</Button>
+        </div>
+      )}
     </Phone>
   );
 }
@@ -202,9 +231,16 @@ export function MessageDetail({ base }: { base: Base }) {
     if (m && !m.readAt) markMessageRead(m.id);
   }, [m]);
   const sender = m?.senderId ? d.users.find((x) => x.id === m.senderId) : null;
+  const nav = useNavigate();
+  const del = () => {
+    if (!m || !window.confirm("이 메세지를 내 메세지함에서 삭제할까요?\n삭제한 메세지는 다시 볼 수 없습니다.")) return;
+    deleteMyMessages([m.id]);
+    toast("메세지를 삭제했습니다.");
+    nav(`${base}/messages`, { replace: true });
+  };
   return (
     <Phone>
-      <AppBar back title="메세지" />
+      <AppBar back title="메세지" right={m ? <button type="button" className="icon-btn" aria-label="메세지 삭제" onClick={del}><Icon name="trash" /></button> : undefined} />
       <div className="mbody" style={{ gap: 16 }}>
         {m ? (
           <article className="card pad col g16">

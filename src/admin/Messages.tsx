@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtDateTimeKo, fmtStamp } from "../lib/date";
 import { fitImage, kb } from "../lib/image";
 import { normalizeUrl, receiptsOf } from "../lib/messages";
 import { toast } from "../lib/remote";
-import { deleteMessage, deleteMessages, MSG_MAX_IMAGES, MSG_MAX_LINKS, sendMessage, useData } from "../lib/store";
+import { hideMessages, MSG_MAX_IMAGES, purgeOrphanMessages, recallMessages, MSG_MAX_LINKS, sendMessage, useData } from "../lib/store";
 import type { Data, MessageLink, TeacherMessage, User } from "../lib/types";
 import { Badge, Button, Icon, Modal, Note } from "../ui";
 import { MessageBody } from "../ui/MessageBody";
@@ -124,23 +124,37 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
   );
 }
 
+/** 회수: 교사 메세지함에서도 사라지고 사진 영구 삭제 / 삭제: 관리자 목록에서만 지움 */
+async function runAction(kind: "recall" | "hide", ms: TeacherMessage[], d: Data): Promise<boolean> {
+  const label = ms.length === 1 ? `‘${ms[0].title}’ 메세지를` : `선택한 메세지 ${ms.length}건을`;
+  const people = new Set((d.receipts ?? []).filter((r) => ms.some((m) => m.id === r.messageId) && !r.deletedAt).map((r) => r.userId)).size;
+  const pics = ms.reduce((n, m) => n + m.images.length, 0);
+  const ask = kind === "recall"
+    ? `${label} 회수할까요?\n받은 교사 ${people}명의 메세지함에서도 사라지고${pics ? `, 첨부 사진 ${pics}장은 저장소에서 완전히 삭제됩니다` : ""}.\n되돌릴 수 없습니다.`
+    : `${label} 삭제할까요?\n관리자 목록에서만 지워지고, 받은 교사들은 자기 메세지함에서 계속 볼 수 있습니다.\n교사가 모두 지우면 사진까지 자동으로 정리됩니다.`;
+  if (!window.confirm(ask)) return false;
+  const ids = ms.map((m) => m.id);
+  const err = kind === "recall" ? await recallMessages(ids) : await hideMessages(ids);
+  if (err) { toast(err, "error"); return false; }
+  toast(kind === "recall" ? `메세지 ${ms.length}건을 회수했습니다.` : `메세지 ${ms.length}건을 목록에서 삭제했습니다.`);
+  return true;
+}
+
 function DetailModal({ m, onClose }: { m: TeacherMessage; onClose: () => void }) {
   const d = useData();
   const rs = receiptsOf(d, m.id);
   const read = rs.filter((r) => r.readAt).length;
   const [busy, setBusy] = useState(false);
-  const del = async () => {
-    if (!window.confirm(`‘${m.title}’ 메세지를 삭제할까요?\n받은 교사 ${rs.length}명의 메세지함에서도 사라지고${m.images.length ? `, 첨부 사진 ${m.images.length}장은 저장소에서 완전히 삭제됩니다` : ""}.\n되돌릴 수 없습니다.`)) return;
+  const act = async (kind: "recall" | "hide") => {
     setBusy(true);
-    const err = await deleteMessage(m.id);
+    const ok = await runAction(kind, [m], d);
     setBusy(false);
-    if (err) return toast(err, "error");
-    toast("메세지를 삭제했습니다.");
-    onClose();
+    if (ok) onClose();
   };
   return (
     <Modal wide title="메세지 상세" onClose={onClose} footer={<>
-      <Button variant="danger" disabled={busy} onClick={() => void del()}><Icon name="trash" size={16} />{busy ? "삭제 중…" : "보낸메세지 삭제"}</Button>
+      <Button variant="danger" disabled={busy} onClick={() => void act("recall")} title="교사 메세지함에서도 사라지고 사진도 완전히 삭제됩니다"><Icon name="refresh" size={16} />회수</Button>
+      <Button variant="outline" disabled={busy} onClick={() => void act("hide")} title="관리자 목록에서만 지웁니다. 교사는 계속 볼 수 있습니다"><Icon name="trash" size={16} />삭제</Button>
       <Button variant="outline" className="grow" onClick={onClose}>닫기</Button>
     </>}>
       <div className="col g4">
@@ -167,6 +181,7 @@ function DetailModal({ m, onClose }: { m: TeacherMessage; onClose: () => void })
                     <strong>{u?.name ?? "삭제된 계정"}</strong>
                     {u?.group && <span className="msg-tag-sub">{u.group}부</span>}
                     {r.readAt && <span className="msg-tag-sub">{fmtStamp(r.readAt)}</span>}
+                    {r.deletedAt && <span className="msg-tag-sub" title={`${fmtStamp(r.deletedAt)}에 교사가 메세지함에서 지움`}>· 교사가 지움</span>}
                   </span>
                 );
               })}
@@ -189,6 +204,7 @@ export function Messages() {
   const focusUser = focus ? d.users.find((u) => u.id === focus) : null;
   const since = period ? Date.now() - Number(period) * 86400000 : 0;
   const list = (d.messages ?? [])
+    .filter((m) => !m.hiddenAt)
     .filter((m) => !focus || (d.receipts ?? []).some((r) => r.messageId === m.id && r.userId === focus))
     .filter((m) => (!mq.trim() || m.title.includes(mq.trim()) || m.body.includes(mq.trim())) && new Date(m.createdAt).getTime() >= since)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -198,17 +214,14 @@ export function Messages() {
   const chosen = sel.filter((id) => list.some((m) => m.id === id)); // 필터로 안 보이는 건 지우지 않는다
   const allOn = list.length > 0 && list.every((m) => sel.includes(m.id));
   const toggle = (id: string) => setSel((x) => (x.includes(id) ? x.filter((v) => v !== id) : [...x, id]));
-  const delSelected = async () => {
-    const ms = list.filter((m) => chosen.includes(m.id));
-    const pics = ms.reduce((n, m) => n + m.images.length, 0);
-    if (!window.confirm(`선택한 메세지 ${ms.length}건을 삭제할까요?\n받은 교사들의 메세지함에서도 사라지고${pics ? `, 첨부 사진 ${pics}장은 저장소에서 완전히 삭제됩니다` : ""}.\n되돌릴 수 없습니다.`)) return;
+  const actSelected = async (kind: "recall" | "hide") => {
     setBusy(true);
-    const err = await deleteMessages(ms.map((m) => m.id));
+    const ok = await runAction(kind, list.filter((m) => chosen.includes(m.id)), d);
     setBusy(false);
-    if (err) return toast(err, "error");
-    setSel([]);
-    toast(`메세지 ${ms.length}건을 삭제했습니다.`);
+    if (ok) setSel([]);
   };
+  // 관리자도 지우고 교사도 모두 지운 메세지는 사진까지 정리한다
+  useEffect(() => { void purgeOrphanMessages(); }, []);
   return (
     <Page title="교사별 메세지 전달" sub="교사에게 개인 메세지·미션을 보내고 읽음 여부를 확인합니다">
         <section className="panel">
@@ -234,7 +247,8 @@ export function Messages() {
               <strong className="sb">{chosen.length}건 선택됨</strong>
               <button type="button" className="link" onClick={() => setSel([])}>선택 해제</button>
               <span className="grow" />
-              <Button variant="danger" size="s" disabled={busy} onClick={() => void delSelected()}><Icon name="trash" size={14} />{busy ? "삭제 중…" : `선택한 ${chosen.length}건 삭제`}</Button>
+              <Button variant="danger" size="s" disabled={busy} onClick={() => void actSelected("recall")}><Icon name="refresh" size={14} />선택한 {chosen.length}건 회수</Button>
+              <Button variant="outline" size="s" disabled={busy} onClick={() => void actSelected("hide")}><Icon name="trash" size={14} />선택한 {chosen.length}건 삭제</Button>
             </div>
           )}
           <div className="tablewrap">
@@ -269,7 +283,7 @@ export function Messages() {
             </table>
             {!list.length && <p className="empty">{focusUser ? `${focusUser.name} 선생님에게 보낸 메세지가 없습니다.` : "보낸 메세지가 없습니다."}</p>}
           </div>
-          <Note>교사는 앱 첫 화면에서 새 메세지를 바로 확인하고, 내 정보 › 내 메세지함에서 다시 볼 수 있습니다. 메세지를 열면 읽음으로 표시됩니다. 메세지를 삭제하면 첨부 사진도 저장소에서 완전히 지워집니다.</Note>
+          <Note>교사는 앱 첫 화면에서 새 메세지를 바로 확인하고, 내 정보 › 내 메세지함에서 다시 볼 수 있습니다. 메세지를 열면 읽음으로 표시됩니다. <b>회수</b>하면 교사 메세지함에서도 사라지고 첨부 사진도 완전히 지워집니다. <b>삭제</b>는 관리자 목록에서만 지우며, 교사는 계속 볼 수 있습니다.</Note>
         </section>
       {compose && <ComposeModal initial={compose} onClose={() => setCompose(null)} />}
       {opened && <DetailModal m={opened} onClose={() => setOpen(null)} />}

@@ -429,3 +429,22 @@ create policy msgimg_delete on storage.objects for delete to authenticated
 -- 2026-11-18 메세지 내용 5,000자로 늘림 (이미 만든 표용)
 alter table public.teacher_messages drop constraint if exists teacher_messages_body_check;
 alter table public.teacher_messages add constraint teacher_messages_body_check check (char_length(body) <= 5000);
+
+-- ───────── 메세지 회수 / 삭제 분리 (2026-11-18) ─────────
+alter table public.teacher_messages add column if not exists hidden_at timestamptz;
+alter table public.teacher_message_recipients add column if not exists deleted_at timestamptz;
+
+-- 관리자는 메세지를 숨김 처리(수정)할 수 있다
+drop policy if exists tmsg_update on public.teacher_messages;
+create policy tmsg_update on public.teacher_messages for update to authenticated using (is_admin()) with check (is_admin());
+
+-- 교사는 본인 줄의 '읽은 시각'과 '지운 시각'만 바꿀 수 있다
+revoke update on public.teacher_message_recipients from authenticated;
+grant update (read_at, deleted_at) on public.teacher_message_recipients to authenticated;
+
+-- 교사가 지운 메세지는 본문·사진도 더 이상 열 수 없게 한다
+create or replace function public.receives_message(mid text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from teacher_message_recipients r join profiles p on p.id = r.user_id where r.message_id = mid and r.user_id = auth.uid() and r.deleted_at is null and p.active);
+$$;
+

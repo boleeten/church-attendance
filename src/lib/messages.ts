@@ -6,7 +6,7 @@ export type InboxItem = TeacherMessage & { readAt: string | null };
 
 /** 이 교사가 받은 메세지 (최신순) */
 export function inboxOf(d: Data, userId: string): InboxItem[] {
-  const mine = new Map((d.receipts ?? []).filter((r) => r.userId === userId).map((r) => [r.messageId, r.readAt]));
+  const mine = new Map((d.receipts ?? []).filter((r) => r.userId === userId && !r.deletedAt).map((r) => [r.messageId, r.readAt]));
   return (d.messages ?? []).filter((m) => mine.has(m.id)).map((m) => ({ ...m, readAt: mine.get(m.id) ?? null })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
