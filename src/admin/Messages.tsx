@@ -82,7 +82,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
             <option value="">전체</option>
           </SelectBox>
           <SelectBox label="교사 추가" value="" onChange={(v) => v && add([v])}>
-            <option value="">{rest.length ? `교사 추가 (${rest.length}명)` : "추가할 교사가 없습니다"}</option>
+            <option value="">{rest.length ? "교사이름을 선택하세요" : "추가할 교사가 없습니다"}</option>
             {rest.map((t) => <option key={t.id} value={t.id}>{pickGroup ? t.name : `${t.name} (${t.group}부)`}</option>)}
           </SelectBox>
         </div>
