@@ -89,8 +89,8 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
         <div className="input"><input id="msg-title" maxLength={50} placeholder="예: 겨울 성경학교 준비 미션" value={title} onChange={(e) => setTitle(e.target.value)} /></div>
       </div>
       <div className="field">
-        <label htmlFor="msg-body">내용 <span className="muted">{body.length}/2000</span></label>
-        <textarea id="msg-body" className="area" style={{ minHeight: 160 }} maxLength={2000} placeholder="선생님께 전할 내용을 적어 주세요." value={body} onChange={(e) => setBody(e.target.value)} />
+        <label htmlFor="msg-body">내용 <span className="muted">{body.length.toLocaleString()}/5,000</span></label>
+        <textarea id="msg-body" className="area" style={{ minHeight: 160 }} maxLength={5000} placeholder="선생님께 전할 내용을 적어 주세요." value={body} onChange={(e) => setBody(e.target.value)} />
       </div>
       <div className="field">
         <label>사진 <span className="muted">{pics.length}/{MSG_MAX_IMAGES}장 · 장당 500KB 이하</span></label>

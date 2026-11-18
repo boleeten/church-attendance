@@ -9,7 +9,7 @@ begin;
 create table if not exists public.teacher_messages (
   id text primary key,
   title text not null check (char_length(title) between 1 and 50),
-  body text not null default '' check (char_length(body) <= 2000),
+  body text not null default '' check (char_length(body) <= 5000),
   images text[] not null default '{}',          -- 저장소 경로: {메세지id}/{번호}.jpg
   links jsonb not null default '[]',            -- [{ "url": "https://…", "label": "…" }]
   sender_id uuid references public.profiles (id) on delete set null,

@@ -217,7 +217,7 @@ export function buildSeed(): Data {
   const g1Teachers = users.filter((u) => u.group === 1 && u.roles.includes("teacher"));
   const messages: NonNullable<Data["messages"]> = [
     { id: "msg3", title: "겨울 성경학교 준비 미션", body: "선생님, 이번 겨울 성경학교에서 반별 율동을 맡아 주세요.\n\n· 12월 첫 주까지 율동 영상 확인\n· 반 아이들과 2주 동안 연습\n· 성경학교 당일 반별 발표 (3분 이내)\n\n준비하면서 궁금한 점은 언제든 말씀해 주세요.", images: [poster], links: [{ url: "https://www.youtube.com/", label: "율동 영상 보기" }], senderId: pastor.id, createdAt: at(cur, "17:10") },
-    { id: "msg2", title: "새친구 환영 카드 부탁드립니다", body: "이번 주 새친구로 온 아이에게 손글씨 환영 카드를 써 주세요. 카드는 교육부실 책상 위에 있습니다.", images: [], links: [], senderId: "u_admin_lee01", createdAt: at(addWeeks(cur, -1), "14:30") },
+    { id: "msg2", title: "새친구 환영 카드 부탁드립니다", body: "이번 주 새친구로 온 아이에게 손글씨 환영 카드를 써 주세요. 카드는 교육부실 책상 위에 있습니다.\n카드 문구 예시는 https://www.example.com/card 를 참고해 주세요.", images: [], links: [], senderId: "u_admin_lee01", createdAt: at(addWeeks(cur, -1), "14:30") },
     { id: "msg1", title: "11월 교사 기도제목", body: "이번 달에는 반 아이들 한 명 한 명의 이름을 불러 가며 기도해 주세요. 다음 교사 모임 때 나눔 시간이 있습니다.", images: [], links: [], senderId: pastor.id, createdAt: at(addWeeks(cur, -3), "19:00") },
   ];
   const receipts: NonNullable<Data["receipts"]> = [

@@ -365,7 +365,7 @@ update public.students set status = '새친구' where status = '등록' and clas
 create table if not exists public.teacher_messages (
   id text primary key,
   title text not null check (char_length(title) between 1 and 50),
-  body text not null default '' check (char_length(body) <= 2000),
+  body text not null default '' check (char_length(body) <= 5000),
   images text[] not null default '{}',          -- 저장소 경로: {메세지id}/{번호}.jpg
   links jsonb not null default '[]',            -- [{ "url": "https://…", "label": "…" }]
   sender_id uuid references public.profiles (id) on delete set null,
@@ -426,3 +426,6 @@ drop policy if exists msgimg_delete on storage.objects;
 create policy msgimg_delete on storage.objects for delete to authenticated
   using (bucket_id = 'message-images' and is_admin());
 
+-- 2026-11-18 메세지 내용 5,000자로 늘림 (이미 만든 표용)
+alter table public.teacher_messages drop constraint if exists teacher_messages_body_check;
+alter table public.teacher_messages add constraint teacher_messages_body_check check (char_length(body) <= 5000);
