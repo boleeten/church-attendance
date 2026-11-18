@@ -558,3 +558,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .pager-btn:hover:not(:disabled):not(.on) { background: var(--soft); }
 .pager-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; cursor: default; }
 .pager-btn:disabled { opacity: .4; cursor: default; }
+
+/* 학생 목록 전화 버튼 (상세정보 버튼과 줄을 나눠 잘못 누르지 않게) */
+.call-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 10px; background: var(--soft); color: var(--primary); font-size: 14px; font-weight: 600; text-decoration: none; }
+.call-btn.warm { background: var(--warm); color: var(--secondary); }
+.call-btn:active { filter: brightness(.95); }

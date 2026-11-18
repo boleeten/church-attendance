@@ -252,23 +252,21 @@ export function StudentList() {
           {list.map((s) => {
             const m = d.studentMarks[`${date}|${s.id}`];
             return (
-              <div key={s.id} className="row g10" style={{ padding: "12px 16px" }}>
-                <Link to={`/t/students/${s.id}`} className="row g12 grow">
+              <div key={s.id} className="col g12" style={{ padding: "14px 16px" }}>
+                <div className="row g12">
                   <Avatar name={s.name} photo={s.photo} />
-                  <div className="col g4 grow">
-                    <strong className="t-base sb">{s.name}</strong>
+                  <div className="col g4 grow" style={{ minWidth: 0 }}>
+                    <strong className="t-base sb ellipsis">{s.name}</strong>
                     <span className="row g6 t-xs muted">최근 <Badge tone={m === "P" ? "success" : m === "A" ? "error" : "neutral"}>{m === "P" ? "출석" : m === "A" ? "결석" : "미확인"}</Badge></span>
                   </div>
-                </Link>
-                {s.phone && (
-                  <a className="col center g2 t-xs muted" href={`tel:${s.phone}`} aria-label={`${s.name} 학생에게 전화`}>
-                    <span className="icon-btn soft" style={{ width: 36, height: 36 }}><Icon name="phone" size={18} /></span>학생
-                  </a>
+                  <Link to={`/t/students/${s.id}`} className="btn outline s" aria-label={`${s.name} 학생 상세정보`}>학생 상세정보</Link>
+                </div>
+                {(s.phone || s.guardianPhone) && (
+                  <div className="row g8">
+                    {s.phone && <a className="call-btn" href={`tel:${s.phone}`} aria-label={`${s.name} 학생에게 전화`}><Icon name="phone" size={16} />학생 전화</a>}
+                    {s.guardianPhone && <a className="call-btn warm" href={`tel:${s.guardianPhone}`} aria-label={`${s.name} 보호자에게 전화`}><Icon name="phone" size={16} />보호자 전화</a>}
+                  </div>
                 )}
-                <a className="col center g2 t-xs muted" href={`tel:${s.guardianPhone}`} aria-label={`${s.name} 보호자에게 전화`}>
-                  <span className="icon-btn warm" style={{ width: 36, height: 36 }}><Icon name="phone" size={18} /></span>보호자
-                </a>
-                <Link to={`/t/students/${s.id}`} aria-label={`${s.name} 상세`} className="muted"><Icon name="right" size={18} /></Link>
               </div>
             );
           })}
