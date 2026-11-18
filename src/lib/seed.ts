@@ -191,6 +191,7 @@ export function buildSeed(): Data {
   const body = "1부 4학년 1반의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.";
   const park = users.find((u) => u.loginId === "head_park01")!;
   const notifications: Data["notifications"] = [
+    { id: "nt-msg3", userId: kim.id, kind: "message", title: "새 메세지가 도착했습니다", body: "[겨울 성경학교 준비 미션] 선생님, 이번 겨울 성경학교에서 반별 율동을 맡아 주세요.", date: cur, createdAt: at(cur, "17:10"), read: false, link: "/t/messages/msg3" },
     { id: "nt0", userId: kim.id, kind: "reply", title: "심방노트에 답변이 왔습니다", body: `[박지호] ${pastor.title ?? pastor.name}: 빨리 낫도록 기도하겠습니다. 다음 주에도 못 나오면 제게 알려 주세요. 함께 심방 가…`, date: cur, createdAt: at(cur, "16:20"), read: false, link: `/t/students/${find("박지호").id}#note-n1` },
     { id: "nt1", userId: kim.id, kind: "student", title: "주일 출석체크 안내", body, date: cur, createdAt: at(cur, "15:00"), read: false },
     { id: "nt2", userId: kim.id, kind: "student", title: "주일 출석체크 안내", body, date: addWeeks(cur, -4), createdAt: at(addWeeks(cur, -4), "15:00"), read: true },

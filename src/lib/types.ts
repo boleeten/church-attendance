@@ -74,7 +74,7 @@ export interface Note {
 export interface AppNotification {
   id: string;
   userId: string;
-  kind: "student" | "teacher" | "reply";
+  kind: "student" | "teacher" | "reply" | "message";
   title: string;
   body: string;
   date: string; // 대상 주일

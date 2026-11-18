@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
-import { remote, remoteEnabled } from "./remote";
-import { fmtDot } from "./date";
+import { remote, remoteEnabled, toast } from "./remote";
+import { fmtDot, todayISO } from "./date";
 import { blobToDataUrl } from "./image";
 import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
-const DATA_KEY = "ca-demo-v13";
+const DATA_KEY = "ca-demo-v14";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
@@ -198,10 +198,24 @@ export async function sendMessage(input: { title: string; body: string; images: 
   }
   data.messages = [m, ...(data.messages ?? [])];
   data.receipts = [...(data.receipts ?? []), ...input.userIds.map((u) => ({ messageId: id, userId: u, readAt: null }))];
+  // 알림 목록에도 '새 메세지' 항목을 남기고, 기기 푸시도 보낸다
+  const preview = m.body.replace(/\s+/g, " ").trim();
+  for (const u of input.userIds) {
+    const row: AppNotification = { id: uid(), userId: u, kind: "message", title: "새 메세지가 도착했습니다", body: preview ? `[${title}] ${preview.length > 60 ? preview.slice(0, 60) + "…" : preview}` : `[${title}]`, date: todayISO(), createdAt: now(), read: false, link: `${messageBase(u)}/messages/${id}` };
+    data.notifications.unshift(row);
+    remote.upsert("notifications", row);
+  }
+  if (remoteEnabled) void remote.api("push-reminders", "POST", { message: id }).then((r) => { if (typeof r === "string") toast(`기기 푸시는 보내지 못했습니다. 앱 안의 알림 목록에는 표시됩니다. (${r})`, "error"); });
   const names = input.userIds.map((u) => data.users.find((x) => x.id === u)?.name ?? u);
   audit("메세지 발송", title, "-", names.length > 3 ? `${names.slice(0, 3).join(", ")} 외 ${names.length - 3}명` : names.join(", "));
   emit();
   return null;
+}
+
+/** 받는 사람이 메세지를 열 화면: 담당 반이 있으면 교사 화면(/t), 없으면 부장교사 화면(/h) */
+function messageBase(userId: string): "/t" | "/h" {
+  const u = data.users.find((x) => x.id === userId);
+  return data.assignments.some((a) => a.userId === userId) || !u?.roles.includes("head") ? "/t" : "/h";
 }
 
 /** 메세지와 사진을 완전히 지운다 (내부용). 사진을 먼저 지우고, 실패하면 메세지는 남겨 둔다 */
@@ -286,6 +300,13 @@ export function markMessageRead(messageId: string) {
   r.readAt = now();
   data.receipts = [...data.receipts!];
   remote.update("teacher_message_recipients", { messageId, userId: r.userId }, { readAt: r.readAt });
+  // 이 메세지의 '새 메세지' 알림도 읽음으로
+  for (const n of data.notifications) {
+    if (n.userId === userId && n.kind === "message" && !n.read && n.link?.endsWith(`/messages/${messageId}`)) {
+      n.read = true;
+      remote.update("notifications", { id: n.id }, { read: true });
+    }
+  }
   emit();
 }
 

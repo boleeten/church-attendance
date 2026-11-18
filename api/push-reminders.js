@@ -2,7 +2,8 @@
 // - 매주 일요일 오후 3시(KST)에 Vercel Cron이 호출한다 (vercel.json).
 // - 관리자가 앱에서 "알림 보내기"를 누르면 같은 함수를 호출해 기기 푸시만 추가로 보낸다.
 // 필요한 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CRON_SECRET
-// body.test 가 있으면 로그인한 본인 기기로 테스트 푸시만, body.reply(노트 ID)가 있으면 심방 답변 푸시만 보낸다.
+// body.test 가 있으면 로그인한 본인 기기로 테스트 푸시만, body.reply(노트 ID)가 있으면 심방 답변 푸시만,
+// body.message(메세지 ID)가 있으면 그 메세지를 받은 교사 기기로 새 메세지 푸시만 보낸다.
 import * as webpushModule from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -77,6 +78,43 @@ export default async function handler(req, res) {
         sent++;
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: note.author_id, endpoint: s.endpoint });
+      }
+    }
+    return res.status(200).json({ sent, devices: (subs || []).length });
+  }
+
+  // ── 교사별 메세지: 관리자가 메세지를 보내면 받는 교사 기기로 푸시 ──
+  if (body.message) {
+    const { data: me } = token ? await sb.auth.getUser(token) : { data: null };
+    if (!me?.user) return res.status(401).json({ error: "로그인이 필요합니다." });
+    const { data: actor } = await sb.from("profiles").select("roles, active").eq("id", me.user.id).single();
+    if (!actor?.active || !actor.roles.some((r) => r === "admin" || r === "super")) return res.status(403).json({ error: "관리자만 보낼 수 있습니다." });
+    const { data: msg } = await sb.from("teacher_messages").select("id, title, body").eq("id", String(body.message)).single();
+    if (!msg) return res.status(404).json({ error: "메세지를 찾을 수 없습니다." });
+    const { data: rcpts } = await sb.from("teacher_message_recipients").select("user_id").eq("message_id", msg.id).is("deleted_at", null);
+    const ids = (rcpts || []).map((r) => r.user_id);
+    if (!ids.length) return res.status(200).json({ sent: 0, devices: 0 });
+    const [{ data: subs }, { data: assigns }, { data: profs }] = await Promise.all([
+      sb.from("push_subscriptions").select("user_id, endpoint, subscription").in("user_id", ids),
+      sb.from("teacher_assignments").select("user_id").in("user_id", ids),
+      sb.from("profiles").select("id, roles").in("id", ids),
+    ]);
+    const hasClass = new Set((assigns || []).map((a) => a.user_id));
+    // 담당 반이 있으면 교사 화면(/t), 반 없는 부장교사는 부장교사 화면(/h)
+    const base = (u) => (hasClass.has(u) || !(profs || []).find((p) => p.id === u)?.roles?.includes("head") ? "/t" : "/h");
+    const text = String(msg.body || "").replace(/\s+/g, " ").trim();
+    let sent = 0;
+    for (const s of subs || []) {
+      try {
+        await webpush.sendNotification(s.subscription, JSON.stringify({
+          title: "새 메세지가 도착했습니다",
+          body: text ? `[${msg.title}] ${text.length > 80 ? text.slice(0, 80) + "…" : text}` : `[${msg.title}]`,
+          url: `${base(s.user_id)}/messages/${msg.id}`,
+          tag: `msg-${msg.id}`,
+        }));
+        sent++;
+      } catch (e) {
+        if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: s.user_id, endpoint: s.endpoint });
       }
     }
     return res.status(200).json({ sent, devices: (subs || []).length });

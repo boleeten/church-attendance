@@ -53,3 +53,12 @@ export function normalizeUrl(raw: string): string | null {
 }
 
 export const linkText = (l: { url: string; label?: string }) => l.label?.trim() || new URL(l.url).hostname.replace(/^www\./, "");
+
+/** 메세지 알림의 링크(…/messages/{id})에서 메세지 ID를 꺼낸다 */
+export const messageIdOfLink = (link?: string | null) => link?.match(/\/messages\/([^/?#]+)/)?.[1] ?? null;
+
+/** 회수·삭제되어 더 볼 수 없는 메세지의 알림은 목록에서 뺀다 */
+export function visibleNotifications(d: Data, userId: string) {
+  const inbox = new Set(inboxOf(d, userId).map((m) => m.id));
+  return d.notifications.filter((n) => n.userId === userId && (n.kind !== "message" || inbox.has(messageIdOfLink(n.link) ?? "")));
+}

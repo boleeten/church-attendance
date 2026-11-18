@@ -11,12 +11,13 @@ import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
 import { NoteSheet } from "./Attendance";
 import { PasswordForm } from "./Auth";
 import { InboxMenuRow, MessagePopup } from "./Messages";
+import { visibleNotifications } from "../lib/messages";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
   const d = useData();
   const u = useMe()!;
-  const unread = d.notifications.some((n) => n.userId === u.id && !n.read);
+  const unread = visibleNotifications(d, u.id).some((n) => !n.read);
   return (
     <Link to={`${base}/notifications`} className="icon-btn bordered" aria-label={unread ? "알림, 읽지 않은 알림 있음" : "알림"}>
       <Icon name="bell" size={22} />
@@ -185,7 +186,7 @@ export function Notifications({ base }: { base: "/t" | "/h" }) {
   const d = useData();
   const u = useMe()!;
   const nav = useNavigate();
-  const mine = d.notifications.filter((n) => n.userId === u.id);
+  const mine = visibleNotifications(d, u.id);
   const group = (label: string, list: typeof mine) =>
     list.length > 0 && (
       <>
@@ -202,8 +203,8 @@ export function Notifications({ base }: { base: "/t" | "/h" }) {
                 nav(n.link ?? `${base}/check?date=${n.date}`);
               }}
             >
-              <span className="icon-btn" style={{ width: 40, height: 40, borderRadius: 20, background: n.read ? "var(--soft)" : n.kind === "reply" ? "var(--soft)" : "var(--error-soft)", color: n.read ? "var(--text)" : n.kind === "reply" ? "var(--primary)" : "var(--error)" }}>
-                <Icon name={n.kind === "reply" ? "note" : "bell"} />
+              <span className="icon-btn" style={{ width: 40, height: 40, borderRadius: 20, background: n.read ? "var(--soft)" : n.kind === "reply" || n.kind === "message" ? "var(--soft)" : "var(--error-soft)", color: n.read ? "var(--text)" : n.kind === "reply" || n.kind === "message" ? "var(--primary)" : "var(--error)" }}>
+                <Icon name={n.kind === "reply" ? "note" : n.kind === "message" ? "mail" : "bell"} />
               </span>
               <span className="col g4 grow">
                 <span className="row g6">
@@ -225,7 +226,7 @@ export function Notifications({ base }: { base: "/t" | "/h" }) {
         {mine.length === 0 && <p className="empty">받은 알림이 없습니다.</p>}
         {group("새 알림", mine.filter((n) => !n.read))}
         {group("지난 알림", mine.filter((n) => n.read))}
-        <p className="row g6 t-xs muted"><Icon name="info" size={14} />출석 알림은 해당 주일 {base === "/h" ? "교사 " : ""}출석체크 화면으로, 심방 답변 알림은 그 학생의 심방노트로 이동합니다.</p>
+        <p className="row g6 t-xs muted"><Icon name="info" size={14} />출석 알림은 해당 주일 {base === "/h" ? "교사 " : ""}출석체크 화면으로, 심방 답변 알림은 그 학생의 심방노트로, 새 메세지 알림은 그 메세지로 이동합니다.</p>
       </div>
     </Phone>
   );
