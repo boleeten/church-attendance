@@ -3,7 +3,7 @@ import { fmtDateTimeKo, fmtStamp } from "../lib/date";
 import { fitImage, kb } from "../lib/image";
 import { normalizeUrl, receiptsOf } from "../lib/messages";
 import { toast } from "../lib/remote";
-import { deleteMessage, MSG_MAX_IMAGES, MSG_MAX_LINKS, sendMessage, useData } from "../lib/store";
+import { deleteMessage, deleteMessages, MSG_MAX_IMAGES, MSG_MAX_LINKS, sendMessage, useData } from "../lib/store";
 import type { Data, MessageLink, TeacherMessage, User } from "../lib/types";
 import { Badge, Button, Icon, Modal, Note } from "../ui";
 import { MessageBody } from "../ui/MessageBody";
@@ -193,6 +193,22 @@ export function Messages() {
     .filter((m) => (!mq.trim() || m.title.includes(mq.trim()) || m.body.includes(mq.trim())) && new Date(m.createdAt).getTime() >= since)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const opened = open ? d.messages?.find((m) => m.id === open) : null;
+  const [sel, setSel] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const chosen = sel.filter((id) => list.some((m) => m.id === id)); // 필터로 안 보이는 건 지우지 않는다
+  const allOn = list.length > 0 && list.every((m) => sel.includes(m.id));
+  const toggle = (id: string) => setSel((x) => (x.includes(id) ? x.filter((v) => v !== id) : [...x, id]));
+  const delSelected = async () => {
+    const ms = list.filter((m) => chosen.includes(m.id));
+    const pics = ms.reduce((n, m) => n + m.images.length, 0);
+    if (!window.confirm(`선택한 메세지 ${ms.length}건을 삭제할까요?\n받은 교사들의 메세지함에서도 사라지고${pics ? `, 첨부 사진 ${pics}장은 저장소에서 완전히 삭제됩니다` : ""}.\n되돌릴 수 없습니다.`)) return;
+    setBusy(true);
+    const err = await deleteMessages(ms.map((m) => m.id));
+    setBusy(false);
+    if (err) return toast(err, "error");
+    setSel([]);
+    toast(`메세지 ${ms.length}건을 삭제했습니다.`);
+  };
   return (
     <Page title="교사별 메세지 전달" sub="교사에게 개인 메세지·미션을 보내고 읽음 여부를 확인합니다">
         <section className="panel">
@@ -213,9 +229,17 @@ export function Messages() {
             </SelectBox>
             <SelectBox label="기간" value={period} onChange={setPeriod}><option value="">기간: 전체</option><option value="7">최근 1주</option><option value="31">최근 1개월</option><option value="92">최근 3개월</option></SelectBox>
           </div>
+          {chosen.length > 0 && (
+            <div className="msg-selbar">
+              <strong className="sb">{chosen.length}건 선택됨</strong>
+              <button type="button" className="link" onClick={() => setSel([])}>선택 해제</button>
+              <span className="grow" />
+              <Button variant="danger" size="s" disabled={busy} onClick={() => void delSelected()}><Icon name="trash" size={14} />{busy ? "삭제 중…" : `선택한 ${chosen.length}건 삭제`}</Button>
+            </div>
+          )}
           <div className="tablewrap">
             <table className="tbl msg-tbl">
-              <thead><tr><th>보낸 날짜</th><th>제목</th><th>받는 사람</th><th>{focusUser ? "상태" : "읽음"}</th></tr></thead>
+              <thead><tr><th className="msg-chk"><label className="chk"><input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? sel.filter((id) => !list.some((m) => m.id === id)) : [...new Set([...sel, ...list.map((m) => m.id)])])} aria-label="보이는 메세지 모두 선택" /></label></th><th>보낸 날짜</th><th>제목</th><th>받는 사람</th><th>{focusUser ? "상태" : "읽음"}</th></tr></thead>
               <tbody>
                 {list.map((m) => {
                   const rs = receiptsOf(d, m.id);
@@ -223,7 +247,8 @@ export function Messages() {
                   const mine = focus ? rs.find((r) => r.userId === focus) : null;
                   const names = rs.map((r) => userName(d, r.userId));
                   return (
-                    <tr key={m.id} className="click" tabIndex={0} onClick={() => setOpen(m.id)} onKeyDown={(e) => e.key === "Enter" && setOpen(m.id)}>
+                    <tr key={m.id} className={`click ${sel.includes(m.id) ? "on" : ""}`} tabIndex={0} onClick={() => setOpen(m.id)} onKeyDown={(e) => e.key === "Enter" && setOpen(m.id)}>
+                      <td className="msg-chk" onClick={(e) => e.stopPropagation()}><label className="chk"><input type="checkbox" checked={sel.includes(m.id)} onChange={() => toggle(m.id)} aria-label={`${m.title} 선택`} /></label></td>
                       <td className="nowrap muted">{fmtStamp(m.createdAt)}</td>
                       <td>
                         <span className="row g6">

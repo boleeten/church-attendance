@@ -529,3 +529,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .img-viewer-prev, .img-viewer-next { position: absolute; top: 50%; transform: translateY(-50%); }
 .img-viewer-prev { left: 12px; }
 .img-viewer-next { right: 12px; }
+.msg-selbar { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 12px; background: #eff6ff; box-shadow: inset 0 0 0 1px #bfdbfe; font-size: 14px; color: var(--primary); }
+.msg-tbl th.msg-chk, .msg-tbl td.msg-chk { width: 44px; padding-right: 0; }
+.msg-tbl td.msg-chk .chk { padding: 6px; margin: -6px; }
+.tbl tr.click.on td { background: #f5f9ff; }

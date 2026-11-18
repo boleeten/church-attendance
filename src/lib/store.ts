@@ -205,18 +205,24 @@ export async function sendMessage(input: { title: string; body: string; images: 
 }
 
 /** 메세지를 지운다. 첨부 사진은 저장소에서 완전히 삭제한다 */
-export async function deleteMessage(id: string): Promise<string | null> {
-  const m = data.messages?.find((x) => x.id === id);
-  if (!m) return "이미 삭제된 메세지입니다.";
+export const deleteMessage = (id: string) => deleteMessages([id]);
+
+/** 여러 메세지를 한 번에 지운다. 사진을 먼저 지우고, 실패하면 메세지는 남겨 둔다(사진만 남는 일이 없도록) */
+export async function deleteMessages(ids: string[]): Promise<string | null> {
+  const ms = (data.messages ?? []).filter((x) => ids.includes(x.id));
+  if (!ms.length) return "이미 삭제된 메세지입니다.";
+  const images = ms.flatMap((m) => m.images);
   if (remoteEnabled) {
-    const imgErr = await remote.removeMessageImages(m.images);
+    const imgErr = await remote.removeMessageImages(images);
     if (imgErr) return `사진을 지우지 못해 삭제를 멈췄습니다. ${imgErr}`;
-    const err = await remote.removeNow("teacher_messages", { id });
-    if (err) return err;
+    const r = await remote.removeIn("teacher_messages", ms.map((m) => m.id));
+    if (typeof r === "string") return r;
+    if (r < ms.length) return "삭제 권한이 없거나 일부가 이미 삭제되었습니다.";
   }
-  data.messages = (data.messages ?? []).filter((x) => x.id !== id);
-  data.receipts = (data.receipts ?? []).filter((r) => r.messageId !== id);
-  audit("메세지 삭제", m.title, `사진 ${m.images.length}장`, "삭제(사진 영구 삭제)");
+  const gone = new Set(ms.map((m) => m.id));
+  data.messages = (data.messages ?? []).filter((x) => !gone.has(x.id));
+  data.receipts = (data.receipts ?? []).filter((r) => !gone.has(r.messageId));
+  audit("메세지 삭제", ms.length === 1 ? ms[0].title : `${ms[0].title} 외 ${ms.length - 1}건`, `사진 ${images.length}장`, "삭제(사진 영구 삭제)");
   emit();
   return null;
 }
