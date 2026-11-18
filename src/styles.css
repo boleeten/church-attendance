@@ -477,13 +477,6 @@ table.tbl { width: 100%; border-collapse: collapse; }
 }
 
 /* ── 교사별 메세지 ── */
-.msg-layout { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 24px; align-items: start; }
-.msg-people { position: sticky; top: 88px; max-height: calc(100dvh - 120px); }
-.msg-plist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; min-height: 120px; margin: 0 -8px; padding: 0 8px; }
-.msg-person { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; }
-.msg-person:hover { background: var(--canvas); }
-.msg-person.on { background: #eff6ff; box-shadow: inset 0 0 0 1px #bfdbfe; }
-.msg-person > button { min-width: 0; padding: 2px 0; }
 .tbl tr.click { cursor: pointer; }
 .tbl tr.click:hover td { background: var(--canvas); }
 .tbl tr.click:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
@@ -511,9 +504,6 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .msg-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--error); flex: none; }
 .msg-hr { border: 0; height: 1px; background: var(--border); margin: 0; }
 @media (max-width: 860px) {
-  .msg-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  .msg-people { position: static; max-height: none; }
-  .msg-plist { max-height: 320px; }
   .msg-link-row { flex-wrap: wrap; }
   .msg-link-row > .input:first-child { flex: 1 1 100% !important; }
 }

@@ -3,10 +3,9 @@ import { fmtDateTimeKo, fmtStamp } from "../lib/date";
 import { fitImage, kb } from "../lib/image";
 import { normalizeUrl, receiptsOf } from "../lib/messages";
 import { toast } from "../lib/remote";
-import { teacherDuty } from "../lib/stats";
 import { deleteMessage, MSG_MAX_IMAGES, MSG_MAX_LINKS, sendMessage, useData } from "../lib/store";
 import type { Data, MessageLink, TeacherMessage, User } from "../lib/types";
-import { Avatar, Badge, Button, Icon, Modal, Note } from "../ui";
+import { Badge, Button, Icon, Modal, Note } from "../ui";
 import { MessageBody } from "../ui/MessageBody";
 import { Page } from "./AdminApp";
 import { SelectBox } from "./Manage";
@@ -182,17 +181,11 @@ function DetailModal({ m, onClose }: { m: TeacherMessage; onClose: () => void })
 export function Messages() {
   const d = useData();
   const teachers = useMemo(() => msgTeachers(d), [d]);
-  const [q, setQ] = useState("");
-  const [group, setGroup] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [focus, setFocus] = useState<string | null>(null);
+  const [focus, setFocus] = useState("");
   const [compose, setCompose] = useState<string[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [mq, setMq] = useState("");
   const [period, setPeriod] = useState("");
-  const shown = teachers.filter((t) => (!q.trim() || t.name.includes(q.trim())) && (!group || String(t.group) === group));
-  const allOn = shown.length > 0 && shown.every((t) => picked.includes(t.id));
-  const toggle = (id: string) => setPicked((x) => (x.includes(id) ? x.filter((v) => v !== id) : [...x, id]));
   const focusUser = focus ? d.users.find((u) => u.id === focus) : null;
   const since = period ? Date.now() - Number(period) * 86400000 : 0;
   const list = (d.messages ?? [])
@@ -202,38 +195,6 @@ export function Messages() {
   const opened = open ? d.messages?.find((m) => m.id === open) : null;
   return (
     <Page title="교사별 메세지 전달" sub="교사에게 개인 메세지·미션을 보내고 읽음 여부를 확인합니다">
-      <div className="msg-layout">
-        <section className="panel msg-people">
-          <div className="row between"><h2 className="t-lg b">교사 목록</h2><span className="t-xs muted">{teachers.length}명</span></div>
-          <div className="input m"><Icon name="search" size={18} /><input placeholder="교사 이름 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 이름 검색" /></div>
-          <div className="row g6">
-            {[["", "전체"], ["1", "1부"], ["2", "2부"]].map(([v, l]) => (
-              <button key={v} type="button" className={`chip ${group === v ? "on" : ""}`} style={{ height: 32 }} onClick={() => setGroup(v)}>{l}</button>
-            ))}
-          </div>
-          <label className="chk"><input type="checkbox" checked={allOn} onChange={() => setPicked((x) => (allOn ? x.filter((v) => !shown.some((t) => t.id === v)) : [...new Set([...x, ...shown.map((t) => t.id)])]))} />보이는 교사 모두 선택</label>
-          <div className="msg-plist">
-            {shown.map((t) => {
-              const un = unreadCount(d, t.id);
-              return (
-                <div key={t.id} className={`msg-person ${focus === t.id ? "on" : ""}`}>
-                  <label className="chk"><input type="checkbox" checked={picked.includes(t.id)} onChange={() => toggle(t.id)} aria-label={`${t.name} 선택`} /></label>
-                  <button type="button" className="row g8 grow" onClick={() => setFocus(focus === t.id ? null : t.id)} aria-pressed={focus === t.id} title="이 교사에게 보낸 메세지 보기">
-                    <Avatar name={t.name} size={32} />
-                    <span className="col grow" style={{ minWidth: 0, textAlign: "left" }}>
-                      <strong className="sb">{t.name}</strong>
-                      <span className="t-xs muted ellipsis">{t.group}부 · {teacherDuty(d, t)}</span>
-                    </span>
-                    {un > 0 && <Badge tone="warning">안 읽음 {un}</Badge>}
-                  </button>
-                </div>
-              );
-            })}
-            {!shown.length && <p className="empty">조건에 맞는 교사가 없습니다.</p>}
-          </div>
-          <Button block disabled={!picked.length} onClick={() => setCompose(picked)}><Icon name="mail" size={16} />선택한 {picked.length}명에게 보내기</Button>
-        </section>
-
         <section className="panel">
           <div className="row between wrap g8">
             <div className="col g2">
@@ -241,12 +202,15 @@ export function Messages() {
               <span className="t-xs muted">{list.length}건</span>
             </div>
             <div className="row g8">
-              {focusUser && <Button variant="outline" onClick={() => setFocus(null)}>전체 보기</Button>}
-              <Button onClick={() => setCompose(focusUser ? [focusUser.id] : picked)}><Icon name="plus" size={16} />{focusUser ? `${focusUser.name} 선생님에게 보내기` : "새 메세지"}</Button>
+              <Button onClick={() => setCompose(focusUser ? [focusUser.id] : [])}><Icon name="plus" size={16} />{focusUser ? `${focusUser.name} 선생님에게 보내기` : "새 메세지"}</Button>
             </div>
           </div>
           <div className="row g8 wrap">
             <div className="input m grow" style={{ minWidth: 200 }}><Icon name="search" size={18} /><input placeholder="제목, 내용 검색" value={mq} onChange={(e) => setMq(e.target.value)} aria-label="메세지 검색" /></div>
+            <SelectBox label="받는 사람" value={focus} onChange={setFocus}>
+              <option value="">받는 사람: 전체</option>
+              {teachers.map((t) => { const un = unreadCount(d, t.id); return <option key={t.id} value={t.id}>{`${t.name} (${t.group}부)${un ? ` · 안 읽음 ${un}` : ""}`}</option>; })}
+            </SelectBox>
             <SelectBox label="기간" value={period} onChange={setPeriod}><option value="">기간: 전체</option><option value="7">최근 1주</option><option value="31">최근 1개월</option><option value="92">최근 3개월</option></SelectBox>
           </div>
           <div className="tablewrap">
@@ -282,7 +246,6 @@ export function Messages() {
           </div>
           <Note>교사는 앱 첫 화면에서 새 메세지를 바로 확인하고, 내 정보 › 내 메세지함에서 다시 볼 수 있습니다. 메세지를 열면 읽음으로 표시됩니다. 메세지를 삭제하면 첨부 사진도 저장소에서 완전히 지워집니다.</Note>
         </section>
-      </div>
       {compose && <ComposeModal initial={compose} onClose={() => setCompose(null)} />}
       {opened && <DetailModal m={opened} onClose={() => setOpen(null)} />}
     </Page>
