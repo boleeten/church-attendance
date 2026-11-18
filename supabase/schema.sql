@@ -191,13 +191,12 @@ end $$;
 drop trigger if exists guard_profile on public.profiles;
 create trigger guard_profile before update on public.profiles for each row execute function public.guard_profile();
 
--- 담당 교사는 학생의 사진만 바꿀 수 있다. 연락처·반·상태는 관리자만.
+-- 담당 교사는 학생의 사진·생년월일·성별·연락처를 바꿀 수 있다. 이름·반·상태는 관리자만.
 create or replace function public.guard_student() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if auth.uid() is null or is_admin() then return new; end if;
-  new.name := old.name; new.gender := old.gender; new.class_id := old.class_id; new.status := old.status;
-  new.phone := old.phone; new.guardian_phone := old.guardian_phone; new.guardian_rel := old.guardian_rel;
+  new.name := old.name; new.class_id := old.class_id; new.status := old.status;
   return new;
 end $$;
 

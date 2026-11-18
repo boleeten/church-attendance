@@ -567,11 +567,18 @@ export function setStudentPhoto(id: string, photo: string | null): string | null
 }
 
 /** 생년월일 저장. 관리자와 그 반 교사가 고칠 수 있다(교사 권한은 DB 정책·트리거가 허용). */
-export function setStudentBirth(id: string, birthDate: string | null): string | null {
+/** 담당 교사가 고칠 수 있는 학생 기본 정보 (이름·반·상태는 관리자만) */
+export type StudentInfo = Pick<Student, "birthDate" | "gender" | "phone" | "guardianPhone" | "guardianRel">;
+
+export function setStudentInfo(id: string, info: StudentInfo): string | null {
   const s = data.students.find((x) => x.id === id);
   if (!s) return "학생을 찾을 수 없습니다.";
-  s.birthDate = birthDate;
-  remote.update("students", { id: s.id }, { birthDate });
+  const next: StudentInfo = { birthDate: info.birthDate || null, gender: info.gender ?? null, phone: info.phone.trim(), guardianPhone: info.guardianPhone.trim(), guardianRel: info.guardianRel.trim() || "모" };
+  const show = (x: StudentInfo) => [x.gender ?? "성별 없음", x.birthDate || "생일 없음", x.phone || "-", `${x.guardianRel} ${x.guardianPhone || "-"}`].join(" / ");
+  const before = show({ birthDate: s.birthDate ?? null, gender: s.gender ?? null, phone: s.phone, guardianPhone: s.guardianPhone, guardianRel: s.guardianRel });
+  Object.assign(s, next);
+  remote.update("students", { id: s.id }, next);
+  audit("학생 정보 수정", s.name, before, show(next));
   emit();
   return null;
 }

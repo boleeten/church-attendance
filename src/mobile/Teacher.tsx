@@ -4,8 +4,8 @@ import { currentSunday, todayISO, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD,
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
 import { classSummary, consecutiveAbsences, monthBirthdays, newFriendsReady, NEW_FRIEND_WEEKS, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
-import { classLabel, logout, markAllRead, markRead, setPushAllowed, setStudentBirth, setStudentPhoto, useData, useMe } from "../lib/store";
-import type { Student } from "../lib/types";
+import { classLabel, logout, markAllRead, markRead, setPushAllowed, setStudentInfo, setStudentPhoto, type StudentInfo, useData, useMe } from "../lib/store";
+import type { Gender, Student } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Note, Progress, Sheet } from "../ui";
 import { PhotoCropper, photoKB } from "../ui/PhotoCropper";
 import { NoteSheet } from "./Attendance";
@@ -283,7 +283,7 @@ export function StudentDetail() {
   const file = useRef<HTMLInputElement>(null);
   const [noteFor, setNoteFor] = useState<Student | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
-  const [birthEdit, setBirthEdit] = useState<string | null>(null);
+  const [edit, setEdit] = useState<StudentInfo | null>(null);
   const s = d.students.find((x) => x.id === id);
   const u = useMe()!;
   const allowed = s && (isAdmin(u) || d.assignments.some((a) => a.userId === u.id && a.classId === s.classId));
@@ -347,28 +347,23 @@ export function StudentDetail() {
             }}
           />
         </div>
-        <div className="card pad row between g12">
-          <div className="col g4 grow">
-            <span className="t-xs muted">생년월일</span>
-            {birthEdit === null ? (
-              <strong className="t-base sb num">{fmtBirth(s.birthDate) || "등록된 생년월일 없음"}</strong>
-            ) : (
-              <div className="input m"><input type="date" value={birthEdit} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBirthEdit(e.target.value)} aria-label="생년월일" /></div>
-            )}
-          </div>
-          {birthEdit === null ? (
-            <Button variant="secondary" size="s" onClick={() => setBirthEdit(s.birthDate ?? "")}>{s.birthDate ? "수정" : "입력"}</Button>
-          ) : (
-            <div className="row g6">
-              <Button variant="outline" size="s" onClick={() => setBirthEdit(null)}>취소</Button>
-              <Button size="s" onClick={() => { const err = setStudentBirth(s.id, birthEdit || null); toast(err ?? "생년월일을 저장했습니다.", err ? "error" : "info"); if (!err) setBirthEdit(null); }}>저장</Button>
-            </div>
-          )}
-        </div>
         <div className="card list">
+          <div className="row between g12" style={{ padding: 16 }}>
+            <div className="row g24 grow">
+              <div className="col g4">
+                <span className="t-xs muted">생년월일</span>
+                <strong className={`t-base sb num ${s.birthDate ? "" : "c-error"}`}>{fmtBirth(s.birthDate) || "미입력"}</strong>
+              </div>
+              <div className="col g4">
+                <span className="t-xs muted">성별</span>
+                <strong className={`t-base sb ${s.gender ? "" : "c-error"}`}>{s.gender ?? "미입력"}</strong>
+              </div>
+            </div>
+            <Button variant="secondary" size="s" onClick={() => setEdit({ birthDate: s.birthDate ?? null, gender: s.gender ?? null, phone: s.phone, guardianPhone: s.guardianPhone, guardianRel: s.guardianRel })}>정보 수정</Button>
+          </div>
           {contact("학생", s.phone)}
           {contact(`보호자 (${s.guardianRel})`, s.guardianPhone)}
-          <p className="row g6 t-xs muted" style={{ padding: "12px 16px" }}><Icon name="lock" size={14} />연락처·소속 반은 관리자만 변경할 수 있습니다.</p>
+          <p className="row g6 t-xs muted" style={{ padding: "12px 16px" }}><Icon name="lock" size={14} />이름·소속 반·상태는 관리자만 변경할 수 있습니다.</p>
         </div>
         <div className="row g12">
           <div className="card pad col g4 grow">
@@ -422,6 +417,46 @@ export function StudentDetail() {
         })}
       </div>
       {noteFor && <NoteSheet student={noteFor} date={cur} onClose={() => setNoteFor(null)} />}
+      {edit && (
+        <Sheet onClose={() => setEdit(null)}>
+          <h2 className="t-lg b">{s.name} 정보 수정</h2>
+          <form
+            className="col g12"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const err = setStudentInfo(s.id, edit);
+              toast(err ?? "학생 정보를 저장했습니다.", err ? "error" : "info");
+              if (!err) setEdit(null);
+            }}
+          >
+            <div className="field"><label htmlFor="si-birth">생년월일</label>
+              <div className="input m"><input id="si-birth" type="date" value={edit.birthDate ?? ""} max={todayISO()} onChange={(e) => setEdit({ ...edit, birthDate: e.target.value || null })} /></div>
+            </div>
+            <div className="field"><label>성별</label>
+              <div className="row g8" role="radiogroup" aria-label="성별">
+                {(["남", "여"] as Gender[]).map((g) => (
+                  <button key={g} type="button" role="radio" aria-checked={edit.gender === g} className={`chip ${edit.gender === g ? "on" : ""}`} style={{ minWidth: 72 }} onClick={() => setEdit({ ...edit, gender: edit.gender === g ? null : g })}>{g}</button>
+                ))}
+              </div>
+            </div>
+            <div className="field"><label htmlFor="si-phone">학생 연락처</label>
+              <div className="input m"><input id="si-phone" type="tel" inputMode="tel" placeholder="010-0000-0000" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></div>
+            </div>
+            <div className="row g8">
+              <div className="field grow"><label htmlFor="si-gphone">보호자 연락처</label>
+                <div className="input m"><input id="si-gphone" type="tel" inputMode="tel" placeholder="010-0000-0000" value={edit.guardianPhone} onChange={(e) => setEdit({ ...edit, guardianPhone: e.target.value })} /></div>
+              </div>
+              <div className="field" style={{ width: 96 }}><label htmlFor="si-rel">관계</label>
+                <div className="input m"><input id="si-rel" placeholder="모 / 부" value={edit.guardianRel} onChange={(e) => setEdit({ ...edit, guardianRel: e.target.value })} /></div>
+              </div>
+            </div>
+            <div className="row g8" style={{ marginTop: 4 }}>
+              <Button type="button" variant="outline" block onClick={() => setEdit(null)}>취소</Button>
+              <Button type="submit" block>저장</Button>
+            </div>
+          </form>
+        </Sheet>
+      )}
       {cropFile && (
         <PhotoCropper
           file={cropFile}
