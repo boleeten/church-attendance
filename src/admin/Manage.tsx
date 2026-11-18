@@ -159,7 +159,7 @@ function BirthdayPanel() {
       {list.length === 0 ? (
         <p className="muted">이번 달 생일인 학생이 없습니다.</p>
       ) : (
-        <div className="bday-grid">
+        <div className="bday-wrap"><div className="bday-grid">
           {list.map(({ s, day, isToday }) => {
             const c = classOf(d, s);
             return (
@@ -174,7 +174,7 @@ function BirthdayPanel() {
               </button>
             );
           })}
-        </div>
+        </div></div>
       )}
       {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
     </section>
