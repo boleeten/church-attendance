@@ -223,3 +223,20 @@ export function Toasts() {
     </div>
   );
 }
+
+/** 목록 아래 페이지 넘김 (page는 0부터) */
+export function Pager({ page, total, size, onChange }: { page: number; total: number; size: number; onChange: (p: number) => void }) {
+  const pages = Math.ceil(total / size);
+  if (pages <= 1) return null;
+  const from = Math.max(0, Math.min(page - 2, pages - 5));
+  const nums = Array.from({ length: Math.min(5, pages) }, (_, i) => from + i);
+  return (
+    <nav className="pager" aria-label="페이지">
+      <button type="button" className="pager-btn" aria-label="이전 페이지" disabled={page === 0} onClick={() => onChange(page - 1)}><Icon name="left" size={16} /></button>
+      {nums.map((n) => (
+        <button key={n} type="button" className={`pager-btn${n === page ? " on" : ""}`} aria-current={n === page ? "page" : undefined} onClick={() => onChange(n)}>{n + 1}</button>
+      ))}
+      <button type="button" className="pager-btn" aria-label="다음 페이지" disabled={page >= pages - 1} onClick={() => onChange(page + 1)}><Icon name="right" size={16} /></button>
+    </nav>
+  );
+}

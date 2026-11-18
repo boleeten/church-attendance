@@ -5,7 +5,7 @@ import { remote, remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, attendingStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
 import { audit, canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, pendingGraduates, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
 import type { Data, Mark, Role, User } from "../lib/types";
-import { Avatar, Badge, Button, Icon, Modal, Note, Switch } from "../ui";
+import { Avatar, Badge, Button, Icon, Modal, Note, Pager, Switch } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 import { classOf, Kpi, SelectBox, TempPasswordModal } from "./Manage";
 
@@ -320,7 +320,11 @@ export function Accounts() {
   const admins = d.users.filter((u) => u.roles.includes("admin") && !u.roles.includes("super"));
   const candidates = d.users.filter((u) => !u.roles.includes("admin") && !u.roles.includes("super") && u.active);
   const isSuper = me.roles.includes("super");
-  const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화", "계정 삭제", "삭제 권한 변경"].includes(a.type)).slice(0, 30);
+  const history = d.audits.filter((a) => ["비밀번호 초기화", "권한 변경", "계정 등록", "계정 활성화", "계정 비활성화", "계정 삭제", "삭제 권한 변경"].includes(a.type));
+  const HISTORY_SIZE = 10;
+  const [hPage, setHPage] = useState(0);
+  const hLast = Math.max(0, Math.ceil(history.length / HISTORY_SIZE) - 1);
+  const hCur = Math.min(hPage, hLast);
   const doReset = async (u: User) => {
     if (!window.confirm(`${u.name}(${u.loginId}) 계정의 비밀번호를 초기화할까요?`)) return;
     const r = await resetPassword(u.id);
@@ -390,13 +394,14 @@ export function Accounts() {
           <table className="tbl">
             <thead><tr><th>시각</th><th>수행자</th><th>유형</th><th>대상</th><th>내용</th></tr></thead>
             <tbody>
-              {history.map((a) => (
+              {history.slice(hCur * HISTORY_SIZE, (hCur + 1) * HISTORY_SIZE).map((a) => (
                 <tr key={a.id}><td className="num muted">{fmtStamp(a.at)}</td><td className="sb">{d.users.find((u) => u.id === a.actorId)?.name ?? "시스템"}</td><td><Badge tone="info">{a.type}</Badge></td><td>{a.target}</td><td>{a.after}</td></tr>
               ))}
             </tbody>
           </table>
           {!history.length && <p className="empty">변경 이력이 없습니다.</p>}
         </div>
+        <Pager page={hCur} total={history.length} size={HISTORY_SIZE} onChange={setHPage} />
       </section>
       {adding && (
         <Modal title="일반 관리자 등록" onClose={() => setAdding(false)} footer={<><Button variant="outline" onClick={() => setAdding(false)}>취소</Button><Button disabled={!pick} onClick={() => { const u = d.users.find((x) => x.id === pick)!; setRoles(u, [...u.roles, "admin"], { adminScope: scope }); toast(`${u.name}을(를) 일반 관리자로 등록했습니다.`); setAdding(false); }}>등록</Button></>}>

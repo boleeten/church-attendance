@@ -551,3 +551,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .msg-row-edit { cursor: pointer; align-items: center; }
 .msg-row-edit.on { background: #f5f9ff; }
 .msg-pick { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
+
+/* 페이지 넘김 */
+.pager { display: flex; justify-content: center; align-items: center; gap: 4px; padding-top: 12px; }
+.pager-btn { min-width: 32px; height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--white); color: inherit; font: inherit; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.pager-btn:hover:not(:disabled):not(.on) { background: var(--soft); }
+.pager-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; cursor: default; }
+.pager-btn:disabled { opacity: .4; cursor: default; }
