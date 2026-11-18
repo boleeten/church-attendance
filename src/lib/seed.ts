@@ -223,7 +223,7 @@ export function buildSeed(): Data {
   const receipts: NonNullable<Data["receipts"]> = [
     ...g1Teachers.map((u, i) => ({ messageId: "msg3", userId: u.id, readAt: u.id === kim.id || i % 3 ? null : at(cur, "18:05") })),
     { messageId: "msg3", userId: park.id, readAt: null },
-    { messageId: "msg2", userId: kim.id, readAt: at(addWeeks(cur, -1), "15:02") },
+    { messageId: "msg2", userId: kim.id, readAt: null },
     { messageId: "msg1", userId: kim.id, readAt: at(addWeeks(cur, -3), "20:11") },
     { messageId: "msg1", userId: jang.id, readAt: null },
   ];

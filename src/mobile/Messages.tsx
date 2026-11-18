@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fmtDateTimeKo, todayISO } from "../lib/date";
 import { inboxOf } from "../lib/messages";
@@ -32,6 +32,8 @@ const dateOnly = (iso: string) => {
 };
 
 /** 첫 화면에 들어오면 안 읽은 메세지를 아래에서 올라오는 창으로 알려 준다 */
+const ROLL_MS = 4000;
+
 export function MessagePopup({ base }: { base: Base }) {
   const d = useData();
   const u = useMe()!;
@@ -39,13 +41,25 @@ export function MessagePopup({ base }: { base: Base }) {
   const unread = inboxOf(d, u.id).filter((m) => !m.readAt);
   const [hidden, setHidden] = useState<string[]>(laterIds);
   const show = unread.filter((m) => !hidden.includes(m.id));
-  if (!show.length) return null;
-  const top = show[0];
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchX = useRef<number | null>(null);
+  const n = show.length;
+  const cur = Math.min(i, Math.max(0, n - 1));
+  const go = (step: number) => setI((x) => (Math.min(x, n - 1) + step + n) % n);
+  // 여러 건이면 자동으로 넘긴다. 직접 넘기면 그때부터 다시 4초를 센다.
+  useEffect(() => {
+    if (n < 2 || paused) return;
+    const t = window.setTimeout(() => setI((x) => (Math.min(x, n - 1) + 1) % n), ROLL_MS);
+    return () => window.clearTimeout(t);
+  }, [n, paused, cur]);
+  if (!n) return null;
   const later = () => {
     const ids = [...new Set([...hidden, ...unread.map((m) => m.id)])];
     setLater(ids);
     setHidden(ids);
   };
+  const open = () => nav(`${base}/messages/${show[cur].id}`);
   return (
     <Sheet onClose={later}>
       <div className="row g8">
@@ -55,28 +69,46 @@ export function MessagePopup({ base }: { base: Base }) {
           <span className="t-xs muted">관리자가 보낸 메세지입니다</span>
         </div>
       </div>
-      <button type="button" className="msg-pop-card" onClick={() => nav(`${base}/messages/${top.id}`)}>
-        <span className="row g6"><Badge tone="error">NEW</Badge><strong className="sb grow ellipsis">{top.title}</strong></span>
-        {top.body && <span className="msg-clamp">{preview(top.body)}</span>}
-        <span className="row g8 t-xs muted">
-          {fmtDateTimeKo(top.createdAt)}
-          {top.images.length > 0 && <span className="row g2"><Icon name="image" size={13} />{top.images.length}</span>}
-          {top.links.length > 0 && <span className="row g2"><Icon name="link" size={13} />{top.links.length}</span>}
-        </span>
-      </button>
-      {unread.length > 1 && (
-        <div className="col g4">
-          {unread.slice(1, 4).map((m) => (
-            <button key={m.id} type="button" className="msg-pop-more" onClick={() => nav(`${base}/messages/${m.id}`)}>
-              <span className="grow ellipsis">{m.title}</span><span className="t-xs muted">{dateOnly(m.createdAt).slice(5)}</span>
+      <div
+        className="msg-roll"
+        aria-roledescription="carousel"
+        aria-label="새 메세지"
+        onPointerEnter={(e) => e.pointerType === "mouse" && setPaused(true)}
+        onPointerLeave={(e) => e.pointerType === "mouse" && setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={() => setPaused(false)}
+        onTouchStart={(e) => { touchX.current = e.touches[0].clientX; setPaused(true); }}
+        onTouchEnd={(e) => {
+          const dx = touchX.current === null ? 0 : e.changedTouches[0].clientX - touchX.current;
+          touchX.current = null;
+          if (n > 1 && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+          setPaused(false);
+        }}
+      >
+        <div className="msg-roll-track" style={{ transform: `translateX(-${cur * 100}%)` }}>
+          {show.map((m, k) => (
+            <button key={m.id} type="button" className="msg-pop-card" aria-roledescription="slide" aria-label={`${k + 1} / ${n}: ${m.title}`} aria-hidden={k !== cur} tabIndex={k === cur ? 0 : -1} onClick={() => nav(`${base}/messages/${m.id}`)}>
+              <span className="row g6"><Badge tone="error">NEW</Badge><strong className="sb grow ellipsis">{m.title}</strong></span>
+              <span className="msg-clamp">{m.body ? preview(m.body) : "내용 없이 사진·링크만 있는 메세지입니다."}</span>
+              <span className="row g8 t-xs muted">
+                {fmtDateTimeKo(m.createdAt)}
+                {m.images.length > 0 && <span className="row g2"><Icon name="image" size={13} />{m.images.length}</span>}
+                {m.links.length > 0 && <span className="row g2"><Icon name="link" size={13} />{m.links.length}</span>}
+              </span>
             </button>
           ))}
-          {unread.length > 4 && <Link to={`${base}/messages`} className="t-xs c-primary sb" style={{ padding: "4px 2px" }}>안 읽은 메세지 {unread.length - 4}건 더 보기</Link>}
+        </div>
+      </div>
+      {n > 1 && (
+        <div className="msg-roll-nav">
+          <button type="button" className="msg-roll-btn" aria-label="이전 메세지" onClick={() => go(-1)}><Icon name="left" size={18} /></button>
+          <span className="msg-roll-count" aria-live="polite"><strong>{cur + 1}</strong> / {n}</span>
+          <button type="button" className="msg-roll-btn" aria-label="다음 메세지" onClick={() => go(1)}><Icon name="right" size={18} /></button>
         </div>
       )}
       <div className="row g8">
         <Button variant="outline" size="l" onClick={later}>나중에 보기</Button>
-        <Button size="l" className="grow" onClick={() => nav(`${base}/messages/${top.id}`)}>자세히 보기</Button>
+        <Button size="l" className="grow" onClick={open}>자세히 보기</Button>
       </div>
     </Sheet>
   );

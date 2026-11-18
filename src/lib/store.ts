@@ -5,7 +5,7 @@ import { fmtDot } from "./date";
 import { blobToDataUrl } from "./image";
 import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
 
-const DATA_KEY = "ca-demo-v11";
+const DATA_KEY = "ca-demo-v12";
 const SESSION_KEY = "ca-session";
 
 let data: Data = load();
