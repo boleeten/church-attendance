@@ -206,7 +206,13 @@ export async function sendMessage(input: { title: string; body: string; images: 
     data.notifications.unshift(row);
     remote.upsert("notifications", row);
   }
-  if (remoteEnabled) void remote.api("push-reminders", "POST", { message: id }).then((r) => { if (typeof r === "string") toast(`기기 푸시는 보내지 못했습니다. 앱 안의 알림 목록에는 표시됩니다. (${r})`, "error"); });
+  if (remoteEnabled)
+    void remote.api<{ sent: number; recipients: number; missed: string[] }>("push-reminders", "POST", { message: id }).then((r) => {
+      if (typeof r === "string") return toast(`기기 푸시는 보내지 못했습니다. 앱 안의 알림 목록에는 표시됩니다. (${r})`, "error");
+      if (!r.missed?.length) return toast(`${r.recipients}명 모두의 휴대폰으로 알림을 보냈습니다.`);
+      const who = r.missed.length > 3 ? `${r.missed.slice(0, 3).join(", ")} 외 ${r.missed.length - 3}명` : r.missed.join(", ");
+      toast(`휴대폰 알림을 받지 못한 교사: ${who}. 이 분들은 앱의 내 정보 → 푸시 알림을 다시 허용해야 합니다. (앱 안 알림 목록에는 표시됩니다)`, "error");
+    });
   const names = input.userIds.map((u) => data.users.find((x) => x.id === u)?.name ?? u);
   audit("메세지 발송", title, "-", names.length > 3 ? `${names.slice(0, 3).join(", ")} 외 ${names.length - 3}명` : names.join(", "));
   emit();

@@ -97,13 +97,15 @@ export default async function handler(req, res) {
     const [{ data: subs }, { data: assigns }, { data: profs }] = await Promise.all([
       sb.from("push_subscriptions").select("user_id, endpoint, subscription").in("user_id", ids),
       sb.from("teacher_assignments").select("user_id").in("user_id", ids),
-      sb.from("profiles").select("id, roles").in("id", ids),
+      sb.from("profiles").select("id, name, roles").in("id", ids),
     ]);
     const hasClass = new Set((assigns || []).map((a) => a.user_id));
     // 담당 반이 있으면 교사 화면(/t), 반 없는 부장교사는 부장교사 화면(/h)
     const base = (u) => (hasClass.has(u) || !(profs || []).find((p) => p.id === u)?.roles?.includes("head") ? "/t" : "/h");
     const text = String(msg.body || "").replace(/\s+/g, " ").trim();
     let sent = 0;
+    let lastError = "";
+    const reached = new Set();
     for (const s of subs || []) {
       try {
         await webpush.sendNotification(s.subscription, JSON.stringify({
@@ -113,11 +115,18 @@ export default async function handler(req, res) {
           tag: `msg-${msg.id}`,
         }));
         sent++;
+        reached.add(s.user_id);
       } catch (e) {
+        lastError = e.body || e.message || String(e.statusCode);
+        console.error("[message push] 전송 실패", e.statusCode, lastError);
         if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: s.user_id, endpoint: s.endpoint });
       }
     }
-    return res.status(200).json({ sent, devices: (subs || []).length });
+    // 알림을 받지 못한 교사: 기기 등록이 없거나 모든 기기 전송이 실패한 사람
+    const nameOf = (u) => (profs || []).find((p) => p.id === u)?.name ?? "교사";
+    const missed = ids.filter((u) => !reached.has(u)).map(nameOf);
+    console.log(`[message push] ${msg.id} 받는 교사 ${ids.length}명, 기기 ${(subs || []).length}대, 전송 ${sent}대, 못 받음 ${missed.length}명`);
+    return res.status(200).json({ sent, devices: (subs || []).length, recipients: ids.length, missed, error: lastError || undefined });
   }
 
   // ── 호출자 확인: Vercel Cron(비밀 값) 또는 로그인한 관리자 ──
