@@ -117,7 +117,7 @@ export function StudentAttendance() {
           </div>
         </div>
         {tab === "student" && <span className="t-xs muted">옆으로 스크롤하면 1월부터 전체 주일을 볼 수 있습니다. 이름과 반은 고정됩니다.</span>}
-        <div className="tablewrap" ref={yearWrap}>
+        <div className={`tablewrap ${tab === "student" ? "year-wrap" : ""}`} ref={yearWrap}>
           {tab === "class" ? (
             <table className="tbl">
               <thead><tr><th>반</th><th>담임</th><th>전체</th><th>출석</th><th>결석</th><th>미확인</th><th style={{ width: 200 }}>출석률</th><th>상태</th><th>관리</th></tr></thead>
@@ -533,7 +533,7 @@ export function TeacherAttendance() {
           <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
         </div>
         {yearView && <span className="t-xs muted">옆으로 스크롤하면 1월부터 전체 주일을 볼 수 있습니다. 이름은 고정됩니다.</span>}
-        <div className="tablewrap" ref={yearWrap}>
+        <div className={`tablewrap ${yearView ? "year-wrap" : ""}`} ref={yearWrap}>
           <table className={`tbl ${yearView ? "year-grid" : ""}`}>
             {yearView ? (
               <thead>

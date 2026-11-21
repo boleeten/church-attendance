@@ -578,3 +578,13 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .year-grid th.wk, .year-grid td.wk { min-width: 34px; padding: 8px 2px; }
   .year-grid .mark { width: 22px; height: 22px; }
 }
+
+/* 연간 표: 표 안에서 위아래로도 스크롤하고, 월·날짜 머리글과 이름 칸은 고정 */
+.year-wrap { max-height: calc(100vh - 180px); max-height: calc(100dvh - 180px); overflow: auto; }
+.year-grid { border-collapse: separate; border-spacing: 0; }
+.year-grid thead th { position: sticky; z-index: 3; }
+.year-grid .month-row th { top: 0; height: 30px; box-sizing: border-box; }
+.year-grid thead tr:last-child th { top: 30px; box-shadow: inset 0 -1px 0 var(--border); }
+.year-grid thead tr:last-child th.m-start { box-shadow: inset 1px 0 0 var(--border), inset 0 -1px 0 var(--border); }
+.year-grid thead th.stick { z-index: 4; }
+@media (max-width: 860px) { .year-wrap { max-height: calc(100dvh - 120px); } }
