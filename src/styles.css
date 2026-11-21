@@ -568,7 +568,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .year-grid th.wk, .year-grid td.wk { padding: 8px 4px; min-width: 40px; }
 .year-grid th.wk { font-size: 11px; }
 .year-grid .m-start { box-shadow: inset 1px 0 0 var(--border); }
-.year-grid .month-row th { padding: 6px 4px; font-size: 12px; color: var(--text); border-bottom: 1px solid var(--border); }
+.year-grid .month-row th { padding: 0 4px; font-size: 12px; line-height: 30px; color: var(--text); }
 .year-grid .month-row th.month { box-shadow: inset 1px 0 0 var(--border); }
 .year-grid .stick { position: sticky; z-index: 2; }
 .year-grid td.stick { background: var(--white); }
@@ -584,7 +584,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .year-grid { border-collapse: separate; border-spacing: 0; }
 .year-grid thead th { position: sticky; z-index: 3; }
 .year-grid .month-row th { top: 0; height: 30px; box-sizing: border-box; }
-.year-grid thead tr:last-child th { top: 30px; box-shadow: inset 0 -1px 0 var(--border); }
-.year-grid thead tr:last-child th.m-start { box-shadow: inset 1px 0 0 var(--border), inset 0 -1px 0 var(--border); }
+/* 날짜 줄을 월 줄에 1px 겹쳐 붙여, 스크롤할 때 두 줄 사이로 아래 칸이 비치지 않게 한다 */
+.year-grid thead tr:last-child th { top: 29px; box-shadow: inset 0 -1px 0 var(--border), inset 0 1px 0 var(--border); }
+.year-grid thead tr:last-child th.m-start { box-shadow: inset 1px 0 0 var(--border), inset 0 -1px 0 var(--border), inset 0 1px 0 var(--border); }
 .year-grid thead th.stick { z-index: 4; }
 @media (max-width: 860px) { .year-wrap { max-height: calc(100dvh - 120px); } }
