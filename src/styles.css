@@ -572,5 +572,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .year-grid .month-row th.month { box-shadow: inset 1px 0 0 var(--border); }
 .year-grid .stick { position: sticky; z-index: 2; }
 .year-grid td.stick { background: var(--white); }
-.year-grid .s1 { left: 0; min-width: 88px; max-width: 88px; }
-.year-grid .s2 { left: 88px; min-width: 128px; box-shadow: inset -1px 0 0 var(--border); }
+.year-grid .s1 { left: 0; box-sizing: border-box; width: 132px; min-width: 132px; max-width: 132px; padding: 8px 12px; box-shadow: inset -1px 0 0 var(--border); }
+@media (max-width: 860px) {
+  .year-grid .s1 { width: 84px; min-width: 84px; max-width: 84px; padding: 8px 8px 8px 10px; }
+  .year-grid th.wk, .year-grid td.wk { min-width: 34px; padding: 8px 2px; }
+  .year-grid .mark { width: 22px; height: 22px; }
+}

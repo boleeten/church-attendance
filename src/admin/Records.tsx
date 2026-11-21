@@ -77,7 +77,12 @@ export function StudentAttendance() {
     return acc;
   }, []);
   useEffect(() => {
-    if (tab === "student" && yearWrap.current) yearWrap.current.scrollLeft = yearWrap.current.scrollWidth;
+    // 가장 최근 주일 칸이 화면 오른쪽 끝에 오도록 (휴대폰에서도 연속 결석·출석률 칸 대신 최근 주일이 보이게)
+    const w = yearWrap.current;
+    if (tab !== "student" || !w) return;
+    const wks = w.querySelectorAll<HTMLElement>("thead tr:last-child th.wk");
+    const last = wks[wks.length - 1];
+    w.scrollLeft = last ? last.offsetLeft + last.offsetWidth - w.clientWidth : w.scrollWidth;
   }, [tab, date, group, grade]);
   return (
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
@@ -134,8 +139,8 @@ export function StudentAttendance() {
           ) : (
             <table className="tbl year-grid">
               <thead>
-                <tr className="month-row"><th className="stick s1" /><th className="stick s2" />{months.map((x) => <th key={x.m} colSpan={x.n} className="c month">{x.m}월</th>)}<th colSpan={3} /></tr>
-                <tr><th className="stick s1">학생</th><th className="stick s2">반</th>{cols.map((dt) => <th key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}>{fmtMD(dt)}</th>)}<th>연속 결석</th><th>연간 출석률</th><th /></tr>
+                <tr className="month-row"><th className="stick s1" />{months.map((x) => <th key={x.m} colSpan={x.n} className="c month">{x.m}월</th>)}<th colSpan={3} /></tr>
+                <tr><th className="stick s1">학생 · 반</th>{cols.map((dt) => <th key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}>{fmtMD(dt)}</th>)}<th>연속 결석</th><th>연간 출석률</th><th /></tr>
               </thead>
               <tbody>
                 {rows.map((s) => {
@@ -143,7 +148,7 @@ export function StudentAttendance() {
                   const st = streaks.get(s.id) ?? 0;
                   return (
                     <tr key={s.id}>
-                      <td className="sb stick s1">{s.name}</td><td className="stick s2">{c ? classLabel(c) : "-"}</td>
+                      <td className="stick s1"><span className="col g2"><strong className="sb ellipsis">{s.name}</strong><span className="t-xs muted ellipsis">{c ? `${c.group}부 ${classShort(c)}` : "반 미배정"}</span></span></td>
                       {cols.map((dt) => <td key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}><MarkDot mark={d.studentMarks[`${dt}|${s.id}`]} /></td>)}
                       <td>{st >= 2 ? <Badge tone="error">{st}주 연속</Badge> : <span className="muted">-</span>}</td>
                       <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
