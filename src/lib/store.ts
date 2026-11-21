@@ -340,6 +340,37 @@ export function setStudentMark(date: string, studentId: string, mark: Mark | nul
   emit();
 }
 
+/**
+ * 지난 출석 가져오기 (엑셀 업로드). 출석·결석을 한꺼번에 저장하고,
+ * 기록이 들어간 주일·반의 출석부는 아직 저장된 적이 없으면 '완료'로 둔다.
+ */
+export async function importStudentMarks(marks: { date: string; studentId: string; mark: Mark }[], fileName: string): Promise<string | null> {
+  if (!marks.length) return "가져올 출석 기록이 없습니다.";
+  const err = await remote.upsertMany("student_marks", marks);
+  if (err) return err;
+  for (const m of marks) data.studentMarks[`${m.date}|${m.studentId}`] = m.mark;
+  const sessions: { date: string; target: string; completed: boolean; savedAt: string; savedBy: string }[] = [];
+  const seen = new Set<string>();
+  for (const m of marks) {
+    const cls = data.students.find((s) => s.id === m.studentId)?.classId;
+    const key = `${m.date}|class:${cls}`;
+    if (!cls || seen.has(key) || data.sessions[key]) continue;
+    seen.add(key);
+    const row = { completed: true, savedAt: now(), savedBy: userId ?? "system" };
+    data.sessions[key] = row;
+    sessions.push({ date: m.date, target: `class:${cls}`, ...row });
+  }
+  if (sessions.length) {
+    const e2 = await remote.upsertMany("sessions", sessions);
+    if (e2) toast(`출석 기록은 저장했지만 출석부 완료 표시는 일부 실패했습니다. (${e2})`, "error");
+  }
+  const dates = [...new Set(marks.map((m) => m.date))].sort();
+  const p = marks.filter((m) => m.mark === "P").length;
+  audit("지난 출석 가져오기", fileName, "-", `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}주 · 출석 ${p} · 결석 ${marks.length - p}`);
+  emit();
+  return null;
+}
+
 export function setTeacherMark(date: string, teacherId: string, mark: Mark | null) {
   const key = `${date}|${teacherId}`;
   const before = data.teacherMarks[key];

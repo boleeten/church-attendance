@@ -104,6 +104,17 @@ export const remote = {
     if (table === "students" && r.birth_date === "") r.birth_date = null;
     queue(table, () => sb!.from(table).upsert(r));
   },
+  /** 여러 줄을 500줄씩 나눠 한꺼번에 저장한다 (지난 출석 가져오기처럼 많은 양). 실패하면 오류 문구를 돌려준다. */
+  async upsertMany(table: string, rows: object[]): Promise<string | null> {
+    if (!sb) return null;
+    await writes;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500).map((r) => mapKeys(r as Record<string, unknown>, snake));
+      const { error } = await sb.from(table).upsert(chunk);
+      if (error) return `${i}번째 줄부터 저장하지 못했습니다. (${error.message})`;
+    }
+    return null;
+  },
   /** 새 줄만 추가한다. 본인이 읽을 권한이 없는 테이블(감사 로그)은 upsert 대신 이것을 쓴다. */
   insert(table: string, row: object) {
     if (!sb) return;

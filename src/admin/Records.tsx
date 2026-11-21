@@ -6,6 +6,7 @@ import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeac
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg, Toggle } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
+import { ImportMarksButton } from "./ImportMarks";
 import { classOf, GroupBar, groupStudents, newFriendStudents, incompleteClasses, Kpi, SelectBox, StudentDetailModal } from "./Manage";
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
@@ -192,7 +193,10 @@ export function Stats() {
           <Seg value={tab} options={[["week", "주간"], ["month", "월간"], ["year", "연간"]] as const} onChange={setTab} />
           <strong className="t-lg b">{title}</strong>
         </div>
-        <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />학생별 출결 Excel 다운로드</Button>
+        <div className="row g8 wrap">
+          <ImportMarksButton />
+          <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />학생별 출결 Excel 다운로드</Button>
+        </div>
       </div>
       <div className="grid split">
         <section className="panel">
