@@ -366,6 +366,8 @@ export function addNote(studentId: string, date: string, reason: string | null, 
   const note: Note = { id: uid(), studentId, date, reason, content: content.trim(), authorId: userId ?? "system", createdAt: now() };
   data.notes.unshift(note);
   remote.upsert("visit_notes", note);
+  // 관리자(목사님 등) 휴대폰으로 새 노트 알림. 실패해도 노트 저장에는 영향이 없다.
+  if (remoteEnabled) void remote.api("push-reminders", "POST", { note: note.id });
   emit();
 }
 

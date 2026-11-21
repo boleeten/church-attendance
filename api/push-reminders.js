@@ -19,6 +19,24 @@ function currentSundayKST() {
   return kst.toISOString().slice(0, 10);
 }
 
+/** 활성 관리자(일반·최고) 중 기기를 등록한 사람에게 푸시. except 는 보내지 않을 사람 ID */
+async function pushAdmins(sb, payload, except) {
+  const { data: people } = await sb.from("profiles").select("id, roles, active").eq("active", true);
+  const ids = (people || []).filter((p) => p.id !== except && (p.roles || []).some((r) => r === "admin" || r === "super")).map((p) => p.id);
+  if (!ids.length) return { sent: 0, devices: 0 };
+  const { data: subs } = await sb.from("push_subscriptions").select("user_id, endpoint, subscription").in("user_id", ids);
+  let sent = 0;
+  for (const s of subs || []) {
+    try {
+      await webpush.sendNotification(s.subscription, JSON.stringify(payload));
+      sent++;
+    } catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) await sb.from("push_subscriptions").delete().match({ user_id: s.user_id, endpoint: s.endpoint });
+    }
+  }
+  return { sent, devices: (subs || []).length };
+}
+
 export default async function handler(req, res) {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CRON_SECRET } = process.env;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
@@ -81,6 +99,29 @@ export default async function handler(req, res) {
       }
     }
     return res.status(200).json({ sent, devices: (subs || []).length });
+  }
+
+  // ── 새 심방노트: 교사가 노트를 쓰면 관리자 기기로 푸시 ──
+  if (body.note) {
+    const { data: me } = token ? await sb.auth.getUser(token) : { data: null };
+    if (!me?.user) return res.status(401).json({ error: "로그인이 필요합니다." });
+    const { data: note } = await sb.from("visit_notes").select("id, author_id, student_id, reason, content").eq("id", String(body.note)).single();
+    if (!note) return res.status(404).json({ error: "심방노트를 찾을 수 없습니다." });
+    if (note.author_id !== me.user.id) return res.status(403).json({ error: "본인이 쓴 노트만 알릴 수 있습니다." });
+    const [{ data: student }, { data: author }] = await Promise.all([
+      sb.from("students").select("name, class_id").eq("id", note.student_id).single(),
+      sb.from("profiles").select("name").eq("id", me.user.id).single(),
+    ]);
+    const { data: cls } = student?.class_id ? await sb.from("classes").select("group, grade, no").eq("id", student.class_id).single() : { data: null };
+    const where = cls ? (cls.grade ? `${cls.group}부 ${cls.grade}-${cls.no} ` : `${cls.group}부 새친구반 `) : "";
+    const text = String(note.content || "").replace(/\s+/g, " ").trim();
+    const r = await pushAdmins(sb, {
+      title: "새 심방노트가 등록되었습니다",
+      body: `[${where}${student?.name ?? "학생"}] ${author?.name ?? "교사"} 선생님${note.reason ? ` · ${note.reason}` : ""}${text ? `: ${text.length > 70 ? text.slice(0, 70) + "…" : text}` : ""}`,
+      url: `/admin/notes?note=${note.id}`,
+      tag: `note-${note.id}`,
+    }, me.user.id);
+    return res.status(200).json(r);
   }
 
   // ── 교사별 메세지: 관리자가 메세지를 보내면 받는 교사 기기로 푸시 ──
@@ -177,6 +218,21 @@ export default async function handler(req, res) {
         items.push({ userId: h.id, kind: "teacher", target: `${g}부 교사`, title: "교사 출석체크 안내", body: `${g}부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`, url: `/h/check?date=${date}` });
       }
     }
+  }
+  // 자동 실행(주일 오후) 때 관리자에게 미완료 현황 요약
+  if (isCron) {
+    const left = (classes || []).filter((c) => !done.has(`class:${c.id}`)).sort((a, b) => a.group - b.group || a.grade - b.grade || a.no - b.no);
+    const short = (c) => (c.grade ? `${c.group}부 ${c.grade}-${c.no}` : `${c.group}부 새친구반`);
+    const teacherLeft = settings.teacherNotifyOn ? [1, 2].filter((g) => !done.has(`group:${g}`)) : [];
+    const parts = [];
+    if (left.length) parts.push(`학생 출석 미완료 ${left.length}개 반: ${left.slice(0, 6).map(short).join(", ")}${left.length > 6 ? ` 외 ${left.length - 6}개` : ""}`);
+    if (teacherLeft.length) parts.push(`교사 출석 미완료: ${teacherLeft.map((g) => `${g}부`).join(", ")}`);
+    await pushAdmins(sb, {
+      title: parts.length ? "이번 주 출석 미완료 현황" : "이번 주 출석이 모두 완료되었습니다",
+      body: parts.length ? parts.join(" / ") : "모든 반의 출석체크가 끝났습니다. 수고 많으셨습니다.",
+      url: "/admin",
+      tag: `admin-summary-${date}`,
+    });
   }
   if (!items.length) return res.status(200).json({ date, sent: 0, failed: 0, message: "미완료 출석부가 없습니다." });
 

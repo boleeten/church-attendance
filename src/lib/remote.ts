@@ -180,6 +180,7 @@ export const remote = {
   },
   /** 로그인한 사용자 토큰으로 서버 함수(api/…)를 부른다. 실패하면 오류 문구를 돌려준다. */
   async api<T>(path: string, method: "GET" | "POST" = "POST", payload?: unknown): Promise<T | string> {
+    await writes; // 방금 저장한 내용(노트·메세지 등)을 서버가 읽을 수 있도록 먼저 끝낸다
     const { data } = await sb!.auth.getSession();
     if (!data.session) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
     try {

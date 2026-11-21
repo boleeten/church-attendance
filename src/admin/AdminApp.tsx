@@ -3,9 +3,11 @@ import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { currentSunday, fmtDot } from "../lib/date";
 import { activeStudents, pctText, studentsSummary, yearSundays } from "../lib/stats";
 import type { Data } from "../lib/types";
-import { logout, useData, useMe } from "../lib/store";
+import { logout, setPushAllowed, useData, useMe } from "../lib/store";
+import { enablePush, isIOS, isStandalone, pushPermission, sendTestNotification } from "../lib/push";
+import { toast } from "../lib/remote";
 import { entryOptions, setTeacherGroup } from "../mobile/Shell";
-import { Avatar, Icon, Modal } from "../ui";
+import { Avatar, Badge, Button, Icon, Modal, Note } from "../ui";
 import { PasswordForm } from "../mobile/Auth";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
 import { Notes, Stats, StudentAttendance, TeacherAttendance } from "./Records";
@@ -168,11 +170,62 @@ function WeekPicker({ date, setDate, variant = "header" }: { date: string; setDa
   );
 }
 
-/** 오른쪽 위 이름 영역: 누르면 비밀번호 변경·로그아웃 메뉴 */
+/** 관리자용 '내 정보': 교사 앱의 내 정보 탭과 같은 기능(알림·앱 설치·비밀번호·버전) */
+function AdminMyInfo({ onClose, onPassword }: { onClose: () => void; onPassword: () => void }) {
+  const u = useMe()!;
+  const [, refresh] = useState(0);
+  const [install, setInstall] = useState(false);
+  const perm = pushPermission();
+  const pushOn = Boolean(u.pushAllowed) && perm === "granted";
+  const askPush = async () => {
+    const r = await enablePush(u.id);
+    setPushAllowed(r.ok);
+    toast(r.message, r.ok ? "info" : "error");
+    refresh((x) => x + 1);
+  };
+  const testPush = async () => {
+    const r = await sendTestNotification("/admin");
+    toast(r.message, r.ok ? "info" : "error");
+  };
+  const role = [u.roles.includes("super") ? "최고 관리자" : "일반 관리자", u.roles.includes("head") ? `${u.group ?? ""}부 부장교사` : null].filter(Boolean).join(" · ");
+  return (
+    <Modal title="내 정보" onClose={onClose}>
+      <div className="col g16">
+        <div className="row g12">
+          <Avatar name={u.name} size={52} />
+          <div className="col g4">
+            <strong className="t-lg b">{u.name}</strong>
+            <span className="t-xs muted">아이디 {u.loginId}</span>
+            <div className="row g6"><Badge tone="warning">{role}</Badge></div>
+          </div>
+        </div>
+        <div className="card list">
+          <button type="button" className="menu-row" onClick={onPassword}><Icon name="lock" /><span className="grow sb">비밀번호 변경</span><Icon name="right" size={16} /></button>
+          <button type="button" className="menu-row" onClick={askPush}><Icon name="bell" /><span className="grow sb">푸시 알림</span><Badge tone={pushOn ? "success" : "neutral"}>{pushOn ? "허용됨" : "미허용"}</Badge></button>
+          {pushOn && <button type="button" className="menu-row" onClick={testPush}><Icon name="check" /><span className="grow sb">테스트 알림 받아 보기</span><Icon name="right" size={16} /></button>}
+          <button type="button" className="menu-row" onClick={() => setInstall(!install)} aria-expanded={install}><Icon name="download" /><span className="grow sb">홈 화면에 앱 설치</span><Icon name={install ? "down" : "right"} size={16} /></button>
+          {install && (
+            <ol className="col g8 t-sm" style={{ margin: 0, padding: "0 16px 16px 40px", lineHeight: 1.5 }}>
+              <li><b>아이폰(Safari)</b>: 아래 공유 버튼 → "홈 화면에 추가"</li>
+              <li><b>안드로이드(Chrome)</b>: 오른쪽 위 ⋮ 메뉴 → "홈 화면에 추가" 또는 "앱 설치"</li>
+              <li>홈 화면의 아이콘으로 앱을 연 뒤, 여기서 푸시 알림을 허용해 주세요.</li>
+            </ol>
+          )}
+          <div className="menu-row"><Icon name="info" /><span className="grow sb">앱 버전</span><span className="muted">1.0.0</span></div>
+        </div>
+        <Note icon="bell">알림을 허용하면 이 기기로 <b>교사가 새 심방노트를 쓸 때</b>와 <b>주일 오후 출석 미완료 현황</b>을 받습니다.{isIOS() && !isStandalone() ? " 아이폰은 홈 화면에 설치한 앱에서 알림을 허용해야 합니다." : ""}</Note>
+        <Button variant="outline" block onClick={onClose}>닫기</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** 오른쪽 위 이름 영역: 누르면 내 정보·비밀번호 변경·로그아웃 메뉴 */
 function UserMenu({ name, role }: { name: string; role: string }) {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [pw, setPw] = useState(false);
+  const [info, setInfo] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -199,10 +252,12 @@ function UserMenu({ name, role }: { name: string; role: string }) {
       {open && (
         <div className="user-pop" role="menu">
           <div className="col g2 user-pop-head"><strong className="sb">{name}</strong><span className="t-xs muted">{role}</span></div>
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); setInfo(true); }}><Icon name="user" size={18} />내 정보 · 알림 설정</button>
           <button type="button" role="menuitem" onClick={() => { setOpen(false); setPw(true); }}><Icon name="lock" size={18} />비밀번호 변경</button>
           <button type="button" role="menuitem" onClick={() => { logout(); nav("/login", { replace: true }); }}><Icon name="logout" size={18} />로그아웃</button>
         </div>
       )}
+      {info && <AdminMyInfo onClose={() => setInfo(false)} onPassword={() => { setInfo(false); setPw(true); }} />}
       {pw && (
         <Modal title="비밀번호 변경" onClose={() => setPw(false)}>
           <PasswordForm onDone={() => setPw(false)} />

@@ -280,7 +280,8 @@ export function Notes() {
   const [from, setFrom] = useState(`${d.settings.year}-01-01`);
   const [to, setTo] = useState(`${d.settings.year}-12-31`);
   const [replied, setReplied] = useState("");
-  const [viewId, setViewId] = useState<string | null>(null);
+  // 알림(새 심방노트)을 눌러 들어오면 그 노트를 바로 연다: /admin/notes?note=ID
+  const [viewId, setViewId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("note"));
   const view = d.notes.find((n) => n.id === viewId) ?? null;
   const me = useMe()!;
   const canReply = me.roles.includes("super");
