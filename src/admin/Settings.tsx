@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { fmtDot, fmtRelDay, fmtStamp, fmtTime12, ym, fmtBirth } from "../lib/date";
+import { fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12, ym, fmtBirth } from "../lib/date";
 import { remote, remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, attendingStudents, allStaff, classSummary, download, homeroomName, pctText, personRate, teacherDuty, yearSundays } from "../lib/stats";
 import { audit, canManageAccount, canResetPassword, classLabel, exportBackup, importBackup, promoteGrades, pendingGraduates, resetPassword, sendStudentReminders, sendTeacherReminders, setUserActive, updateSettings, upsertUser, useData, useMe } from "../lib/store";
@@ -21,11 +21,12 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 
 const SHARED: SheetDef[] = [
   { name: "전체 학생 명부", rows: (d) => [["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", homeroomName(d, s.classId), s.status]; })] },
-  { name: "학생 주일 출석 원본", rows: (d) => [["주일", "학생", "반", "출석 상태"], ...yearSundays(d).flatMap((dt) => attendingStudents(d).map((s) => { const c = classOf(d, s); return [dt, s.name, c ? classLabel(c) : "", markText(d.studentMarks[`${dt}|${s.id}`])]; }))] },
+  // 한 사람이 한 줄: 이름·반 옆으로 주일 날짜가 이어지고, 그 아래 칸에 출석 여부
+  { name: "학생 주일 출석 원본", rows: (d) => { const dates = yearSundays(d); const list = attendingStudents(d).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c ? classLabel(a.c) : "~").localeCompare(b.c ? classLabel(b.c) : "~", "ko") || a.s.name.localeCompare(b.s.name, "ko")); return [["학생", "반", ...dates.map(fmtMD), "출석", "결석", "출석률"], ...list.map(({ s, c }) => { const r = personRate(d.studentMarks, s.id, dates); return [s.name, c ? classLabel(c) : "", ...dates.map((dt) => markText(d.studentMarks[`${dt}|${s.id}`])), r.p, r.a, pctText(r.rate)]; })]; } },
   { name: "반별 출석현황", rows: (d) => [["주일", "반", "전체", "출석", "결석", "미확인", "출석률", "완료"], ...yearSundays(d).flatMap((dt) => d.classes.map((c) => { const s = classSummary(d, dt, c.id); return [dt, classLabel(c), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; }))] },
   { name: "학생 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["학생", "반", ...MONTHS, "연간"], ...attendingStudents(d).map((s) => { const c = classOf(d, s); return [s.name, c ? classLabel(c) : "", ...monthlyRates(d.studentMarks, s.id, dates), pctText(personRate(d.studentMarks, s.id, dates).rate)]; })]; } },
   { name: "전체 교사 명부", rows: (d) => [["이름", "아이디", "소속", "담당"], ...allStaff(d).map((u) => [u.name, u.loginId, `${u.group}부`, teacherDuty(d, u, false)])] },
-  { name: "교사 주일 출석 원본", rows: (d) => [["주일", "교사", "소속", "출석 상태"], ...yearSundays(d).flatMap((dt) => allStaff(d).map((u) => [dt, u.name, `${u.group}부`, markText(d.teacherMarks[`${dt}|${u.id}`])]))] },
+  { name: "교사 주일 출석 원본", rows: (d) => { const dates = yearSundays(d); return [["교사", "소속", ...dates.map(fmtMD), "출석", "결석", "출석률"], ...allStaff(d).map((u) => { const r = personRate(d.teacherMarks, u.id, dates); return [u.name, `${u.group}부`, ...dates.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), r.p, r.a, pctText(r.rate)]; })]; } },
   { name: "교사 월간·연간 통계", rows: (d) => { const dates = yearSundays(d); return [["교사", "소속", ...MONTHS, "연간"], ...allStaff(d).map((u) => [u.name, `${u.group}부`, ...monthlyRates(d.teacherMarks, u.id, dates), pctText(personRate(d.teacherMarks, u.id, dates).rate)])]; } },
 ];
 const PRIVATE: SheetDef[] = [
