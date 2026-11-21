@@ -481,7 +481,8 @@ function staffSummary(d: Data, date: string, list: User[]) {
 export function TeacherAttendance() {
   const d = useData();
   const { date } = useAdminDate();
-  const [tab, setTab] = useState<"week" | "month" | "year">("month");
+  const [tab, setTab] = useState<"week" | "month" | "year">("year");
+  const yearWrap = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
   const [status, setStatus] = useState("");
@@ -489,7 +490,14 @@ export function TeacherAttendance() {
   const { y, m } = ym(date);
   const all = useMemo(() => yearSundays(d).filter((x) => x <= date), [d, date]);
   const monthDates = sundaysOfMonth(y, m).filter((x) => x <= date);
-  const cols = tab === "week" ? [date] : tab === "month" ? monthDates : [];
+  const cols = tab === "week" ? [date] : tab === "month" ? monthDates : all;
+  const yearView = tab === "year";
+  const months = cols.reduce<{ m: number; n: number }[]>((acc, dt) => {
+    const mm = ym(dt).m;
+    if (acc.length && acc[acc.length - 1].m === mm) acc[acc.length - 1].n++;
+    else acc.push({ m: mm, n: 1 });
+    return acc;
+  }, []);
   const staff = allStaff(d);
   const sum = staffSummary(d, date, staff);
   const pendingGroups = ([1, 2] as const).filter((g) => !d.sessions[`${date}|group:${g}`]?.completed);
@@ -497,6 +505,14 @@ export function TeacherAttendance() {
     .filter((u) => (!q.trim() || u.name.includes(q.trim())) && (!group || String(u.group) === group))
     .filter((u) => { const mk = d.teacherMarks[`${date}|${u.id}`]; return !status || (status === "U" ? !mk : mk === status); })
     .sort((a, b) => (a.group ?? 9) - (b.group ?? 9) || Number(b.roles.includes("head")) - Number(a.roles.includes("head")) || a.name.localeCompare(b.name, "ko"));
+  // 연간: 가장 최근 주일 칸이 화면 오른쪽 끝에 오도록 스크롤 (학생 출결현황과 같은 방식)
+  useEffect(() => {
+    const w = yearWrap.current;
+    if (!yearView || !w) return;
+    const wks = w.querySelectorAll<HTMLElement>("thead tr:last-child th.wk");
+    const last = wks[wks.length - 1];
+    w.scrollLeft = last ? last.offsetLeft + last.offsetWidth - w.clientWidth : w.scrollWidth;
+  }, [yearView, date, group, q, status]);
   const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.p + mo.a}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
   return (
     <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
@@ -516,18 +532,32 @@ export function TeacherAttendance() {
           </div>
           <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
         </div>
-        <div className="tablewrap">
-          <table className="tbl">
-            <thead><tr><th>교사</th><th>소속</th><th>담당</th>{cols.map((dt) => <th key={dt} className="c">{fmtMD(dt)}</th>)}<th>{m}월 출석</th><th style={{ width: 180 }}>연간 출석률</th><th /></tr></thead>
+        {yearView && <span className="t-xs muted">옆으로 스크롤하면 1월부터 전체 주일을 볼 수 있습니다. 이름은 고정됩니다.</span>}
+        <div className="tablewrap" ref={yearWrap}>
+          <table className={`tbl ${yearView ? "year-grid" : ""}`}>
+            {yearView ? (
+              <thead>
+                <tr className="month-row"><th className="stick s1" />{months.map((x) => <th key={x.m} colSpan={x.n} className="c month">{x.m}월</th>)}<th colSpan={3} /></tr>
+                <tr><th className="stick s1">교사 · 담당</th>{cols.map((dt) => <th key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}>{fmtMD(dt)}</th>)}<th>{m}월 출석</th><th style={{ width: 180 }}>연간 출석률</th><th /></tr>
+              </thead>
+            ) : (
+              <thead><tr><th>교사</th><th>소속</th><th>담당</th>{cols.map((dt) => <th key={dt} className="c">{fmtMD(dt)}</th>)}<th>{m}월 출석</th><th style={{ width: 180 }}>연간 출석률</th><th /></tr></thead>
+            )}
             <tbody>
               {rows.map((u) => {
                 const mo = personRate(d.teacherMarks, u.id, monthDates);
                 const yr = personRate(d.teacherMarks, u.id, all);
                 return (
                   <tr key={u.id}>
-                    <td><span className="row g8"><Avatar name={u.name} size={28} /><strong className="sb">{u.name}</strong></span></td>
-                    <td>{u.group}부</td><td>{teacherDuty(d, u, false)}</td>
-                    {cols.map((dt) => <td key={dt} className="c"><MarkDot mark={d.teacherMarks[`${dt}|${u.id}`]} /></td>)}
+                    {yearView ? (
+                      <td className="stick s1"><span className="col g2"><strong className="sb ellipsis">{u.name}</strong><span className="t-xs muted ellipsis">{u.group}부 · {teacherDuty(d, u, false)}</span></span></td>
+                    ) : (
+                      <>
+                        <td><span className="row g8"><Avatar name={u.name} size={28} /><strong className="sb">{u.name}</strong></span></td>
+                        <td>{u.group}부</td><td>{teacherDuty(d, u, false)}</td>
+                      </>
+                    )}
+                    {cols.map((dt) => <td key={dt} className={`c ${yearView ? `wk ${ym(dt).d <= 7 ? "m-start" : ""}` : ""}`}><MarkDot mark={d.teacherMarks[`${dt}|${u.id}`]} /></td>)}
                     <td className="sb num">{mo.p} / {mo.p + mo.a}</td>
                     <td><div className="row g8"><div className="grow"><Progress value={yr.rate ?? 0} /></div><span className="sb num" style={{ width: 40 }}>{pctText(yr.rate)}</span></div></td>
                     <td><Button variant="outline" size="s" onClick={() => setEdit(u)}>기록 수정</Button></td>
