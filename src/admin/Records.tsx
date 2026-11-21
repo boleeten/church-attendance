@@ -294,6 +294,18 @@ export function Stats() {
 }
 
 // ───────── A07 심방노트 관리 ─────────
+/** '확인' 버튼으로 보내는 기본 답변 */
+const CONFIRM_REPLY = "심방내용 확인했습니다";
+
+/** 확인 답변 보내기: 이미 답변이 있으면 보내지 않는다 (두 번 눌러도 한 번만) */
+function confirmNote(note: VisitNote, by: string): boolean {
+  if (note.reply) return false;
+  const err = replyNote(note.id, CONFIRM_REPLY);
+  if (err) { toast(err, "error"); return false; }
+  toast(`${by} 선생님에게 "${CONFIRM_REPLY}" 답변을 보냈습니다.`);
+  return true;
+}
+
 export function Notes() {
   const d = useData();
   const [q, setQ] = useState("");
@@ -347,7 +359,12 @@ export function Notes() {
                   <td className="wraptext">{n.content || "(내용 없음)"}</td>
                   <td>{by}</td><td className="muted num">{fmtStamp(n.createdAt)}</td>
                   <td>{n.reply ? <Badge tone="info">답변 완료</Badge> : <Badge>대기</Badge>}</td>
-                  <td><Button variant={canReply && !n.reply ? "primary" : "outline"} size="s" onClick={() => setViewId(n.id)}>{canReply && !n.reply ? "답변" : "보기"}</Button></td>
+                  <td>
+                    <span className="row g6">
+                      <Button variant={canReply && !n.reply ? "primary" : "outline"} size="s" onClick={() => setViewId(n.id)}>{canReply && !n.reply ? "답변" : "보기"}</Button>
+                      {canReply && <Button variant="outline" size="s" disabled={!!n.reply} title={n.reply ? "이미 답변한 노트입니다" : `"${CONFIRM_REPLY}" 답변을 보냅니다`} onClick={() => confirmNote(n, by)}>{n.reply === CONFIRM_REPLY ? "확인됨" : "확인"}</Button>}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -434,6 +451,7 @@ function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; in
         editing ? (
           <>
             <Button variant="outline" onClick={() => (note.reply ? (setEditing(false), setText(note.reply)) : onClose())}>취소</Button>
+            {!note.reply && <Button variant="secondary" disabled={!!note.reply} onClick={() => { if (confirmNote(note, by)) { setEditing(false); setText(CONFIRM_REPLY); } }}>확인</Button>}
             <Button disabled={!text.trim()} onClick={() => save(text)}>{note.reply ? "수정해서 보내기" : "답변 보내기"}</Button>
           </>
         ) : undefined
@@ -446,7 +464,7 @@ function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; in
         <div className="col g8">
           <label className="sb" htmlFor="reply-text">심방 답변</label>
           <textarea id="reply-text" className="area" autoFocus placeholder={`${by} 선생님에게 보낼 답변을 적어 주세요. 격려, 심방 계획, 기도 제목 등`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
-          <span className="t-xs muted">보내면 {by} 선생님의 알림 목록에 표시되고, 학생 상세의 심방노트 아래에서 볼 수 있습니다.</span>
+          <span className="t-xs muted">보내면 {by} 선생님의 알림 목록에 표시되고, 학생 상세의 심방노트 아래에서 볼 수 있습니다. 따로 적을 내용이 없으면 [확인]을 누르세요. "{CONFIRM_REPLY}"라고 답변이 갑니다.</span>
           {!remoteEnabled && <Note icon="info">데모 모드에서는 데이터가 이 브라우저에만 저장됩니다. 답변은 같은 기기·같은 브라우저·같은 주소에서 {by} 선생님 계정으로 로그인해야 보입니다. 휴대폰이나 다른 주소(관리자 주소와 교사 주소)에서는 전달되지 않습니다.</Note>}
         </div>
       ) : note.reply ? (
