@@ -52,9 +52,10 @@ function ClassSheetModal({ cls, date, onClose }: { cls: ClassRoom; date: string;
 export function StudentAttendance() {
   const d = useData();
   const { date } = useAdminDate();
-  const [tab, setTab] = useState<"class" | "student">("class");
+  const [tab, setTab] = useState<"class" | "student">("student");
   const [group, setGroup] = useState("");
   const [grade, setGrade] = useState("");
+  const yearWrap = useRef<HTMLDivElement>(null);
   const [pendingOnly, setPendingOnly] = useState(false);
   const [streakOnly, setStreakOnly] = useState(false);
   const [sheet, setSheet] = useState<ClassRoom | null>(null);
@@ -67,7 +68,17 @@ export function StudentAttendance() {
   const classes = d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade) && (!pendingOnly || !d.sessions[`${date}|class:${c.id}`]?.completed));
   const classIds = new Set(classes.map((c) => c.id));
   const rows = students.filter((s) => classIds.has(s.classId) && (!streakOnly || (streaks.get(s.id) ?? 0) >= 2)).sort((a, b) => a.classId.localeCompare(b.classId) || a.name.localeCompare(b.name, "ko"));
-  const cols = dates.slice(-5);
+  // 1년 전체 주일을 보여 주고, 처음에는 가장 최근 주일이 보이도록 오른쪽 끝으로 스크롤한다
+  const cols = dates;
+  const months = cols.reduce<{ m: number; n: number }[]>((acc, dt) => {
+    const m = ym(dt).m;
+    if (acc.length && acc[acc.length - 1].m === m) acc[acc.length - 1].n++;
+    else acc.push({ m, n: 1 });
+    return acc;
+  }, []);
+  useEffect(() => {
+    if (tab === "student" && yearWrap.current) yearWrap.current.scrollLeft = yearWrap.current.scrollWidth;
+  }, [tab, date, group, grade]);
   return (
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
       {/* 모바일에서는 출석 카드 하나만 폭에 맞춰 보여 준다 (Figma 170:2326) */}
@@ -93,14 +104,15 @@ export function StudentAttendance() {
       <section className="panel">
         <div className="row between wrap g8">
           <div className="filters">
-            <Seg value={tab} options={[["class", "반별 현황"], ["student", "학생별 현황표"]] as const} onChange={setTab} />
+            <Seg value={tab} options={[["student", "학생별 현황표"], ["class", "반별 현황"]] as const} onChange={setTab} />
             <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
             <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
             <label className="row g6 sb"><input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />미완료 반만</label>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
           </div>
         </div>
-        <div className="tablewrap">
+        {tab === "student" && <span className="t-xs muted">옆으로 스크롤하면 1월부터 전체 주일을 볼 수 있습니다. 이름과 반은 고정됩니다.</span>}
+        <div className="tablewrap" ref={yearWrap}>
           {tab === "class" ? (
             <table className="tbl">
               <thead><tr><th>반</th><th>담임</th><th>전체</th><th>출석</th><th>결석</th><th>미확인</th><th style={{ width: 200 }}>출석률</th><th>상태</th><th>관리</th></tr></thead>
@@ -120,16 +132,19 @@ export function StudentAttendance() {
               </tbody>
             </table>
           ) : (
-            <table className="tbl">
-              <thead><tr><th>학생</th><th>반</th>{cols.map((dt) => <th key={dt} className="c">{fmtMD(dt)}</th>)}<th>연속 결석</th><th>연간 출석률</th><th /></tr></thead>
+            <table className="tbl year-grid">
+              <thead>
+                <tr className="month-row"><th className="stick s1" /><th className="stick s2" />{months.map((x) => <th key={x.m} colSpan={x.n} className="c month">{x.m}월</th>)}<th colSpan={3} /></tr>
+                <tr><th className="stick s1">학생</th><th className="stick s2">반</th>{cols.map((dt) => <th key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}>{fmtMD(dt)}</th>)}<th>연속 결석</th><th>연간 출석률</th><th /></tr>
+              </thead>
               <tbody>
                 {rows.map((s) => {
                   const c = classOf(d, s);
                   const st = streaks.get(s.id) ?? 0;
                   return (
                     <tr key={s.id}>
-                      <td className="sb">{s.name}</td><td>{c ? classLabel(c) : "-"}</td>
-                      {cols.map((dt) => <td key={dt} className="c"><MarkDot mark={d.studentMarks[`${dt}|${s.id}`]} /></td>)}
+                      <td className="sb stick s1">{s.name}</td><td className="stick s2">{c ? classLabel(c) : "-"}</td>
+                      {cols.map((dt) => <td key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}><MarkDot mark={d.studentMarks[`${dt}|${s.id}`]} /></td>)}
                       <td>{st >= 2 ? <Badge tone="error">{st}주 연속</Badge> : <span className="muted">-</span>}</td>
                       <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
                       <td><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button></td>
