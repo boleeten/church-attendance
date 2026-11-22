@@ -362,7 +362,7 @@ export function StudentDetailModal({ student, onClose }: { student: Student; onC
         <div className="col" style={{ textAlign: "right" }}>
           <span className="t-xs muted">{d.settings.year}년 출석률</span>
           <strong className="t-2xl b">{pctText(year.rate)}</strong>
-          <span className="t-xs muted">{year.p} / {year.p + year.a}주</span>
+          <span className="t-xs muted">{year.p} / {year.total}주</span>
         </div>
       </div>
       <div className="grid cols-4" style={{ gap: 12 }}>

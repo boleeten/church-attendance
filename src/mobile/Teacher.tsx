@@ -368,12 +368,12 @@ export function StudentDetail() {
           <div className="card pad col g4 grow">
             <span className="t-xs muted">{m}월 출석률</span>
             <strong className={`t-2xl b ${month.rate !== null && month.rate < 50 ? "c-error" : ""}`}>{pctText(month.rate)}</strong>
-            <span className="t-xs muted">{month.p} / {month.p + month.a}주</span>
+            <span className="t-xs muted">{month.p} / {month.total}주</span>
           </div>
           <div className="card pad col g4 grow">
             <span className="t-xs muted">{y}년 출석률</span>
             <strong className="t-2xl b">{pctText(year.rate)}</strong>
-            <span className="t-xs muted">{year.p} / {year.p + year.a}주</span>
+            <span className="t-xs muted">{year.p} / {year.total}주</span>
           </div>
         </div>
         <div className="row between">

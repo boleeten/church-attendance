@@ -71,6 +71,10 @@ export function teacherSummary(d: Data, date: string, g: 1 | 2): Summary {
   );
 }
 
+/**
+ * 개인 출석률 = 출석한 주 / 지금까지의 주일 수.
+ * 체크하지 않은(미확인) 주도 분모에 넣는다. 그래서 '23/23주'가 아니라 '23/47주'처럼 보인다.
+ */
 export function personRate(marks: Record<string, Mark>, id: string, dates: string[]) {
   let p = 0;
   let a = 0;
@@ -79,7 +83,8 @@ export function personRate(marks: Record<string, Mark>, id: string, dates: strin
     if (m === "P") p++;
     else if (m === "A") a++;
   }
-  return { p, a, rate: pct(p, a) };
+  const total = dates.length;
+  return { p, a, total, rate: total ? Math.round((p / total) * 100) : null };
 }
 
 /** 최근 주일부터 거슬러 올라가며 연속 결석 횟수를 센다. 미확인 주일은 건너뛴다. */

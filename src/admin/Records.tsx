@@ -531,7 +531,7 @@ export function TeacherAttendance() {
     const last = wks[wks.length - 1];
     w.scrollLeft = last ? last.offsetLeft + last.offsetWidth - w.clientWidth : w.scrollWidth;
   }, [yearView, date, group, q, status]);
-  const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.p + mo.a}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
+  const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.total}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
   return (
     <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
       <div className="grid cols-4 kpis-attend">
@@ -576,7 +576,7 @@ export function TeacherAttendance() {
                       </>
                     )}
                     {cols.map((dt) => <td key={dt} className={`c ${yearView ? `wk ${ym(dt).d <= 7 ? "m-start" : ""}` : ""}`}><MarkDot mark={d.teacherMarks[`${dt}|${u.id}`]} /></td>)}
-                    <td className="sb num">{mo.p} / {mo.p + mo.a}</td>
+                    <td className="sb num">{mo.p} / {mo.total}</td>
                     <td><div className="row g8"><div className="grow"><Progress value={yr.rate ?? 0} /></div><span className="sb num" style={{ width: 40 }}>{pctText(yr.rate)}</span></div></td>
                     <td><Button variant="outline" size="s" onClick={() => setEdit(u)}>기록 수정</Button></td>
                   </tr>
