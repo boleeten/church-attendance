@@ -219,6 +219,8 @@ export default async function handler(req, res) {
       }
     }
   }
+  // 점검용 기록: 누구에게 무엇을 보내는지 (이름·연락처 없이 개수만)
+  console.log(`[reminders] ${mode} ${date} 학생 알림 ${items.filter((i) => i.kind === "student").length}건, 교사 알림 ${items.filter((i) => i.kind === "teacher").length}건 · 교사 출석 완료: ${[1, 2].map((g) => `${g}부 ${done.has(`group:${g}`) ? "완료" : "미완료"}`).join(", ")} · 부장교사 ${[1, 2].map((g) => `${g}부 ${(heads || []).filter((h) => h.active && h.group === g).length}명`).join(", ")}${(heads || []).some((h) => h.active && !h.group) ? ` · 소속 없는 부장교사 ${(heads || []).filter((h) => h.active && !h.group).length}명` : ""} · 교사 알림 설정 ${settings.teacherNotifyOn ? "켜짐" : "꺼짐"}`);
   // 자동 실행(주일 오후) 때 관리자에게 미완료 현황 요약
   if (isCron) {
     const left = (classes || []).filter((c) => !done.has(`class:${c.id}`)).sort((a, b) => a.group - b.group || a.grade - b.grade || a.no - b.no);
