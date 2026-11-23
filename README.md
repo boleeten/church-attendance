@@ -20,6 +20,19 @@ npm run build
 | 데모 모드 | 환경 변수 없음 (기본) | 가상의 예시 데이터. 입력 내용은 각자의 브라우저(localStorage)에만 저장되고 다른 사람과 공유되지 않습니다. |
 | 실제 DB 모드 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 설정 | Supabase(PostgreSQL)에 저장되고 권한 정책(RLS)이 적용됩니다. |
 
+### 부서별 배포 (`VITE_DEPT`)
+
+같은 코드를 부서마다 따로 배포합니다. 부서 이름·학년 구성은 [`src/config/departments.js`](src/config/departments.js)에 있고, 환경 변수 `VITE_DEPT`로 어느 부서인지 정합니다 (없으면 초등부).
+
+| `VITE_DEPT` | 부서 | 학년 |
+|---|---|---|
+| (없음) / `elementary` | 초등부 | 4~6학년 |
+| `kids` | 유년부 | 1~3학년 (초안) |
+| `infant` | 영아부 | 0~3세 (초안) |
+| `youth` | 청소년부 | 중1~고3 (초안) |
+
+새 부서는 Vercel 프로젝트와 Supabase 프로젝트를 따로 만들고, Vercel 환경 변수에 `VITE_DEPT`와 그 부서의 Supabase 키를 넣습니다. `supabase/*.sql`은 날짜 순서대로 실행합니다.
+
 데모 모드의 로그인 화면에는 교사·부장교사·관리자 데모 계정 버튼이 있습니다. 데모 계정 비밀번호는 `src/lib/seed.ts`에 있습니다.
 
 **데모 모드는 실제 학생 정보를 넣는 용도가 아닙니다.** 실제 운영은 반드시 실제 DB 모드로 전환한 뒤 시작하세요.

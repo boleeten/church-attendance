@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GROUPS } from "../config/dept";
 import { fmtDateTimeKo, fmtStamp } from "../lib/date";
 import { fitImage, kb } from "../lib/image";
 import { normalizeUrl, receiptsOf } from "../lib/messages";
@@ -77,8 +78,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
         </div>
         <div className="msg-pick">
           <SelectBox label="부서" value={pickGroup} onChange={setPickGroup}>
-            <option value="1">1부</option>
-            <option value="2">2부</option>
+            {GROUPS.map((x) => <option key={x} value={x}>{x}부</option>)}
             <option value="">전체</option>
           </SelectBox>
           <SelectBox label="교사 추가" value="" onChange={(v) => v && add([v])}>
@@ -87,8 +87,7 @@ function ComposeModal({ initial, onClose }: { initial: string[]; onClose: () => 
           </SelectBox>
         </div>
         <div className="row g8 wrap">
-          <Button variant="outline" size="s" onClick={() => add(teachers.filter((t) => t.group === 1).map((t) => t.id))}>1부 전체</Button>
-          <Button variant="outline" size="s" onClick={() => add(teachers.filter((t) => t.group === 2).map((t) => t.id))}>2부 전체</Button>
+          {GROUPS.map((x) => <Button key={x} variant="outline" size="s" onClick={() => add(teachers.filter((t) => t.group === x).map((t) => t.id))}>{x}부 전체</Button>)}
           {to.length > 0 && <Button variant="outline" size="s" onClick={() => setTo([])}>모두 빼기</Button>}
         </div>
       </div>

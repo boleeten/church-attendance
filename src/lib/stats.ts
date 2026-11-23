@@ -1,4 +1,5 @@
 import { currentSunday, sundaysOfYear } from "./date";
+import { classLong, classShort } from "../config/dept";
 import { attendsClass, isEnrolled, type ClassRoom, type Data, type Mark, type Student, type User } from "./types";
 
 /** 출석률 = 출석 ÷ 전체 인원 (미확인은 결석으로 친다). 아직 아무도 체크하지 않았으면 null("-") */
@@ -113,7 +114,7 @@ export function teacherDuty(d: Data, u: User, short = true): string {
   const names = as.map((a) => {
     const c = d.classes.find((x) => x.id === a.classId)!;
     if (c.grade === 0) return "새친구반";
-    return short || as.length > 1 ? `${c.grade}-${c.no}반` : `${c.grade}학년 ${c.no}반`;
+    return short || as.length > 1 ? classShort(c.grade, c.no) : classLong(c.grade, c.no);
   });
   return `${head ? `${head} · ` : ""}${names.join(" · ")} ${kinds.join("·")}`;
 }

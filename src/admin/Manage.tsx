@@ -1,4 +1,5 @@
 import { formatPhone } from "../lib/phone";
+import { classShort as deptClassShort, GRADES, GROUPS, GROUPS_TEXT, gradeName, gradeShortName, parseClassText, parseGrade } from "../config/dept";
 import { lastPastorReply, threadText } from "../lib/notes";
 import { Children, Fragment, isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -214,13 +215,13 @@ export function Dashboard() {
     <Page title="통합 대시보드" sub={`${d.settings.year}학년도 · ${fmtDot(date)} 주일 기준`}>
       <NewFriendAlert />
       <div className="grid cols-2">
-        <Kpi label="전체 학생" value={`${students.length}명`} sub={`1부 ${groupStudents(d, 1).length}명 · 2부 ${groupStudents(d, 2).length}명 (등록 기준)${newFriendCount ? ` · 새친구 ${newFriendCount}명 별도` : ""}`} icon="users" />
-        <Kpi label="전체 교사" value={`${staff.length}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명`} icon="badge" />
+        <Kpi label="전체 학생" value={`${students.length}명`} sub={`${GROUPS.map((x) => `${x}부 ${groupStudents(d, x).length}명`).join(" · ")} (등록 기준)${newFriendCount ? ` · 새친구 ${newFriendCount}명 별도` : ""}`} icon="users" />
+        <Kpi label="전체 교사" value={`${staff.length}명`} sub={GROUPS.map((x) => `${x}부 ${staff.filter((u) => u.group === x).length}명`).join(" · ")} icon="badge" />
       </div>
       <div className="grid cols-2">
         <section className="panel">
           <div className="row between"><h2>학생 출석현황</h2><Badge tone="success">실시간</Badge></div>
-          {([1, 2] as const).map((g) => (
+          {GROUPS.map((g) => (
             <Fragment key={g}>
               <GroupBar title={`${g}부`} sum={studentsSummary(d, date, groupStudents(d, g))} provisional={false} />
               {newFriendStudents(d, g).length > 0 && <GroupBar title={`${g}부 새친구`} sum={studentsSummary(d, date, newFriendStudents(d, g))} provisional={false} />}
@@ -229,7 +230,7 @@ export function Dashboard() {
         </section>
         <section className="panel">
           <div className="row between"><h2>교사 출석현황</h2><Badge tone="success">실시간</Badge></div>
-          {([1, 2] as const).map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={false} />)}
+          {GROUPS.map((g) => <GroupBar key={g} title={`${g}부`} sum={teacherSummary(d, date, g)} provisional={false} />)}
         </section>
       </div>
       <div className="grid split">
@@ -500,7 +501,7 @@ export function Students() {
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(rows.map(({ s }) => s.id)));
 
   const exportCsv = () =>
-    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
+    download(`학생명부_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률"], ...rows.map(({ s, c, teacher }) => [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? (c.grade ? gradeShortName(c.grade) : "새친구반") : "", c && c.grade ? c.no : "", teacher, s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)])]));
 
   const importCsv = async (file: File) => {
     const all = parseCSV(await file.text());
@@ -523,7 +524,7 @@ export function Students() {
       const num = (v?: string) => clean(v).replace(/[^0-9]/g, "");
       // 학년이나 반 칸에 '새친구'라고 적으면 그 부의 새친구반
       const nf = /새친구/.test(`${gr ?? ""}${no ?? ""}`);
-      const c = nf ? d.classes.find((x) => x.grade === 0 && String(x.group) === num(g)) : d.classes.find((x) => String(x.group) === num(g) && String(x.grade) === num(gr) && String(x.no) === num(no));
+      const c = nf ? d.classes.find((x) => x.grade === 0 && String(x.group) === num(g)) : d.classes.find((x) => String(x.group) === num(g) && x.grade === parseGrade(gr) && String(x.no) === num(no));
       if (!c) unassigned.push(name);
       upsertStudent({ name, gender, birthDate: parseBirth(birth), classId: c ? c.id : "", status: "등록", phone: clean(phone), guardianPhone: clean(guardian), guardianRel: clean(rel) });
       ok++;
@@ -542,8 +543,8 @@ export function Students() {
         </div>
         <div className="filter-row">
           <SelectBox label="그룹" value={group} onChange={upd(setGroup)}><option value="">그룹: 전체</option><option value="1">그룹: 1부</option><option value="2">그룹: 2부</option></SelectBox>
-          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>학년: {g}학년</option>)}</SelectBox>
-          <SelectBox label="반" value={classId} onChange={pickClass}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{([1, 2] as const).filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
+          <SelectBox label="학년" value={grade} onChange={upd(setGrade)}><option value="">학년: 전체</option>{GRADES.map((g) => <option key={g} value={g}>학년: {gradeName(g)}</option>)}</SelectBox>
+          <SelectBox label="반" value={classId} onChange={pickClass}><option value="">반: 전체</option>{d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade)).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}{GROUPS.filter((g) => !group || String(g) === group).map((g) => <option key={g} value={longClassId(g)}>반: {longLabel(g)}</option>)}<option value="none">반: 미배정</option></SelectBox>
           <SelectBox label="상태" value={status} onChange={upd(setStatus)}><option value="">상태: 전체</option>{STATUSES.map((s) => <option key={s} value={s}>상태: {s}</option>)}</SelectBox>
           <SelectBox label="출석 상태" value={mark} onChange={upd(setMark)}><option value="">출석 상태: 전체</option><option value="P">출석 상태: 출석</option><option value="A">출석 상태: 결석</option><option value="U">출석 상태: 미확인</option></SelectBox>
           <SelectBox label="생일" value={birth} onChange={upd(setBirth)}><option value="">생일: 전체</option><option value="this">생일: 이번 달 생일</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1)}>생일: {i + 1}월</option>)}</SelectBox>
@@ -563,7 +564,7 @@ export function Students() {
             {canDeleteStudent && <Button variant="outline" size="s" className="btn-del" disabled={!sel.size} onClick={() => void removeSelected()}><Icon name="trash" size={14} />선택 학생 삭제</Button>}
             <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>
             <Button variant="secondary" size="s" onClick={() => fileRef.current?.click()}>Excel/CSV 일괄 등록</Button>
-            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "2016-03-07", "1부", 4, 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2015-11-21", "2부", 5, 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
+            <Button variant="outline" size="s" className="btn-line" onClick={() => download("학생_일괄등록_양식.csv", toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ["홍길동", "남", "2016-03-07", `${GROUPS[0]}부`, gradeShortName(GRADES[0]), 2, "010-0000-0000", "010-0000-0000", "모"], ["김하늘", "여", "2015-11-21", `${GROUPS[GROUPS.length - 1]}부`, gradeShortName(GRADES[1] ?? GRADES[0]), 1, "010-0000-0000", "010-0000-0000", "부"]]))}><Icon name="download" size={14} />양식 받기</Button>
             <Button size="s" onClick={() => setEdit("new")}><Icon name="plus" size={14} />학생 등록</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }} />
           </div>
@@ -578,7 +579,7 @@ export function Students() {
                   <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong>{readyIds.has(s.id) && <Badge tone="warning">반 배정 대상</Badge>}</span></td>
                   <td>{s.gender ?? "-"}</td>
                   <td className="num">{fmtBirth(s.birthDate) || "-"}</td>
-                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? (c.grade ? `${c.grade}학년` : "새친구") : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? (c.grade ? `${c.no}반` : "새친구반") : <span className="sb c-warning">미배정</span>}</td>
+                  <td>{c ? `${c.group}부` : "-"}</td><td>{c ? (c.grade ? gradeName(c.grade) : "새친구") : "-"}</td><td>{s.status === "장결자" ? <span className="col"><span className="sb c-warning">장결자반</span>{c && <span className="t-xs muted">원래 {c.no}반</span>}</span> : c ? (c.grade ? `${c.no}반` : "새친구반") : <span className="sb c-warning">미배정</span>}</td>
                   <td>{s.status === "장결자" ? "-" : teacher}</td>
                   <td className="num">{s.phone || "-"}</td><td className="num">{s.guardianPhone || "-"}</td>
                   <td><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
@@ -598,7 +599,7 @@ export function Students() {
           <SelectBox label="이동할 반" value={moveTo} onChange={setMoveTo}>
             <option value="">이동할 반 선택</option>
             {d.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c)} (현재 {classCount(c.id)}명)</option>)}
-            {([1, 2] as const).map((g) => <option key={g} value={longClassId(g)}>{longLabel(g)} (교사 배정 없음)</option>)}
+            {GROUPS.map((g) => <option key={g} value={longClassId(g)}>{longLabel(g)} (교사 배정 없음)</option>)}
           </SelectBox>
           <Note>반을 옮겨도 이전 출석 기록과 심방노트는 보존됩니다. 장결자반으로 옮기면 상태가 '장결자'가 되고, 장결자반에서 일반 반으로 옮기면 '등록'으로 돌아옵니다.</Note>
         </Modal>
@@ -688,10 +689,10 @@ export function Classes() {
     toast(err ?? `${classLabel(c)}을(를) 삭제했습니다.`, err ? "error" : "info");
   };
   return (
-    <Page title="그룹·반 관리" sub="1부·2부 그룹과 학년별 반, 담당 교사를 관리합니다">
+    <Page title="그룹·반 관리" sub={`${GROUPS_TEXT} 그룹과 학년별 반, 담당 교사를 관리합니다`}>
       <div className="row between wrap g12">
         <div className="row g16 wrap">
-          <span className="grp-seg"><Seg value={g} options={[["1", `1부 · ${count(1)}개 반`], ["2", `2부 · ${count(2)}개 반`]] as const} onChange={setG} /></span>
+          <span className="grp-seg"><Seg value={g} options={GROUPS.map((x) => [String(x) as "1" | "2", `${x}부 · ${count(x)}개 반`] as const)} onChange={setG} /></span>
           <span className="muted sb">{g}부 등록 {total}명</span>
         </div>
         <Button onClick={() => setAdding(true)}><Icon name="plus" size={16} />반 추가</Button>
@@ -699,9 +700,9 @@ export function Classes() {
       {violations.length > 0 && <Note warm icon="warning">배정 원칙(같은 부에서는 한 반만)에 맞지 않는 교사가 있습니다: {violations.map((v) => `${v.user.name}(${v.group}부 ${v.classes.map(classShort).join("·")})`).join(", ")}. 해당 반의 '교사 배정'에서 한 반만 남겨 주세요.</Note>}
       <div className={`grp-zone g${g}`}>
       <div className="grp-head"><span className="grp-mark">{g}부</span><strong className="t-lg b">{g}부 반 목록</strong><span className="muted t-xs">{count(group)}개 반 · 등록 {total}명</span></div>
-      {[0, 4, 5, 6].filter((gr) => list.some((c) => c.grade === gr)).map((gr) => (
+      {[0, ...GRADES].filter((gr) => list.some((c) => c.grade === gr)).map((gr) => (
         <section key={gr} className="col g12">
-          <h2 className="t-base b">{gr ? `${gr}학년` : "새친구반"}{!gr && <span className="muted t-sm" style={{ fontWeight: 400, marginLeft: 8 }}>{NEW_FRIEND_WEEKS}주 연속 출석하면 반 배정 대상이 됩니다</span>}</h2>
+          <h2 className="t-base b">{gradeName(gr)}{!gr && <span className="muted t-sm" style={{ fontWeight: 400, marginLeft: 8 }}>{NEW_FRIEND_WEEKS}주 연속 출석하면 반 배정 대상이 됩니다</span>}</h2>
           <div className="grid cols-4 class-grid" style={{ gap: 16 }}>
             {list.filter((c) => c.grade === gr).map((c) => {
               const n = classCount(c.id);
@@ -734,7 +735,7 @@ export function Classes() {
       {assign && <AssignModal cls={assign} onClose={() => setAssign(null)} />}
       {adding && (
         <Modal title={`${g}부 반 추가`} onClose={() => setAdding(false)} footer={<><Button variant="outline" onClick={() => setAdding(false)}>취소</Button><Button onClick={() => { addClass(group, Number(grade)); toast("반을 추가했습니다."); setAdding(false); }}>추가</Button></>}>
-          <div className="field"><label>학년</label><SelectBox label="학년" value={grade} onChange={setGrade}>{[4, 5, 6].map((x) => <option key={x} value={x}>{x}학년</option>)}</SelectBox></div>
+          <div className="field"><label>학년</label><SelectBox label="학년" value={grade} onChange={setGrade}>{GRADES.map((x) => <option key={x} value={x}>{gradeName(x)}</option>)}</SelectBox></div>
           <Note>새 반은 해당 학년의 다음 번호로 만들어집니다.</Note>
         </Modal>
       )}
@@ -780,7 +781,7 @@ function TeacherForm({ user, onClose, onTemp }: { user: User | null; onClose: ()
       <div className="field"><label>이름</label><div className="input m"><input value={name} onChange={(e) => setName(e.target.value)} aria-label="이름" /></div></div>
       <div className="field"><label>아이디</label><div className="input m"><input value={loginId} onChange={(e) => setLoginId(e.target.value.toLowerCase())} placeholder="teacher_hong01" aria-label="아이디" /></div></div>
       <div className="grid cols-2" style={{ gap: 12 }}>
-        <div className="field"><label>소속</label><SelectBox label="소속" value={group} onChange={setGroup}><option value="1">1부</option><option value="2">2부</option></SelectBox></div>
+        <div className="field"><label>소속</label><SelectBox label="소속" value={group} onChange={setGroup}>{GROUPS.map((x) => <option key={x} value={x}>{x}부</option>)}</SelectBox></div>
         <div className="field"><label>구분</label><SelectBox label="구분" value={head ? "head" : "teacher"} onChange={(v) => setHead(v === "head")}><option value="teacher">교사</option><option value="head">부장교사</option></SelectBox></div>
       </div>
       {!user && <Note>등록하면 임시 비밀번호가 발급되고, 첫 로그인 때 비밀번호를 변경해야 합니다. 담당 반은 그룹·반 관리에서 배정합니다.</Note>}
@@ -795,8 +796,8 @@ type TeacherRow = { line: number; name: string; loginId: string; group: 1 | 2 | 
 const TEACHER_TEMPLATE = [
   ["이름", "아이디", "소속", "구분", "담당 반", "담당 구분"],
   // 담당 반은 '학년-반반'(예: 4-1반)으로 적는다. '4-1'만 적으면 Excel이 날짜(4월 1일)로 바꿔 버린다.
-  ["홍길동", "hong_gd01", "1부", "교사", "4-1반", "담임"],
-  ["김보조", "kim_bj02", "2부", "교사", "5-1반", "보조"],
+  ["홍길동", "hong_gd01", "1부", "교사", deptClassShort(GRADES[0], 1), "담임"],
+  ["김보조", "kim_bj02", "2부", "교사", deptClassShort(GRADES[1] ?? GRADES[0], 1), "보조"],
   ["박부장", "park_bj03", "2부", "부장교사", "", ""],
 ];
 
@@ -818,7 +819,6 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
       // Excel이 '4-1'을 날짜로 바꿔 저장한 경우(2026-04-01, 4월 1일)도 학년-반으로 읽는다
       const dateLike = (cls ?? "").match(/^\d{4}[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})\.?$/);
       if (dateLike) cls = `${Number(dateLike[1])}-${Number(dateLike[2])}반`;
-      const nums = (cls ?? "").match(/\d+/g);
       if (!name) error = "이름이 없습니다";
       else if (!/^[a-z0-9_]{4,20}$/.test(loginId)) error = "아이디는 영문 소문자·숫자·밑줄 4~20자";
       else if (seenIds.has(loginId)) error = "파일 안에서 아이디가 중복됩니다";
@@ -828,8 +828,8 @@ function parseTeacherRows(d: Data, lines: string[][]): TeacherRow[] {
         // "4-1반"이면 소속 부의 반, "2부 4-1반"처럼 부를 적으면 그 부의 반
         const gm = (cls ?? "").match(/([12])\s*부/);
         const cg = gm ? Number(gm[1]) : group;
-        const rest = gm ? (cls ?? "").replace(gm[0], "").match(/\d+/g) : nums;
-        const c = /새친구/.test(cls ?? "") ? d.classes.find((x) => x.group === cg && x.grade === 0) : rest && rest.length >= 2 ? d.classes.find((x) => x.group === cg && x.grade === Number(rest[0]) && x.no === Number(rest[1])) : undefined;
+        const rest = parseClassText(gm ? (cls ?? "").replace(gm[0], "") : cls);
+        const c = /새친구/.test(cls ?? "") ? d.classes.find((x) => x.group === cg && x.grade === 0) : rest ? d.classes.find((x) => x.group === cg && x.grade === rest.grade && x.no === rest.no) : undefined;
         if (!c) error = `${cg}부에 '${cls}' 반이 없습니다`;
         else if (kind === "담임" && homeroomTaken.has(c.id)) error = `${classShort(c)}에 이미 담임(${homeroomTaken.get(c.id)})이 있습니다. '보조'로 적어 주세요`;
         else {
@@ -999,7 +999,7 @@ export function Teachers() {
       <section className="panel">
         <div className="row g8 wrap">
           <div className="input m grow" style={{ minWidth: 220 }}><Icon name="search" size={18} /><input placeholder="교사 이름, 아이디 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 검색" /></div>
-          <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
+          <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option>{GROUPS.map((x) => <option key={x} value={x}>{x}부</option>)}</SelectBox>
           <SelectBox label="역할" value={role} onChange={setRole}><option value="">역할: 전체</option><option value="teacher">교사</option><option value="head">부장교사</option><option value="admin">일반 관리자</option><option value="super">최고 관리자</option></SelectBox>
           <Button variant="secondary" onClick={() => teacherFile.current?.click()}>Excel/CSV 일괄 등록</Button>
           <Button variant="outline" className="btn-line" onClick={() => download("교사_일괄등록_양식.csv", toCSV(TEACHER_TEMPLATE))}><Icon name="download" size={16} />양식 받기</Button>

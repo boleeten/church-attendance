@@ -6,6 +6,10 @@
 // body.message(메세지 ID)가 있으면 그 메세지를 받은 교사 기기로 새 메세지 푸시만 보낸다.
 import * as webpushModule from "web-push";
 import { createClient } from "@supabase/supabase-js";
+import { classLongLabel, classShortLabel, getDept } from "../src/config/departments.js";
+
+// 이 배포의 부서 (환경 변수 VITE_DEPT, 없으면 초등부)
+const DEPT = getDept(process.env.VITE_DEPT);
 
 // 번들 방식에 따라 default 내보내기가 없을 수 있어 둘 다 받는다
 const webpush = webpushModule.default ?? webpushModule;
@@ -113,7 +117,7 @@ export default async function handler(req, res) {
       sb.from("profiles").select("name").eq("id", me.user.id).single(),
     ]);
     const { data: cls } = student?.class_id ? await sb.from("classes").select("group, grade, no").eq("id", student.class_id).single() : { data: null };
-    const where = cls ? (cls.grade ? `${cls.group}부 ${cls.grade}-${cls.no} ` : `${cls.group}부 새친구반 `) : "";
+    const where = cls ? (cls.grade ? `${cls.group}부 ${classShortLabel(DEPT, cls.grade, cls.no).replace(/반$/, "")} ` : `${cls.group}부 새친구반 `) : "";
     const text = String(note.content || "").replace(/\s+/g, " ").trim();
     const r = await pushAdmins(sb, {
       title: "새 심방노트가 등록되었습니다",
@@ -227,14 +231,14 @@ export default async function handler(req, res) {
     for (const c of classes || []) {
       if (body.classId && c.id !== body.classId) continue;
       if (done.has(`class:${c.id}`)) continue;
-      const label = `${c.group}부 ${c.grade}학년 ${c.no}반`;
+      const label = `${c.group}부 ${classLongLabel(DEPT, c.grade, c.no)}`;
       for (const a of (assigns || []).filter((x) => x.class_id === c.id)) {
         items.push({ userId: a.user_id, kind: "student", target: label, title: "주일 출석체크 안내", body: `${label}의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`, url: `/t/check?date=${date}` });
       }
     }
   }
   if ((isCron && settings.teacherNotifyOn) || body.teachers) {
-    for (const g of [1, 2]) {
+    for (const g of DEPT.groups) {
       if (done.has(`group:${g}`)) continue;
       for (const h of (heads || []).filter((x) => x.active && x.group === g)) {
         items.push({ userId: h.id, kind: "teacher", target: `${g}부 교사`, title: "교사 출석체크 안내", body: `${g}부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`, url: `/h/check?date=${date}` });
@@ -242,12 +246,12 @@ export default async function handler(req, res) {
     }
   }
   // 점검용 기록: 누구에게 무엇을 보내는지 (이름·연락처 없이 개수만)
-  console.log(`[reminders] ${mode} ${date} 학생 알림 ${items.filter((i) => i.kind === "student").length}건, 교사 알림 ${items.filter((i) => i.kind === "teacher").length}건 · 교사 출석 완료: ${[1, 2].map((g) => `${g}부 ${done.has(`group:${g}`) ? "완료" : "미완료"}`).join(", ")} · 부장교사 ${[1, 2].map((g) => `${g}부 ${(heads || []).filter((h) => h.active && h.group === g).length}명`).join(", ")}${(heads || []).some((h) => h.active && !h.group) ? ` · 소속 없는 부장교사 ${(heads || []).filter((h) => h.active && !h.group).length}명` : ""} · 교사 알림 설정 ${settings.teacherNotifyOn ? "켜짐" : "꺼짐"}`);
+  console.log(`[reminders] ${mode} ${date} 학생 알림 ${items.filter((i) => i.kind === "student").length}건, 교사 알림 ${items.filter((i) => i.kind === "teacher").length}건 · 교사 출석 완료: ${DEPT.groups.map((g) => `${g}부 ${done.has(`group:${g}`) ? "완료" : "미완료"}`).join(", ")} · 부장교사 ${DEPT.groups.map((g) => `${g}부 ${(heads || []).filter((h) => h.active && h.group === g).length}명`).join(", ")}${(heads || []).some((h) => h.active && !h.group) ? ` · 소속 없는 부장교사 ${(heads || []).filter((h) => h.active && !h.group).length}명` : ""} · 교사 알림 설정 ${settings.teacherNotifyOn ? "켜짐" : "꺼짐"}`);
   // 자동 실행(주일 오후) 때 관리자에게 미완료 현황 요약
   if (isCron) {
     const left = (classes || []).filter((c) => !done.has(`class:${c.id}`)).sort((a, b) => a.group - b.group || a.grade - b.grade || a.no - b.no);
-    const short = (c) => (c.grade ? `${c.group}부 ${c.grade}-${c.no}` : `${c.group}부 새친구반`);
-    const teacherLeft = settings.teacherNotifyOn ? [1, 2].filter((g) => !done.has(`group:${g}`)) : [];
+    const short = (c) => (c.grade ? `${c.group}부 ${classShortLabel(DEPT, c.grade, c.no).replace(/반$/, "")}` : `${c.group}부 새친구반`);
+    const teacherLeft = settings.teacherNotifyOn ? DEPT.groups.filter((g) => !done.has(`group:${g}`)) : [];
     const parts = [];
     if (left.length) parts.push(`학생 출석 미완료 ${left.length}개 반: ${left.slice(0, 6).map(short).join(", ")}${left.length > 6 ? ` 외 ${left.length - 6}개` : ""}`);
     if (teacherLeft.length) parts.push(`교사 출석 미완료: ${teacherLeft.map((g) => `${g}부`).join(", ")}`);

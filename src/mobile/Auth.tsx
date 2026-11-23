@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { classLong, DEPT_TITLE, GRADES } from "../config/dept";
 import { useNavigate } from "react-router-dom";
 import { remoteEnabled, toast } from "../lib/remote";
 import { DEMO_PASSWORD } from "../lib/seed";
@@ -8,7 +9,7 @@ import { afterLoginPath, entryOptions, Phone, setTeacherGroup } from "./Shell";
 
 // [아이디, 버튼 이름, 설명, 로그인 후 열 화면]
 const DEMO_ACCOUNTS = [
-  ["teacher_kim01", "교사", "1부 4학년 1반 담임", "/t"],
+  ["teacher_kim01", "교사", `1부 ${classLong(GRADES[0], 1)} 담임`, "/t"],
   ["head_park01", "부장교사", "교사 출결관리·관리자 화면 중 선택", undefined],
   ["pastor_han", "관리자", "목사님 · 계정 총괄", "/admin"],
 ] as const;
@@ -48,7 +49,7 @@ export function Login() {
         <div className="col center g16" style={{ marginBottom: 16 }}>
           <img src="/logo.png" alt="" width={96} height={96} style={{ borderRadius: "50%" }} />
           <div className="col center">
-            <h1 className="t-3xl sb c-primary">주님의교회 초등부</h1>
+            <h1 className="t-3xl sb c-primary">{DEPT_TITLE}</h1>
             <p className="t-base muted">출석관리</p>
           </div>
         </div>
@@ -83,7 +84,7 @@ export function Login() {
             </button>
           </div>
         )}
-        <p className="t-xs muted" style={{ textAlign: "center", marginTop: "auto" }}>© 주님의교회 초등부</p>
+        <p className="t-xs muted" style={{ textAlign: "center", marginTop: "auto" }}>© {DEPT_TITLE}</p>
       </form>
     </Phone>
   );

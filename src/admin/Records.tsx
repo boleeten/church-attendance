@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GRADES, GROUPS, GROUPS_TEXT, gradeName } from "../config/dept";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, attendingStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
@@ -96,7 +97,7 @@ export function StudentAttendance() {
           const marks = dates.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
           const p = marks.filter((x) => x === "P").length;
           const a = marks.filter((x) => x === "A").length;
-          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
+          return [s.name, c ? `${c.group}부` : "", c ? gradeName(c.grade) : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
         }),
       ]),
     );
@@ -126,7 +127,7 @@ export function StudentAttendance() {
         <Kpi className="hide-m" label="미확인" value={`${all.u}명`} sub={`미완료 ${pending.length}개 반`} icon="info" tone="warm" />
       </div>
       <div className="grid cols-2">
-        {([1, 2] as const).map((g) => {
+        {GROUPS.map((g) => {
           const total = d.classes.filter((c) => c.group === g).length;
           const left = incompleteClasses(d, date, g).length;
           return (
@@ -157,9 +158,9 @@ export function StudentAttendance() {
         </section>
         <section className="panel">
           <h2>학년별 출석률</h2>
-          {[4, 5, 6].map((g) => {
+          {GRADES.map((g) => {
             const c = gradeCount(g);
-            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
+            return <div key={g} className="hbar"><span className="sb">{gradeName(g)}</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
           })}
         </section>
       </div>
@@ -167,8 +168,8 @@ export function StudentAttendance() {
         <div className="row between wrap g8">
           <div className="filters">
             <Seg value={tab} options={[["student", "학생별 현황표"], ["class", "반별 현황"]] as const} onChange={setTab} />
-            <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
-            <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
+            <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option>{GROUPS.map((x) => <option key={x} value={x}>{x}부</option>)}</SelectBox>
+            <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{GRADES.map((g) => <option key={g} value={g}>{gradeName(g)}</option>)}</SelectBox>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={longOnly} onChange={(e) => setLongOnly(e.target.checked)} />장결자 ({longAbsent.length})</label>}
           </div>
@@ -444,7 +445,7 @@ export function TeacherAttendance() {
   }, []);
   const staff = allStaff(d);
   const sum = staffSummary(d, date, staff);
-  const pendingGroups = ([1, 2] as const).filter((g) => !d.sessions[`${date}|group:${g}`]?.completed);
+  const pendingGroups = GROUPS.filter((g) => !d.sessions[`${date}|group:${g}`]?.completed);
   const rows = staff
     .filter((u) => (!q.trim() || u.name.includes(q.trim())) && (!group || String(u.group) === group))
     .filter((u) => { const mk = d.teacherMarks[`${date}|${u.id}`]; return !status || (status === "U" ? !mk : mk === status); })
@@ -459,7 +460,7 @@ export function TeacherAttendance() {
   }, [yearView, date, group, q, status]);
   const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.total}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
   return (
-    <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
+    <Page title="교사 출결현황" sub={`${GROUPS_TEXT} 교사의 주일 출석 현황을 확인합니다`}>
       <div className="grid kpis-3 kpis-attend">
         <Kpi label="출석" value={`${sum.p}명`} sub={`출석률 ${pctText(sum.rate)} (${sum.p} / ${sum.total}명)`} icon="check" tone="success" />
         <Kpi className="hide-m" label="결석" value={`${sum.a}명`} sub={`${fmtDot(date)} 기준`} icon="x" tone="error" />
@@ -469,7 +470,7 @@ export function TeacherAttendance() {
         <div className="row between wrap g8">
           <div className="filters">
               <div className="input m" style={{ minWidth: 180 }}><Icon name="search" size={18} /><input placeholder="교사 이름 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 이름 검색" /></div>
-            <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
+            <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option>{GROUPS.map((x) => <option key={x} value={x}>{x}부</option>)}</SelectBox>
             <SelectBox label="상태" value={status} onChange={setStatus}><option value="">상태: 전체</option><option value="P">출석</option><option value="A">결석</option><option value="U">미확인</option></SelectBox>
           </div>
           <Button variant="outline" size="s" onClick={exportCsv}><Icon name="download" size={14} />Excel 다운로드</Button>

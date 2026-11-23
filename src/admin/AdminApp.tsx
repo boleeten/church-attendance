@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { DEPT_TITLE } from "../config/dept";
 import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { currentSunday, fmtDot } from "../lib/date";
 import { activeStudents, pctText, studentsSummary, yearSundays } from "../lib/stats";
@@ -280,7 +281,7 @@ export default function AdminApp() {
           <Link to="/admin" className="brand" title="대시보드로 이동" onClick={() => setOpen(false)}>
             <span className="logo"><img src="/brand-flower.svg" alt="" width={43.4} height={43.4} /></span>
             <div className="col">
-              <strong className="b">주님의교회 초등부</strong>
+              <strong className="b">{DEPT_TITLE}</strong>
               <span className="t-xs" style={{ opacity: 0.7 }}>출석관리 Admin</span>
             </div>
           </Link>

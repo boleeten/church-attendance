@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { classLong, DEPT, GRADES, gradeName, gradesText, gradeShortName, LAST_GRADE, LOWER_GRADES } from "../config/dept";
 import { Link } from "react-router-dom";
 import { fmtDot, fmtMD, fmtRelDay, fmtStamp, fmtTime12, ym, fmtBirth } from "../lib/date";
 import { remote, remoteEnabled, toast } from "../lib/remote";
@@ -21,7 +22,7 @@ function monthlyRates(marks: Record<string, Mark>, id: string, dates: string[]) 
 const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 
 const SHARED: SheetDef[] = [
-  { name: "전체 학생 명부", rows: (d) => [["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", homeroomName(d, s.classId), s.status]; })] },
+  { name: "전체 학생 명부", rows: (d) => [["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "상태"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? (c.grade ? gradeShortName(c.grade) : "새친구반") : "", c && c.grade ? c.no : "", homeroomName(d, s.classId), s.status]; })] },
   // 한 사람이 한 줄: 이름·반 옆으로 주일 날짜가 이어지고, 그 아래 칸에 출석 여부
   { name: "학생 주일 출석 원본", rows: (d) => { const dates = yearSundays(d); const list = attendingStudents(d).map((s) => ({ s, c: classOf(d, s) })).sort((a, b) => (a.c ? classLabel(a.c) : "~").localeCompare(b.c ? classLabel(b.c) : "~", "ko") || a.s.name.localeCompare(b.s.name, "ko")); return [["학생", "반", ...dates.map(fmtMD), "출석", "결석", "출석률"], ...list.map(({ s, c }) => { const r = personRate(d.studentMarks, s.id, dates); return [s.name, c ? classLabel(c) : "", ...dates.map((dt) => markText(d.studentMarks[`${dt}|${s.id}`])), r.p, r.a, pctText(r.rate)]; })]; } },
   { name: "반별 출석현황", rows: (d) => [["주일", "반", "전체", "출석", "결석", "미확인", "출석률", "완료"], ...yearSundays(d).flatMap((dt) => d.classes.map((c) => { const s = classSummary(d, dt, c.id); return [dt, classLabel(c), s.total, s.p, s.a, s.u, pctText(s.rate), s.completed ? "완료" : "미완료"]; }))] },
@@ -109,7 +110,7 @@ export function Sheets() {
       <section className="panel" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
         <span className="kpi" style={{ padding: 0, boxShadow: "none" }}><span className="ico warm" style={{ width: 56, height: 56, borderRadius: 28 }}><Icon name="cloud" size={28} /></span></span>
         <div className="col g4 grow">
-          <div className="row g8"><strong className="t-lg b">{y} 초등부 Google Sheets</strong>{ready ? <Badge tone="success">연결됨</Badge> : <Badge tone="warning">연결 필요</Badge>}</div>
+          <div className="row g8"><strong className="t-lg b">{y} {DEPT.name} Google Sheets</strong>{ready ? <Badge tone="success">연결됨</Badge> : <Badge tone="warning">연결 필요</Badge>}</div>
           <span className="muted">교사 공유용 출석대장{s.sheetPrivateId ? " · 관리자 전용 관리자료" : ""} · 마지막 동기화 {fmtRelDay(s.sheetLastSuccess)}</span>
         </div>
         <Button disabled={busy} onClick={sync}>{busy ? "동기화 중…" : "수동 동기화"}</Button>
@@ -136,8 +137,8 @@ export function Sheets() {
           <table className="tbl">
             <thead><tr><th>시트</th><th>행 수</th><th>마지막 동기화</th></tr></thead>
             <tbody>
-              {group(`교사 공유용 · ${y} 초등부 출석대장`, false, SHARED, s.sheetSharedId)}
-              {group(`관리자 전용 · ${y} 초등부 관리자료`, true, PRIVATE, s.sheetPrivateId)}
+              {group(`교사 공유용 · ${y} ${DEPT.name} 출석대장`, false, SHARED, s.sheetSharedId)}
+              {group(`관리자 전용 · ${y} ${DEPT.name} 관리자료`, true, PRIVATE, s.sheetPrivateId)}
             </tbody>
           </table>
         </div>
@@ -179,7 +180,7 @@ export function NotifySettings() {
     <Page title="알림 설정" sub="출석 미완료 푸시 알림의 발송 시간과 결과를 관리합니다">
       <Note warm icon="warning">예약 발송과 기기 푸시는 서버 스케줄러·웹 푸시 키 설정 후 동작합니다. 지금은 수동 재발송으로 앱 안의 알림 목록에 알림을 보낼 수 있습니다.</Note>
       <div className="grid cols-2">
-        {card("학생 출석 미완료 알림 (담당 교사)", s.studentNotifyOn, (v) => updateSettings({ studentNotifyOn: v }), st, setSt, "해당 주일 출석이 완료되지 않은 반의 담당 교사", "주일 출석체크 안내", "1부 4학년 1반의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.", () => { updateSettings({ studentNotifyTime: st }); toast(`발송 시간을 ${fmtTime12(st)}로 저장했습니다.`); }, () => toast(`${fmtDot(date)} 미완료 반 담임 ${sendStudentReminders(date)}명에게 알림을 보냈습니다.`))}
+        {card("학생 출석 미완료 알림 (담당 교사)", s.studentNotifyOn, (v) => updateSettings({ studentNotifyOn: v }), st, setSt, "해당 주일 출석이 완료되지 않은 반의 담당 교사", "주일 출석체크 안내", `1부 ${classLong(GRADES[0], 1)}의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`, () => { updateSettings({ studentNotifyTime: st }); toast(`발송 시간을 ${fmtTime12(st)}로 저장했습니다.`); }, () => toast(`${fmtDot(date)} 미완료 반 담임 ${sendStudentReminders(date)}명에게 알림을 보냈습니다.`))}
         {card("교사 출석 미완료 알림 (부장교사)", s.teacherNotifyOn, (v) => updateSettings({ teacherNotifyOn: v }), tt, setTt, "교사 출석부가 완료되지 않은 부서의 부장교사", "교사 출석체크 안내", "2부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.", () => { updateSettings({ teacherNotifyTime: tt }); toast(`발송 시간을 ${fmtTime12(tt)}로 저장했습니다.`); }, () => toast(`부장교사 ${sendTeacherReminders(date)}명에게 알림을 보냈습니다.`))}
       </div>
       <div className="grid split">
@@ -222,8 +223,10 @@ export function YearSettings() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const dates = yearSundays(d);
-  const lower = d.students.filter((s) => (s.status === "등록" || s.status === "장결자") && [4, 5].includes(classOf(d, s)?.grade ?? 0)).length;
+  const lower = d.students.filter((s) => (s.status === "등록" || s.status === "장결자") && LOWER_GRADES.includes(classOf(d, s)?.grade ?? 0)).length;
   const sixth = pendingGraduates().length;
+  const LAST = gradeName(LAST_GRADE);
+  const LOWER = gradesText(LOWER_GRADES);
   const types = [...new Set(d.audits.map((a) => a.type))];
   const name = (id: string) => d.users.find((u) => u.id === id)?.name ?? "시스템";
   const logs = d.audits.filter((a) => (!type || a.type === type) && (!q.trim() || a.target.includes(q.trim()) || name(a.actorId).includes(q.trim()))).slice(0, 100);
@@ -237,12 +240,12 @@ export function YearSettings() {
         <div className="row g12 wrap"><strong className="t-3xl b">{d.settings.year}학년도</strong><Badge tone="success">운영 중</Badge><span className="muted">{d.settings.year}.01.01 ~ {d.settings.year}.12.31 · 주일 {dates.length} / 52주 진행</span></div>
         <h2 className="mt8">{d.settings.year + 1}학년도 전환 절차</h2>
         <div className="steps">
-          {["백업 받기", "6학년 졸업 처리", "4·5학년 진급 처리", "반 재배정"].map((t, i, all) => <span key={t}><b>{i + 1}</b>{t}{i < all.length - 1 && <Icon name="right" size={14} />}</span>)}
+          {["백업 받기", `${LAST} 졸업 처리`, `${LOWER} 진급 처리`, "반 재배정"].map((t, i, all) => <span key={t}><b>{i + 1}</b>{t}{i < all.length - 1 && <Icon name="right" size={14} />}</span>)}
         </div>
-        <Note>진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다. 6학년을 먼저 졸업 처리해야 5학년이 올라갈 6학년 반이 비워지므로, 졸업 처리 전에는 진급 처리를 할 수 없습니다.</Note>
+        <Note>진급은 되돌리기 어려우므로 실행 전에 반드시 백업 파일을 내려받아 두세요. 출석 기록과 심방노트는 처리 후에도 보존됩니다. {LAST}을 먼저 졸업 처리해야 아래 학년이 올라갈 {LAST} 반이 비워지므로, 졸업 처리 전에는 진급 처리를 할 수 없습니다.</Note>
         <div className="grid cols-3" style={{ gap: 16 }}>
-          {action("users", "6학년 졸업 처리", sixth ? `6학년 ${sixth}명이 남아 있습니다. 학생 관리에서 선택해 심방노트 포함 Excel을 받은 뒤 졸업 처리합니다.` : "졸업 처리할 6학년 학생이 없습니다.", <Link to="/admin/students?grade=6&status=" className="btn outline s">6학년 학생 보기</Link>)}
-          {action("chart", "학생 진급 처리", sixth ? `6학년 ${sixth}명을 먼저 졸업 처리해 주세요.` : `4·5학년 ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower || sixth > 0} onClick={() => window.confirm(`4·5학년 ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>진급 처리</Button>)}
+          {action("users", `${LAST} 졸업 처리`, sixth ? `${LAST} ${sixth}명이 남아 있습니다. 학생 관리에서 선택해 심방노트 포함 Excel을 받은 뒤 졸업 처리합니다.` : `졸업 처리할 ${LAST} 학생이 없습니다.`, <Link to={`/admin/students?grade=${LAST_GRADE}&status=`} className="btn outline s">{LAST} 학생 보기</Link>)}
+          {action("chart", "학생 진급 처리", sixth ? `${LAST} ${sixth}명을 먼저 졸업 처리해 주세요.` : `${LOWER} ${lower}명을 다음 학년의 같은 번호 반으로 진급시킵니다.`, <Button variant="outline" size="s" disabled={!lower || sixth > 0} onClick={() => window.confirm(`${LOWER} ${lower}명을 진급 처리할까요? 되돌리려면 백업 복구가 필요합니다.`) && toast(`${promoteGrades()}명을 진급 처리했습니다.`)}>진급 처리</Button>)}
           {action("grid", "학생 반 재배정", "새 학년도 반 편성에 맞춰 학생과 교사를 배정합니다.", <Link to="/admin/classes" className="btn outline s">반 재배정</Link>)}
           {action("download", "백업 및 복구", `마지막 백업 ${fmtRelDay(d.settings.lastBackup)}. 전체 데이터를 파일로 내려받거나 복구합니다.`, <div className="row g6"><Button variant="outline" size="s" onClick={() => download(`출석관리_백업_${new Date().toISOString().slice(0, 10)}.json`, exportBackup(), "application/json")}>백업 받기</Button><Button variant="outline" size="s" disabled={remoteEnabled} onClick={() => file.current?.click()}>복구</Button></div>)}
         </div>

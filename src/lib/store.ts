@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { classLong, classShort as deptClassShort, gradeName, gradesText, GRADES, GROUPS, LAST_GRADE, LOWER_GRADES } from "../config/dept";
 import { buildSeed, TEMP_PASSWORD } from "./seed";
 import { remote, remoteEnabled, toast } from "./remote";
 import { fmtDot, todayISO } from "./date";
@@ -555,8 +556,8 @@ function pushNotification(n: Omit<AppNotification, "id" | "createdAt" | "read">,
 /** 새친구반: 부마다 하나, 학년 0으로 둔다. 담임 배정·출석체크는 다른 반과 같고 진급·졸업에서는 빠진다. */
 export const isNewFriend = (c?: ClassRoom | null) => c?.grade === 0;
 export const newFriendClassId = (g: 1 | 2) => `g${g}-new`;
-export const classLabel = (c: ClassRoom) => (isNewFriend(c) ? `${c.group}부 새친구반` : `${c.group}부 ${c.grade}학년 ${c.no}반`);
-export const classShort = (c: ClassRoom) => (isNewFriend(c) ? "새친구반" : `${c.grade}-${c.no}반`);
+export const classLabel = (c: ClassRoom) => (isNewFriend(c) ? `${c.group}부 새친구반` : `${c.group}부 ${classLong(c.grade, c.no)}`);
+export const classShort = (c: ClassRoom) => (isNewFriend(c) ? "새친구반" : deptClassShort(c.grade, c.no));
 
 /** 해당 주일 출석이 미완료인 반의 담당 교사에게 앱 알림을 보낸다. classId를 주면 그 반만. */
 export function sendStudentReminders(date: string, classId?: string): number {
@@ -582,7 +583,7 @@ export function sendStudentReminders(date: string, classId?: string): number {
 
 export function sendTeacherReminders(date: string): number {
   let count = 0;
-  for (const g of [1, 2] as const) {
+  for (const g of GROUPS) {
     if (data.sessions[`${date}|group:${g}`]?.completed) continue;
     for (const h of data.users.filter((u) => u.roles.includes("head") && u.group === g && u.active)) {
       pushNotification({ userId: h.id, kind: "teacher", title: "교사 출석체크 안내 (재발송)", body: `${g}부 교사 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`, date }, "수동", `${g}부 교사`);
@@ -746,7 +747,7 @@ export function sameGroupClass(userId: string, classId: string): ClassRoom | nul
 export function assignmentViolations(): { user: User; group: 1 | 2; classes: ClassRoom[] }[] {
   const out: { user: User; group: 1 | 2; classes: ClassRoom[] }[] = [];
   for (const u of data.users) {
-    for (const g of [1, 2] as const) {
+    for (const g of GROUPS) {
       const cls = data.classes.filter((c) => c.group === g && data.assignments.some((a) => a.userId === u.id && a.classId === c.id));
       if (cls.length > 1) out.push({ user: u, group: g, classes: cls });
     }
@@ -926,10 +927,10 @@ export function updateSettings(patch: Partial<Data["settings"]>) {
   emit();
 }
 
-/** 아직 졸업 처리하지 않은 6학년 학생 (등록·장결자) */
-export const pendingGraduates = () => data.students.filter((s) => (s.status === "등록" || s.status === "장결자") && data.classes.find((c) => c.id === s.classId)?.grade === 6);
+/** 아직 졸업 처리하지 않은 마지막 학년 학생 (등록·장결자) */
+export const pendingGraduates = () => data.students.filter((s) => (s.status === "등록" || s.status === "장결자") && data.classes.find((c) => c.id === s.classId)?.grade === LAST_GRADE);
 
-/** 6학년 학생을 졸업 처리한다. 기록(출석·심방노트)은 남고, 학생 목록·출석부·통계에서는 빠진다. */
+/** 마지막 학년 학생을 졸업 처리한다. 기록(출석·심방노트)은 남고, 학생 목록·출석부·통계에서는 빠진다. */
 /** 학생 영구 삭제(관리자 전용). 출석 기록·심방노트도 함께 지워진다. */
 export async function deleteStudent(id: string): Promise<string | null> {
   return deleteStudents([id]);
@@ -961,14 +962,14 @@ export async function deleteStudents(ids: string[]): Promise<string | null> {
 export async function graduateStudents(ids: string[]): Promise<string | null> {
   const picked = data.students.filter((s) => ids.includes(s.id) && s.status !== "졸업");
   if (!picked.length) return "졸업 처리할 학생을 선택해 주세요.";
-  const wrong = picked.filter((s) => data.classes.find((c) => c.id === s.classId)?.grade !== 6);
-  if (wrong.length) return `6학년 학생만 졸업 처리할 수 있습니다. (${wrong.slice(0, 3).map((s) => s.name).join(", ")}${wrong.length > 3 ? ` 외 ${wrong.length - 3}명` : ""})`;
+  const wrong = picked.filter((s) => data.classes.find((c) => c.id === s.classId)?.grade !== LAST_GRADE);
+  if (wrong.length) return `${gradeName(LAST_GRADE)} 학생만 졸업 처리할 수 있습니다. (${wrong.slice(0, 3).map((s) => s.name).join(", ")}${wrong.length > 3 ? ` 외 ${wrong.length - 3}명` : ""})`;
   if (remoteEnabled) {
     const err = await remote.updateIn("students", picked.map((s) => s.id), { status: "졸업" });
     if (err) return /check|constraint/i.test(err) ? "DB에 '졸업' 상태가 아직 추가되지 않았습니다. Supabase SQL Editor에서 안내된 SQL을 먼저 실행해 주세요." : `졸업 처리에 실패했습니다. (${err})`;
   }
   for (const s of picked) s.status = "졸업";
-  audit("졸업 처리", `6학년 ${picked.length}명`, "등록", "졸업");
+  audit("졸업 처리", `${gradeName(LAST_GRADE)} ${picked.length}명`, "등록", "졸업");
   emit();
   return null;
 }
@@ -978,14 +979,16 @@ export function promoteGrades(): number {
   for (const s of data.students) {
     if (s.status !== "등록" && s.status !== "장결자") continue;
     const c = data.classes.find((x) => x.id === s.classId);
-    if (!c || c.grade >= 6) continue;
-    const next = data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1 && x.no === c.no) ?? data.classes.find((x) => x.group === c.group && x.grade === c.grade + 1);
+    if (!c || !c.grade || c.grade >= LAST_GRADE) continue;
+    const up = GRADES[GRADES.indexOf(c.grade) + 1];
+    if (!up) continue;
+    const next = data.classes.find((x) => x.group === c.group && x.grade === up && x.no === c.no) ?? data.classes.find((x) => x.group === c.group && x.grade === up);
     if (!next) continue;
     s.classId = next.id;
     remote.upsert("students", s);
     n++;
   }
-  audit("진급 처리", `4·5학년 ${n}명`, "현재 학년", "다음 학년");
+  audit("진급 처리", `${gradesText(LOWER_GRADES)} ${n}명`, "현재 학년", "다음 학년");
   emit();
   return n;
 }

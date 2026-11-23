@@ -1,5 +1,11 @@
 // 데모 모드용 예시 데이터. 실제 인물이 아닌 가상의 이름·연락처다.
 import { addWeeks, currentSunday, sundaysOfYear, ym } from "./date";
+import { classLong, classShort, GRADES, GROUPS } from "../config/dept";
+
+// 데모 데이터는 부서의 앞 세 학년으로 만든다 (초등부: 4·5·6학년)
+const SG = [0, 1, 2].map((i) => GRADES[Math.min(i, GRADES.length - 1)]);
+/** 초등부 기준으로 적은 반 id("g1-4-1")를 이 부서의 반 id로 바꾼다 */
+const cid = (k: string) => { const [, g, gr, no] = k.match(/^g(\d)-(\d)-(\d)$/)!; return `g${g}-${SG[+gr - 4]}-${no}`; };
 import type { Assignment, ClassRoom, Data, Mark, Role, Student, User } from "./types";
 
 export const DEMO_PASSWORD = "demo1234";
@@ -32,11 +38,11 @@ export function buildSeed(): Data {
     "2": [7, 8, 7, 7, 7, 6, 6, 7, 7],
   };
   const classes: ClassRoom[] = [];
-  for (const g of [1, 2] as const)
-    for (const grade of [4, 5, 6])
+  for (const g of GROUPS)
+    for (const grade of SG)
       for (let no = 1; no <= (g === 1 ? 4 : 3); no++) classes.push({ id: `g${g}-${grade}-${no}`, group: g, grade, no, capacity: 10 });
   // 새친구반 (학년 0): 기존 반 순서를 흐트리지 않도록 뒤에 붙인다
-  for (const g of [1, 2] as const) classes.push({ id: `g${g}-new`, group: g, grade: 0, no: 1, capacity: 10 });
+  for (const g of GROUPS) classes.push({ id: `g${g}-new`, group: g, grade: 0, no: 1, capacity: 10 });
 
   // ── 사용자 ──
   const users: User[] = [];
@@ -69,13 +75,13 @@ export function buildSeed(): Data {
   });
   const moon = mkUser("teacher_moon02", "문지영", ["teacher"], 1);
   // 같은 부에서는 한 반만, 다른 부의 반은 하나 더 맡을 수 있다 (1부 4-1반 · 2부 5-2반 보조)
-  assignments.push({ userId: moon.id, classId: "g1-4-1", kind: "보조" }, { userId: moon.id, classId: "g2-5-2", kind: "보조" });
+  assignments.push({ userId: moon.id, classId: cid("g1-4-1"), kind: "보조" }, { userId: moon.id, classId: cid("g2-5-2"), kind: "보조" });
   const baek = mkUser("teacher_baek16", "백승호", ["teacher"], 1, { pushAllowed: false });
-  assignments.push({ userId: baek.id, classId: "g1-6-2", kind: "보조" });
+  assignments.push({ userId: baek.id, classId: cid("g1-6-2"), kind: "보조" });
   const hwang = mkUser("teacher_hwang17", "황보람", ["teacher"], 2);
-  assignments.push({ userId: hwang.id, classId: "g2-4-1", kind: "보조" });
+  assignments.push({ userId: hwang.id, classId: cid("g2-4-1"), kind: "보조" });
   const woo = mkUser("teacher_woo18", "우다인", ["teacher"], 2);
-  assignments.push({ userId: woo.id, classId: "g2-5-1", kind: "보조" });
+  assignments.push({ userId: woo.id, classId: cid("g2-5-1"), kind: "보조" });
   assignments.push({ userId: mkUser("teacher_new21", "나새롬", ["teacher"], 1).id, classId: "g1-new", kind: "담임" });
   assignments.push({ userId: mkUser("teacher_new22", "반가람", ["teacher"], 2).id, classId: "g2-new", kind: "담임" });
   mkUser("teacher_hong19", "홍기태", ["teacher", "admin"], 2, {
@@ -95,7 +101,7 @@ export function buildSeed(): Data {
     const n = c.grade === 0 ? 4 : sizes[String(c.group)][byGroup(c.group).indexOf(c)];
     for (let i = 0; i < n; i++) {
       let name: string;
-      if (c.id === "g1-4-1") name = firstClass[i];
+      if (c.id === cid("g1-4-1")) name = firstClass[i];
       else {
         do name = SUR[Math.floor(r() * SUR.length)] + GIV[Math.floor(r() * GIV.length)];
         while (used.has(name));
@@ -116,9 +122,9 @@ export function buildSeed(): Data {
   }
   const find = (name: string) => students.find((s) => s.name === name)!;
   // 상태 예시: 장결자 2명, 교회이동 1명 (출석 명단에서는 빠진다)
-  students.filter((s) => s.classId === "g1-6-1").slice(-1).forEach((s) => (s.status = "장결자"));
-  students.filter((s) => s.classId === "g2-5-2").slice(-1).forEach((s) => (s.status = "장결자"));
-  students.filter((s) => s.classId === "g2-6-3").slice(-1).forEach((s) => (s.status = "교회이동"));
+  students.filter((s) => s.classId === cid("g1-6-1")).slice(-1).forEach((s) => (s.status = "장결자"));
+  students.filter((s) => s.classId === cid("g2-5-2")).slice(-1).forEach((s) => (s.status = "장결자"));
+  students.filter((s) => s.classId === cid("g2-6-3")).slice(-1).forEach((s) => (s.status = "교회이동"));
   find("박지호").phone = "010-2345-6789";
   find("박지호").guardianPhone = "010-9876-5432";
   find("박지호").guardianRel = "모";
@@ -140,15 +146,15 @@ export function buildSeed(): Data {
       // 이번 주일의 진행 상황: 일부 반은 미완료
       let mode: "done" | "partial" | "none" = "done";
       if (isCur) {
-        if (["g1-4-1", "g1-5-3", "g2-6-1"].includes(c.id)) mode = "partial";
-        else if (["g1-6-2", "g2-4-2"].includes(c.id)) mode = "none";
+        if ([cid("g1-4-1"), cid("g1-5-3"), cid("g2-6-1")].includes(c.id)) mode = "partial";
+        else if ([cid("g1-6-2"), cid("g2-4-2")].includes(c.id)) mode = "none";
       }
       if (mode === "none") continue;
       roster.forEach((s, i) => {
         // 미완료 반은 3명을 미확인으로 남긴다
-        if (mode === "partial" && (c.id === "g1-4-1" ? ["윤채원", "임시우", "한도윤"].includes(s.name) : i >= roster.length - 3)) return;
+        if (mode === "partial" && (c.id === cid("g1-4-1") ? ["윤채원", "임시우", "한도윤"].includes(s.name) : i >= roster.length - 3)) return;
         let m: Mark = r() < rate.get(s.id)! ? "P" : "A";
-        if (c.id === "g1-4-1" && isCur) m = "P";
+        if (c.id === cid("g1-4-1") && isCur) m = "P";
         if (s.name === "박지호" && lastThree.includes(date)) m = "A";
         if (s.name === "임시우" && prevTwo.includes(date)) m = "A";
         // 새친구반: 앞의 두 명은 최근 3주 연속 출석(반 배정 대상), 나머지는 최근 결석 섞음
@@ -157,7 +163,7 @@ export function buildSeed(): Data {
       });
       sessions[`${date}|class:${c.id}`] = { completed: mode === "done", savedAt: at(date, mode === "done" ? "12:2" + (c.no % 10) : "12:48"), savedBy: homeroomOf(c.id) };
     }
-    for (const g of [1, 2] as const) {
+    for (const g of GROUPS) {
       if (isCur && g === 2) continue; // 2부 교사 출석은 아직 입력 전
       const list = teachers.filter((t) => t.group === g);
       list.forEach((t, i) => {
@@ -179,7 +185,7 @@ export function buildSeed(): Data {
     { id: "n4", studentId: find("강하준").id, date: addWeeks(cur, -1), reason: null, content: "요즘 예배 태도가 좋아짐. 다음 달 찬양팀 권유해 보기로 함.", authorId: kim.id, createdAt: at(addWeeks(cur, -1), "13:20") },
   ];
   const jang = users.find((u) => u.name === "장미래")!;
-  const jangStudent = students.find((s) => s.classId === "g2-4-2")!;
+  const jangStudent = students.find((s) => s.classId === cid("g2-4-2"))!;
   notes.push({ id: "n5", studentId: jangStudent.id, date: addWeeks(cur, -1), reason: "늦잠", content: "늦잠으로 결석. 다음 주 함께 오기로 약속.", authorId: jang.id, createdAt: at(addWeeks(cur, -1), "12:52") });
 
   // 최고 관리자의 심방 답변 예시
@@ -188,7 +194,7 @@ export function buildSeed(): Data {
   Object.assign(notes[0], { reply: "빨리 낫도록 기도하겠습니다. 다음 주에도 못 나오면 제게 알려 주세요. 함께 심방 가겠습니다.", replyBy: pastor.id, replyAt: at(cur, "16:20") });
 
   // ── 알림 ──
-  const body = "1부 4학년 1반의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.";
+  const body = `1부 ${classLong(SG[0], 1)}의 출석체크가 완료되지 않았습니다. 출석 등록을 부탁드립니다.`;
   const park = users.find((u) => u.loginId === "head_park01")!;
   const notifications: Data["notifications"] = [
     { id: "nt-msg3", userId: kim.id, kind: "message", title: "새 메세지가 도착했습니다", body: "[겨울 성경학교 준비 미션] 선생님, 이번 겨울 성경학교에서 반별 율동을 맡아 주세요.", date: cur, createdAt: at(cur, "17:10"), read: false, link: "/t/messages/msg3" },
@@ -201,15 +207,15 @@ export function buildSeed(): Data {
   const kang = users.find((u) => u.name === "강유진")!;
   const noh = users.find((u) => u.name === "노경민")!;
   const notifLogs: Data["notifLogs"] = [
-    { id: "l1", at: at(cur, "15:00"), mode: "자동", userId: kim.id, target: "1부 4학년 1반", result: "성공" },
-    { id: "l2", at: at(cur, "15:00"), mode: "자동", userId: yoon.id, target: "1부 5학년 3반", result: "성공" },
-    { id: "l3", at: at(cur, "15:00"), mode: "자동", userId: kang.id, target: "1부 6학년 2반", result: "성공" },
-    { id: "l4", at: at(cur, "15:00"), mode: "자동", userId: jang.id, target: "2부 4학년 2반", result: "실패" },
-    { id: "l5", at: at(cur, "15:00"), mode: "자동", userId: noh.id, target: "2부 6학년 1반", result: "권한 미허용" },
+    { id: "l1", at: at(cur, "15:00"), mode: "자동", userId: kim.id, target: `1부 ${classLong(SG[0], 1)}`, result: "성공" },
+    { id: "l2", at: at(cur, "15:00"), mode: "자동", userId: yoon.id, target: `1부 ${classLong(SG[1], 3)}`, result: "성공" },
+    { id: "l3", at: at(cur, "15:00"), mode: "자동", userId: kang.id, target: `1부 ${classLong(SG[2], 2)}`, result: "성공" },
+    { id: "l4", at: at(cur, "15:00"), mode: "자동", userId: jang.id, target: `2부 ${classLong(SG[0], 2)}`, result: "실패" },
+    { id: "l5", at: at(cur, "15:00"), mode: "자동", userId: noh.id, target: `2부 ${classLong(SG[2], 1)}`, result: "권한 미허용" },
   ];
   const audits: Data["audits"] = [
     { id: "a1", at: at(cur, "12:52"), actorId: kim.id, type: "학생 출석", target: `박지호 · ${ym(cur).m}/${ym(cur).d} 출석부`, before: "미확인", after: "결석" },
-    { id: "a2", at: at(addWeeks(cur, -1), "18:20"), actorId: "u_admin_lee01", type: "교사 배정", target: "문지영", before: "4학년 1반 보조", after: "1부 4-1반 · 2부 5-2반 보조" },
+    { id: "a2", at: at(addWeeks(cur, -1), "18:20"), actorId: "u_admin_lee01", type: "교사 배정", target: "문지영", before: `${classLong(SG[0], 1)} 보조`, after: `1부 ${classShort(SG[0], 1)} · 2부 ${classShort(SG[1], 2)} 보조` },
     { id: "a3", at: at(addWeeks(cur, -1), "09:31"), actorId: "u_admin_lee01", type: "비밀번호 초기화", target: "teacher_hong19", before: "-", after: "임시 비밀번호 발급" },
   ];
 

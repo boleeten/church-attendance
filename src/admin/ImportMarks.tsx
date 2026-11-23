@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { parseGrade } from "../config/dept";
 import { fmtDot } from "../lib/date";
 import { toast } from "../lib/remote";
 import { parseCSV, yearSundays } from "../lib/stats";
@@ -74,12 +75,12 @@ function buildPreview(d: Data, table: string[][], fileName: string): Preview | s
     // 이름이 같은 학생이 여럿이면 그룹·학년·반으로 고른다 (졸업·장결 학생도 찾는다)
     let cands: Student[] = d.students.filter((s) => s.name.replace(/\s/g, "") === name.replace(/\s/g, ""));
     if (cands.length > 1) {
-      const g = digits(r[ci.g]), gr = digits(r[ci.gr]), no = digits(r[ci.no]);
+      const g = digits(r[ci.g]), gr = parseGrade(r[ci.gr]), no = digits(r[ci.no]);
       const nf = /새친구/.test(`${r[ci.gr] ?? ""}${r[ci.no] ?? ""}`);
       const byClass = cands.filter((s) => {
         const c = d.classes.find((x) => x.id === s.classId);
         if (!c) return false;
-        return String(c.group) === g && (nf ? c.grade === 0 : String(c.grade) === gr && String(c.no) === no);
+        return String(c.group) === g && (nf ? c.grade === 0 : c.grade === gr && String(c.no) === no);
       });
       if (byClass.length) cands = byClass;
     }
