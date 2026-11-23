@@ -40,7 +40,7 @@ export function History({ mode }: { mode: "student" | "teacher" }) {
       else if (m === "A") a++;
       else un++;
     }
-  const rate = pct(p, a);
+  const rate = pct(p, a, p + a + un);
   const incomplete = monthPast.filter((x) => !sessionDone(x));
   const provisional = incomplete.length > 0;
   const wi = dates.indexOf(week);

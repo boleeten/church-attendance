@@ -1,7 +1,8 @@
 import { currentSunday, sundaysOfYear } from "./date";
 import { attendsClass, isEnrolled, type ClassRoom, type Data, type Mark, type Student, type User } from "./types";
 
-export const pct = (p: number, a: number): number | null => (p + a === 0 ? null : Math.round((p / (p + a)) * 100));
+/** 출석률 = 출석 ÷ 전체 인원 (미확인은 결석으로 친다). 아직 아무도 체크하지 않았으면 null("-") */
+export const pct = (p: number, a: number, total: number): number | null => (p + a === 0 || !total ? null : Math.round((p / total) * 100));
 export const pctText = (v: number | null) => (v === null ? "-" : `${v}%`);
 
 /** 올해 1월 첫 주일부터 이번 주일까지 */
@@ -27,7 +28,7 @@ export interface Summary {
 function summarize(marks: (Mark | undefined)[], completed: boolean, started: boolean): Summary {
   const p = marks.filter((m) => m === "P").length;
   const a = marks.filter((m) => m === "A").length;
-  return { total: marks.length, p, a, u: marks.length - p - a, completed, started, rate: pct(p, a) };
+  return { total: marks.length, p, a, u: marks.length - p - a, completed, started, rate: pct(p, a, marks.length) };
 }
 
 export function classSummary(d: Data, date: string, classId: string): Summary {

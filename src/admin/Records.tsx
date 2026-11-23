@@ -13,7 +13,7 @@ import { classOf, GroupBar, groupStudents, newFriendStudents, incompleteClasses,
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
 
-/** 기간 동안의 출석 수(연인원)와 전체 인원(학생 수 × 주일 수), 출석률(출석 ÷ 출석+결석) */
+/** 기간 동안의 출석 수(연인원)와 전체 인원(학생 수 × 주일 수), 출석률(출석 ÷ 전체, 미확인은 결석으로 친다) */
 function countOver(marks: Record<string, Mark>, ids: string[], dates: string[]) {
   let p = 0;
   let a = 0;
@@ -23,7 +23,7 @@ function countOver(marks: Record<string, Mark>, ids: string[], dates: string[]) 
       if (m === "P") p++;
       else if (m === "A") a++;
     }
-  return { p, a, total: ids.length * dates.length, rate: pct(p, a) };
+  return { p, a, total: ids.length * dates.length, rate: pct(p, a, ids.length * dates.length) };
 }
 const num = (n: number) => n.toLocaleString("ko-KR");
 /** "출석 78 / 95명" */
@@ -207,7 +207,7 @@ export function Stats() {
           const marks = range.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
           const p = marks.filter((x) => x === "P").length;
           const a = marks.filter((x) => x === "A").length;
-          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a))];
+          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
         }),
       ]),
     );
@@ -495,7 +495,7 @@ function staffSummary(d: Data, date: string, list: User[]) {
   const marks = list.map((u) => d.teacherMarks[`${date}|${u.id}`]);
   const p = marks.filter((x) => x === "P").length;
   const a = marks.filter((x) => x === "A").length;
-  return { total: list.length, p, a, u: list.length - p - a, rate: pct(p, a) };
+  return { total: list.length, p, a, u: list.length - p - a, rate: pct(p, a, list.length) };
 }
 
 export function TeacherAttendance() {
