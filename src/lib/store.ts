@@ -4,7 +4,7 @@ import { remote, remoteEnabled, toast } from "./remote";
 import { fmtDot, todayISO } from "./date";
 import { blobToDataUrl } from "./image";
 import { formatPhone } from "./phone";
-import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type Role, type Student, type StudentStatus, type User } from "./types";
+import { attendsClass, type MessageLink, type TeacherMessage, type AppNotification, type AssignKind, type ClassRoom, type Data, type Mark, type Note, type NoteComment, type Role, type Student, type StudentStatus, type User } from "./types";
 
 const DATA_KEY = "ca-demo-v14";
 const SESSION_KEY = "ca-session";
@@ -447,6 +447,83 @@ export function replyNote(id: string, text: string | null): string | null {
   return null;
 }
 
+// ───────── 심방노트 대화 ─────────
+/** 노트를 볼 수 있는(=대화에 글을 쓸 수 있는) 사람: 최고 관리자, 그 학생 반을 맡은 교사 */
+export function canTalkOnNote(noteId: string, uid_: string | null = userId): boolean {
+  const me = data.users.find((u) => u.id === uid_);
+  const n = data.notes.find((x) => x.id === noteId);
+  if (!me || !n) return false;
+  if (me.roles.includes("super")) return true;
+  const s = data.students.find((x) => x.id === n.studentId);
+  return !!s && data.assignments.some((a) => a.userId === me.id && a.classId === s.classId);
+}
+
+/** 대화에 글을 남긴다. 목사님 글은 노트 작성 교사에게, 교사 글은 목사님(최고 관리자)에게 알림이 간다. */
+export function addNoteComment(noteId: string, text: string): string | null {
+  const me = data.users.find((u) => u.id === userId);
+  const n = data.notes.find((x) => x.id === noteId);
+  const body = text.trim();
+  if (!me || !n) return "심방노트를 찾을 수 없습니다.";
+  if (!body) return "내용을 입력해 주세요.";
+  if (body.length > 1000) return "1000자까지 쓸 수 있습니다.";
+  if (!canTalkOnNote(noteId)) return "이 심방노트에 글을 쓸 권한이 없습니다.";
+  const row: NoteComment = { id: uid(), noteId, authorId: me.id, body, createdAt: now() };
+  (data.comments ??= []).push(row);
+  remote.insert("note_comments", row);
+  const s = data.students.find((x) => x.id === n.studentId);
+  const pastor = me.roles.includes("super");
+  const author = data.users.find((u) => u.id === n.authorId);
+  if (pastor && author && author.active && author.id !== me.id) {
+    const note: AppNotification = {
+      id: uid(),
+      userId: author.id,
+      kind: "reply",
+      title: "심방노트에 답변이 왔습니다",
+      body: `[${s?.name ?? "학생"}] ${me.title ?? me.name}: ${body.length > 60 ? body.slice(0, 60) + "…" : body}`,
+      date: n.date,
+      createdAt: now(),
+      read: false,
+      link: `/t/students/${n.studentId}#note-${n.id}`,
+    };
+    data.notifications.unshift(note);
+    remote.insert("notifications", note);
+    if (remoteEnabled) void remote.api("push-reminders", "POST", { reply: n.id, text: body });
+  }
+  // 교사 답글 → 목사님 휴대폰으로 푸시
+  if (!pastor && remoteEnabled) void remote.api("push-reminders", "POST", { comment: row.id });
+  audit(pastor ? "심방 답변" : "심방 답글", `${s?.name ?? "-"} · ${fmtDot(n.date)} 심방노트`, "-", body.length > 40 ? body.slice(0, 40) + "…" : body);
+  emit();
+  return null;
+}
+
+/** 내가 쓴 대화 글을 고치거나(text) 지운다(null). 예전 방식 답변('r-'로 시작하고 표에 없는 글)은 답변 칸을 고친다. */
+export function editNoteComment(id: string, text: string | null): string | null {
+  const list = data.comments ?? [];
+  const c = list.find((x) => x.id === id);
+  if (!c) {
+    const noteId = id.startsWith("r-") ? id.slice(2) : "";
+    return noteId ? replyNote(noteId, text) : "글을 찾을 수 없습니다.";
+  }
+  if (c.authorId !== userId) return "내가 쓴 글만 고칠 수 있습니다.";
+  const n = data.notes.find((x) => x.id === c.noteId);
+  const s = n ? data.students.find((x) => x.id === n.studentId) : undefined;
+  const where = `${s?.name ?? "-"} · ${n ? fmtDot(n.date) : ""} 심방노트`;
+  if (text === null) {
+    data.comments = list.filter((x) => x.id !== id);
+    remote.remove("note_comments", { id });
+    audit("심방 대화 삭제", where, c.body.slice(0, 40), "-");
+  } else {
+    const body = text.trim();
+    if (!body) return "내용을 입력해 주세요.";
+    audit("심방 대화 수정", where, c.body.slice(0, 40), body.slice(0, 40));
+    c.body = body;
+    c.updatedAt = now();
+    remote.update("note_comments", { id }, { body, updatedAt: c.updatedAt });
+  }
+  emit();
+  return null;
+}
+
 // ───────── 알림 ─────────
 export function markRead(id: string) {
   const n = data.notifications.find((x) => x.id === id);
@@ -752,7 +829,7 @@ export function accountRecords(userId: string): string[] {
   if (!userId) return out;
   const marks = Object.keys(data.teacherMarks).filter((k) => k.endsWith(`|${userId}`)).length;
   if (marks) out.push(`교사 출석 기록 ${marks}건`);
-  const notes = data.notes.filter((n) => n.authorId === userId || (!!n.replyBy && n.replyBy === userId)).length;
+  const notes = data.notes.filter((n) => n.authorId === userId || (!!n.replyBy && n.replyBy === userId)).length + (data.comments ?? []).filter((c) => c.authorId === userId).length;
   if (notes) out.push(`심방노트·답변 ${notes}건`);
   const saved = Object.values(data.sessions).filter((x) => x.savedBy === userId).length;
   if (saved) out.push(`출석부 저장 ${saved}건`);

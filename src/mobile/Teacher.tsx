@@ -13,6 +13,8 @@ import { PasswordForm } from "./Auth";
 import { InboxMenuRow, MessagePopup } from "./Messages";
 import { visibleNotifications } from "../lib/messages";
 import { formatPhone } from "../lib/phone";
+import { noteStatus } from "../lib/notes";
+import { NoteThread } from "../ui/NoteThread";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
@@ -394,23 +396,17 @@ export function StudentDetail() {
         </div>
         {notes.length === 0 && <p className="card pad muted" style={{ textAlign: "center" }}>작성된 심방노트가 없습니다.</p>}
         {notes.map((n) => {
-          const by = n.replyBy ? d.users.find((x) => x.id === n.replyBy) : undefined;
+          const st = noteStatus(d, n);
           return (
             <div key={n.id} id={`note-${n.id}`} className={`card pad col g8 ${hash === `#note-${n.id}` ? "flash" : ""}`}>
               <div className="row g8">
                 {n.reason && <Badge tone="error">{n.reason}</Badge>}
                 <span className="t-xs muted grow">{fmtDot(n.date)}</span>
-                {n.reply && <Badge tone="info">답변 완료</Badge>}
+                {st !== "wait" && <Badge tone="info">답변 완료</Badge>}
               </div>
               <p style={{ lineHeight: 1.5 }}>{n.content || "(내용 없음)"}</p>
               <span className="t-xs muted">{d.users.find((x) => x.id === n.authorId)?.name ?? "-"} · {fmtStamp(n.createdAt)}</span>
-              {n.reply && (
-                <div className="reply">
-                  <span className="row g6 t-xs sb c-primary"><Icon name="note" size={14} />{by ? `${by.title ?? ""} ${by.name}`.trim() : "관리자"}의 답변</span>
-                  <p style={{ lineHeight: 1.5 }}>{n.reply}</p>
-                  {n.replyAt && <span className="t-xs muted">{fmtStamp(n.replyAt)}</span>}
-                </div>
-              )}
+              <NoteThread note={n} compose />
             </div>
           );
         })}

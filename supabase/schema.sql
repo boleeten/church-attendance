@@ -447,3 +447,31 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from teacher_message_recipients r join profiles p on p.id = r.user_id where r.message_id = mid and r.user_id = auth.uid() and r.deleted_at is null and p.active);
 $$;
 
+-- ───────── 심방노트 대화 (2026-11-23) ─────────
+
+create table if not exists public.note_comments (
+  id text primary key,
+  note_id text not null references public.visit_notes (id) on delete cascade,
+  author_id uuid not null references public.profiles (id),
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+create index if not exists note_comments_note_idx on public.note_comments (note_id, created_at);
+alter table public.note_comments enable row level security;
+
+-- 그 심방노트를 볼 수 있는 사람인지 (관리자 또는 그 학생 반 교사)
+create or replace function public.sees_note(nid text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select is_admin() or exists (select 1 from visit_notes n where n.id = nid and teaches_student(n.student_id));
+$$;
+
+drop policy if exists ncom_read on public.note_comments;
+create policy ncom_read on public.note_comments for select to authenticated using (sees_note(note_id));
+drop policy if exists ncom_insert on public.note_comments;
+create policy ncom_insert on public.note_comments for insert to authenticated
+  with check (author_id = auth.uid() and is_member() and (has_role('super') or exists (select 1 from visit_notes n where n.id = note_id and teaches_student(n.student_id))));
+drop policy if exists ncom_update on public.note_comments;
+create policy ncom_update on public.note_comments for update to authenticated using (author_id = auth.uid()) with check (author_id = auth.uid());
+drop policy if exists ncom_delete on public.note_comments;
+create policy ncom_delete on public.note_comments for delete to authenticated using (author_id = auth.uid());

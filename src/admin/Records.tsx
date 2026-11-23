@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtDot, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { remoteEnabled, toast } from "../lib/remote";
 import { activeStudents, attendingStudents, allStaff, classSummary, consecutiveAbsences, download, homeroomName, pct, pctText, personRate, roster, studentsSummary, teacherDuty, toCSV, yearSundays } from "../lib/stats";
-import { classLabel, classShort, replyNote, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
+import { addNoteComment, classLabel, classShort, saveSession, setStudentMark, setTeacherMark, useData, useMe } from "../lib/store";
 import { REASONS, type ClassRoom, type Data, type Mark, type Note as VisitNote, type Student, type User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, MarkDot, Modal, Note, PhotoAvatar, Progress, Seg, Toggle } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 import { ImportMarksButton } from "./ImportMarks";
+import { authorLabel, CONFIRM_REPLY, lastIsConfirm, lastPastorReply, noteStatus, threadText } from "../lib/notes";
+import { NoteThread } from "../ui/NoteThread";
 import { classOf, GroupBar, groupStudents, newFriendStudents, incompleteClasses, Kpi, SelectBox, StudentDetailModal } from "./Manage";
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
@@ -294,13 +296,10 @@ export function Stats() {
 }
 
 // ───────── A07 심방노트 관리 ─────────
-/** '확인' 버튼으로 보내는 기본 답변 */
-const CONFIRM_REPLY = "심방내용 확인했습니다";
-
-/** 확인 답변 보내기: 이미 답변이 있으면 보내지 않는다 (두 번 눌러도 한 번만) */
-function confirmNote(note: VisitNote, by: string): boolean {
-  if (note.reply) return false;
-  const err = replyNote(note.id, CONFIRM_REPLY);
+/** 확인 답변 보내기: 마지막 글이 이미 목사님 글이면 보내지 않는다 (두 번 눌러도 한 번만) */
+function confirmNote(d: Data, note: VisitNote, by: string): boolean {
+  if (noteStatus(d, note) === "done") return false;
+  const err = addNoteComment(note.id, CONFIRM_REPLY);
   if (err) { toast(err, "error"); return false; }
   toast(`${by} 선생님에게 "${CONFIRM_REPLY}" 답변을 보냈습니다.`);
   return true;
@@ -321,7 +320,8 @@ export function Notes() {
   const view = d.notes.find((n) => n.id === viewId) ?? null;
   const me = useMe()!;
   const canReply = me.roles.includes("super");
-  const waiting = d.notes.filter((n) => !n.reply).length;
+  const waiting = d.notes.filter((n) => noteStatus(d, n) === "wait").length;
+  const fresh = d.notes.filter((n) => noteStatus(d, n) === "new").length;
   const info = (n: VisitNote) => {
     const s = d.students.find((x) => x.id === n.studentId);
     const c = s ? classOf(d, s) : undefined;
@@ -329,9 +329,9 @@ export function Notes() {
   };
   const rows = d.notes
     .map((n) => ({ n, ...info(n) }))
-    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!classId || c?.id === classId) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && (!replied || (replied === "done" ? !!n.reply : !n.reply)) && n.date >= from && n.date <= to);
+    .filter(({ n, s, c }) => (!q.trim() || s?.name.includes(q.trim())) && (!group || String(c?.group) === group) && (!classId || c?.id === classId) && (!reason || (reason === "없음" ? !n.reason : n.reason === reason)) && (!author || n.authorId === author) && (!replied || noteStatus(d, n) === replied) && n.date >= from && n.date <= to);
   const authors = [...new Set(d.notes.map((n) => n.authorId))].map((id) => d.users.find((u) => u.id === id)).filter(Boolean) as User[];
-  const exportCsv = () => download(`심방노트_${from}_${to}.csv`, toCSV([["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...rows.map(({ n, s, c, by }) => [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, by, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""])]));
+  const exportCsv = () => download(`심방노트_${from}_${to}.csv`, toCSV([["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변·답글 (대화 순서대로)", "마지막 답변자", "마지막 답변 시각"], ...rows.map(({ n, s, c, by }) => [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, by, fmtStamp(n.createdAt), threadText(d, n), (() => { const r = lastPastorReply(d, n); return r ? authorLabel(d, r.authorId) : ""; })(), (() => { const r = lastPastorReply(d, n); return r ? fmtStamp(r.createdAt) : ""; })()])]));
   return (
     <Page title="심방노트 관리" sub="결석 사유와 심방 이력을 검색·조회합니다">
       <section className="panel filter-panel">
@@ -342,7 +342,7 @@ export function Notes() {
           <SelectBox label="반" value={classId} onChange={setClassId}><option value="">반: 전체</option>{d.classes.filter((c) => !group || String(c.group) === group).map((c) => <option key={c.id} value={c.id}>반: {classLabel(c)}</option>)}</SelectBox>
           <SelectBox label="결석 사유" value={reason} onChange={setReason}><option value="">결석 사유: 전체</option>{REASONS.map((r) => <option key={r} value={r}>결석 사유: {r}</option>)}<option value="없음">결석 사유: 없음 (일반 노트)</option></SelectBox>
           <SelectBox label="작성자" value={author} onChange={setAuthor}><option value="">작성자: 전체</option>{authors.map((u) => <option key={u.id} value={u.id}>작성자: {u.name}</option>)}</SelectBox>
-          <SelectBox label="답변" value={replied} onChange={setReplied}><option value="">답변: 전체</option><option value="wait">답변: 대기 ({waiting})</option><option value="done">답변: 완료</option></SelectBox>
+          <SelectBox label="답변" value={replied} onChange={setReplied}><option value="">답변: 전체</option><option value="wait">답변: 대기 ({waiting})</option><option value="new">답변: 새 답글 ({fresh})</option><option value="done">답변: 완료</option></SelectBox>
         </div>
       </section>
       <section className="panel">
@@ -358,11 +358,18 @@ export function Notes() {
                   <td>{n.reason ? <Badge tone="error">{n.reason}</Badge> : <span className="muted">-</span>}</td>
                   <td className="wraptext">{n.content || "(내용 없음)"}</td>
                   <td>{by}</td><td className="muted num">{fmtStamp(n.createdAt)}</td>
-                  <td>{n.reply ? <Badge tone="info">답변 완료</Badge> : <Badge>대기</Badge>}</td>
+                  <td>{(() => { const st = noteStatus(d, n); return st === "new" ? <Badge tone="error">새 답글</Badge> : st === "done" ? <Badge tone="info">답변 완료</Badge> : <Badge>대기</Badge>; })()}</td>
                   <td>
                     <span className="row g6">
-                      <Button variant={canReply && !n.reply ? "primary" : "outline"} size="s" onClick={() => setViewId(n.id)}>{canReply && !n.reply ? "답변" : "보기"}</Button>
-                      {canReply && <Button variant="outline" size="s" disabled={!!n.reply} title={n.reply ? "이미 답변한 노트입니다" : `"${CONFIRM_REPLY}" 답변을 보냅니다`} onClick={() => confirmNote(n, by)}>{n.reply === CONFIRM_REPLY ? "확인됨" : "확인"}</Button>}
+                      {(() => {
+                        const st = noteStatus(d, n);
+                        return (
+                          <>
+                            <Button variant={canReply && st !== "done" ? "primary" : "outline"} size="s" onClick={() => setViewId(n.id)}>{canReply && st !== "done" ? "답변" : "보기"}</Button>
+                            {canReply && <Button variant="outline" size="s" disabled={st === "done"} title={st === "done" ? "이미 답변한 노트입니다" : `"${CONFIRM_REPLY}" 답변을 보냅니다`} onClick={() => confirmNote(d, n, by)}>{lastIsConfirm(d, n) ? "확인됨" : "확인"}</Button>}
+                          </>
+                        );
+                      })()}
                     </span>
                   </td>
                 </tr>
@@ -433,26 +440,24 @@ function PeriodBox({ from, to, year, onChange }: { from: string; to: string; yea
 function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; info: { s?: Student; c?: ClassRoom; by: string }; canReply: boolean; onClose: () => void }) {
   const d = useData();
   const { s, c, by } = info;
-  const [editing, setEditing] = useState(canReply && !note.reply);
-  const [text, setText] = useState(note.reply ?? "");
-  const replier = d.users.find((u) => u.id === note.replyBy);
-  const save = (value: string | null) => {
-    const err = replyNote(note.id, value);
+  const [text, setText] = useState("");
+  const st = noteStatus(d, note);
+  const send = () => {
+    const err = addNoteComment(note.id, text);
     if (err) return toast(err, "error");
-    toast(value ? `${by} 선생님에게 답변을 보냈습니다.` : "답변을 삭제했습니다.");
-    setEditing(false);
-    if (!value) setText("");
+    toast(`${by} 선생님에게 답변을 보냈습니다.`);
+    setText("");
   };
   return (
     <Modal
       title="심방노트"
       onClose={onClose}
       footer={
-        editing ? (
+        canReply ? (
           <>
-            <Button variant="outline" onClick={() => (note.reply ? (setEditing(false), setText(note.reply)) : onClose())}>취소</Button>
-            {!note.reply && <Button variant="secondary" disabled={!!note.reply} onClick={() => { if (confirmNote(note, by)) { setEditing(false); setText(CONFIRM_REPLY); } }}>확인</Button>}
-            <Button disabled={!text.trim()} onClick={() => save(text)}>{note.reply ? "수정해서 보내기" : "답변 보내기"}</Button>
+            <Button variant="outline" onClick={onClose}>취소</Button>
+            <Button variant="secondary" disabled={st === "done"} title={st === "done" ? "이미 답변했습니다. 교사가 답글을 남기면 다시 누를 수 있습니다." : undefined} onClick={() => confirmNote(d, note, by)}>확인</Button>
+            <Button disabled={!text.trim()} onClick={send}>답변 보내기</Button>
           </>
         ) : undefined
       }
@@ -460,29 +465,16 @@ function NoteReplyModal({ note, info, canReply, onClose }: { note: VisitNote; in
       <div className="row g12"><PhotoAvatar name={s?.name ?? "?"} photo={s?.photo} /><div className="col g2 grow"><strong className="t-lg b">{s?.name}</strong><span className="muted">{c ? classLabel(c) : ""} · {fmtDot(note.date)}</span></div>{note.reason && <Badge tone="error">{note.reason}</Badge>}</div>
       <p className="card pad" style={{ lineHeight: 1.6, background: "var(--canvas)" }}>{note.content || "(내용 없음)"}</p>
       <span className="t-xs muted">{by} · {fmtStamp(note.createdAt)}</span>
-      {editing ? (
+      <NoteThread note={note} />
+      {canReply ? (
         <div className="col g8">
-          <label className="sb" htmlFor="reply-text">심방 답변</label>
-          <textarea id="reply-text" className="area" autoFocus placeholder={`${by} 선생님에게 보낼 답변을 적어 주세요. 격려, 심방 계획, 기도 제목 등`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
-          <span className="t-xs muted">보내면 {by} 선생님의 알림 목록에 표시되고, 학생 상세의 심방노트 아래에서 볼 수 있습니다. 따로 적을 내용이 없으면 [확인]을 누르세요. "{CONFIRM_REPLY}"라고 답변이 갑니다.</span>
-          {!remoteEnabled && <Note icon="info">데모 모드에서는 데이터가 이 브라우저에만 저장됩니다. 답변은 같은 기기·같은 브라우저·같은 주소에서 {by} 선생님 계정으로 로그인해야 보입니다. 휴대폰이나 다른 주소(관리자 주소와 교사 주소)에서는 전달되지 않습니다.</Note>}
-        </div>
-      ) : note.reply ? (
-        <div className="reply">
-          <div className="row g8">
-            <span className="row g6 t-xs sb c-primary grow"><Icon name="note" size={14} />{replier ? `${replier.title ?? ""} ${replier.name}`.trim() : "관리자"}의 답변</span>
-            {canReply && (
-              <>
-                <Button variant="outline" size="s" onClick={() => setEditing(true)}>수정</Button>
-                <Button variant="outline" size="s" onClick={() => window.confirm("보낸 답변을 삭제할까요? 교사 화면에서도 사라집니다.") && save(null)}>삭제</Button>
-              </>
-            )}
-          </div>
-          <p style={{ lineHeight: 1.6 }}>{note.reply}</p>
-          {note.replyAt && <span className="t-xs muted">{fmtStamp(note.replyAt)}</span>}
+          <label className="sb" htmlFor="reply-text">{st === "wait" ? "심방 답변" : "이어서 답변"}</label>
+          <textarea id="reply-text" className="area" placeholder={`${by} 선생님에게 보낼 답변을 적어 주세요. 격려, 심방 계획, 기도 제목 등`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
+          <span className="t-xs muted">보내면 {by} 선생님에게 알림이 가고, 선생님은 그 아래에 답글을 달 수 있습니다. 따로 적을 내용이 없으면 [확인]을 누르세요. "{CONFIRM_REPLY}"라고 답변이 갑니다.</span>
+          {!remoteEnabled && <Note icon="info">데모 모드에서는 데이터가 이 브라우저에만 저장됩니다.</Note>}
         </div>
       ) : (
-        <Note icon="lock">아직 답변이 없습니다. 심방 답변은 최고 관리자만 작성할 수 있습니다.</Note>
+        st === "wait" && <Note icon="lock">아직 답변이 없습니다. 심방 답변은 최고 관리자만 작성할 수 있습니다.</Note>
       )}
     </Modal>
   );

@@ -1,4 +1,5 @@
 import { formatPhone } from "../lib/phone";
+import { lastPastorReply, threadText } from "../lib/notes";
 import { Children, Fragment, isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
@@ -482,9 +483,9 @@ export function Students() {
     const lines = picked.flatMap(({ s, c }) => {
       const info = [s.name, s.gender ?? "", fmtBirth(s.birthDate), c ? `${c.group}부` : "", c ? c.grade || "새친구반" : "", c && c.grade ? c.no : "", homeroomName(d, s.classId), s.phone, s.guardianPhone, s.guardianRel, s.status, pctText(personRate(d.studentMarks, s.id, dates).rate)];
       const notes = d.notes.filter((n) => n.studentId === s.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
-      return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), n.reply ?? "", uname(n.replyBy), fmtAt(n.replyAt)]) : [[...info, 0, "", "", "", "", "", "", ""]];
+      return notes.length ? notes.map((n) => [...info, notes.length, n.date, n.reason ?? "", n.content, uname(n.authorId), threadText(d, n), (() => { const r = lastPastorReply(d, n); return r ? uname(r.authorId) : ""; })(), (() => { const r = lastPastorReply(d, n); return r ? fmtAt(r.createdAt) : ""; })()]) : [[...info, 0, "", "", "", "", "", "", ""]];
     });
-    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변", "답변자", "답변일"], ...lines]));
+    download(`학생_심방노트_${date}.csv`, toCSV([["이름", "성별", "생년월일", "그룹", "학년", "반", "담임교사", "학생 연락처", "보호자 연락처", "보호자 관계", "상태", "출석률", "심방노트 수", "심방 주일", "결석 사유", "심방노트 내용", "작성 교사", "심방 답변·답글 (대화 순서대로)", "마지막 답변자", "마지막 답변일"], ...lines]));
     toast(`${picked.length}명의 명부와 심방노트를 내려받았습니다.`);
   };
   const graduate = async () => {

@@ -2,7 +2,7 @@
 // 로그인 아이디는 Supabase Auth의 이메일 `${아이디}@attendance.local` 로 매핑한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildSeed } from "./seed";
-import type { Data, Mark, MessageReceipt, TeacherMessage, User } from "./types";
+import type { Data, Mark, MessageReceipt, NoteComment, TeacherMessage, User } from "./types";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -59,9 +59,10 @@ async function loadAll(): Promise<Data> {
     fetchAll<{ id: number; data: Data["settings"] }>("settings"),
   ]);
   // 메세지 표가 아직 없으면(SQL 실행 전) 빈 목록으로 두고 나머지 화면은 그대로 쓴다
-  const [messages, receipts] = await Promise.all([
+  const [messages, receipts, comments] = await Promise.all([
     fetchAll<TeacherMessage>("teacher_messages").catch(() => [] as TeacherMessage[]),
     fetchAll<MessageReceipt>("teacher_message_recipients").catch(() => [] as MessageReceipt[]),
+    fetchAll<NoteComment>("note_comments").catch(() => [] as NoteComment[]),
   ]);
   const desc = <T,>(list: T[], k: keyof T) => list.sort((a, b) => String(b[k]).localeCompare(String(a[k])));
   return {
@@ -79,6 +80,7 @@ async function loadAll(): Promise<Data> {
     audits: desc(audits, "at"),
     messages: desc(messages, "createdAt").map((m) => ({ ...m, images: m.images ?? [], links: m.links ?? [] })),
     receipts,
+    comments: comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     settings: { ...base.settings, ...(settings[0]?.data ?? {}) },
   };
 }

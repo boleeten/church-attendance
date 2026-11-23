@@ -8,6 +8,7 @@ import type { Data, Mark, Role, User } from "../lib/types";
 import { Avatar, Badge, Button, Icon, Modal, Note, Pager, Switch } from "../ui";
 import { Page, useAdminDate } from "./AdminApp";
 import { classOf, Kpi, SelectBox, TempPasswordModal } from "./Manage";
+import { authorLabel, lastPastorReply, threadText } from "../lib/notes";
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
 
@@ -31,7 +32,7 @@ const SHARED: SheetDef[] = [
 ];
 const PRIVATE: SheetDef[] = [
   { name: "학생·보호자 연락처", rows: (d) => [["이름", "생년월일", "반", "학생 연락처", "보호자 연락처", "보호자 관계"], ...d.students.filter((s) => s.status !== "졸업").map((s) => { const c = classOf(d, s); return [s.name, fmtBirth(s.birthDate), c ? classLabel(c) : "", s.phone, s.guardianPhone, s.guardianRel]; })] },
-  { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변", "답변자", "답변 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt), n.reply ?? "", d.users.find((u) => u.id === n.replyBy)?.name ?? "", n.replyAt ? fmtStamp(n.replyAt) : ""]; })] },
+  { name: "심방노트", rows: (d) => [["주일", "학생", "반", "결석 사유", "내용", "작성자", "작성 시각", "답변·답글 (대화 순서대로)", "마지막 답변자", "마지막 답변 시각"], ...d.notes.map((n) => { const s = d.students.find((x) => x.id === n.studentId); const c = s ? classOf(d, s) : undefined; return [n.date, s?.name, c ? classLabel(c) : "", n.reason ?? "", n.content, d.users.find((u) => u.id === n.authorId)?.name, fmtStamp(n.createdAt), threadText(d, n), (() => { const r = lastPastorReply(d, n); return r ? authorLabel(d, r.authorId) : ""; })(), (() => { const r = lastPastorReply(d, n); return r ? fmtStamp(r.createdAt) : ""; })()]; })] },
 ];
 
 /** 구글 시트 링크나 ID에서 파일 ID만 뽑는다 */

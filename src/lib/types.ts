@@ -71,6 +71,16 @@ export interface Note {
   replyAt?: string | null;
 }
 
+/** 심방노트 아래 대화 한 줄 (목사님 답변 · 교사 답글) */
+export interface NoteComment {
+  id: string;
+  noteId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
 export interface AppNotification {
   id: string;
   userId: string;
@@ -167,6 +177,8 @@ export interface Data {
   audits: AuditLog[];
   /** 교사별 메세지 (최신순) */
   messages?: TeacherMessage[];
+  /** 심방노트 대화 */
+  comments?: NoteComment[];
   receipts?: MessageReceipt[];
   settings: Settings;
 }

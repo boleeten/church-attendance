@@ -20,9 +20,9 @@ function currentSundayKST() {
 }
 
 /** 활성 관리자(일반·최고) 중 기기를 등록한 사람에게 푸시. except 는 보내지 않을 사람 ID */
-async function pushAdmins(sb, payload, except) {
+async function pushAdmins(sb, payload, except, roles = ["admin", "super"]) {
   const { data: people } = await sb.from("profiles").select("id, roles, active").eq("active", true);
-  const ids = (people || []).filter((p) => p.id !== except && (p.roles || []).some((r) => r === "admin" || r === "super")).map((p) => p.id);
+  const ids = (people || []).filter((p) => p.id !== except && (p.roles || []).some((r) => roles.includes(r))).map((p) => p.id);
   if (!ids.length) return { sent: 0, devices: 0 };
   const { data: subs } = await sb.from("push_subscriptions").select("user_id, endpoint, subscription").in("user_id", ids);
   let sent = 0;
@@ -121,6 +121,28 @@ export default async function handler(req, res) {
       url: `/admin/notes?note=${note.id}`,
       tag: `note-${note.id}`,
     }, me.user.id);
+    return res.status(200).json(r);
+  }
+
+  // ── 심방노트 대화: 교사가 답글을 남기면 목사님(최고 관리자) 기기로 푸시 ──
+  if (body.comment) {
+    const { data: me } = token ? await sb.auth.getUser(token) : { data: null };
+    if (!me?.user) return res.status(401).json({ error: "로그인이 필요합니다." });
+    const { data: c } = await sb.from("note_comments").select("id, note_id, author_id, body").eq("id", String(body.comment)).single();
+    if (!c) return res.status(404).json({ error: "글을 찾을 수 없습니다." });
+    if (c.author_id !== me.user.id) return res.status(403).json({ error: "본인이 쓴 글만 알릴 수 있습니다." });
+    const { data: note } = await sb.from("visit_notes").select("id, student_id").eq("id", c.note_id).single();
+    const [{ data: student }, { data: author }] = await Promise.all([
+      note ? sb.from("students").select("name").eq("id", note.student_id).single() : { data: null },
+      sb.from("profiles").select("name").eq("id", me.user.id).single(),
+    ]);
+    const text = String(c.body || "").replace(/\s+/g, " ").trim();
+    const r = await pushAdmins(sb, {
+      title: "심방노트에 교사 답글이 왔습니다",
+      body: `[${student?.name ?? "학생"}] ${author?.name ?? "교사"} 선생님: ${text.length > 80 ? text.slice(0, 80) + "…" : text}`,
+      url: `/admin/notes?note=${c.note_id}`,
+      tag: `comment-${c.id}`,
+    }, me.user.id, ["super"]);
     return res.status(200).json(r);
   }
 
