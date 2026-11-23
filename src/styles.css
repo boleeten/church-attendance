@@ -252,6 +252,7 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .split { grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); }
 .panel { background: #fff; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--border); padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .panel h2 { font-size: 16px; font-weight: 700; }
@@ -471,7 +472,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
   /* 흰 박스 테두리는 subtle 색 */
   .amain .panel, .amain .kpi { box-shadow: inset 0 0 0 1px var(--subtle); }
   /* 학생 출결현황: 출석 카드만 */
-  .kpis-attend { grid-template-columns: minmax(0, 1fr); }
+  .grid.kpis-attend { grid-template-columns: minmax(0, 1fr); }
   .kpis-attend .hide-m { display: none; }
   .kpi-of { display: inline; color: var(--muted); }
 }

@@ -121,9 +121,8 @@ export function StudentAttendance() {
   return (
     <Page title="학생 출결현황" sub="주일별 전체 학생 출석 현황을 확인하고 수정합니다">
       {/* 모바일에서는 출석 카드 하나만 폭에 맞춰 보여 준다 (Figma 170:2326) */}
-      <div className="grid cols-4 kpis-attend">
-        <Kpi className="hide-m" label="출석 대상" value={`${all.total}명`} sub={`${d.classes.length}개 반`} icon="users" />
-        <Kpi label="출석" value={<>{all.p}명<span className="kpi-of"> / {all.total}명</span></>} sub={`출석률 ${pctText(all.rate)}`} icon="check" tone="success" />
+      <div className="grid kpis-3 kpis-attend">
+        <Kpi label="출석" value={`${all.p}명`} sub={`출석률 ${pctText(all.rate)} (${all.p} / ${all.total}명)`} icon="check" tone="success" />
         <Kpi className="hide-m" label="결석" value={`${all.a}명`} sub={`연속 결석 ${[...streaks.values()].filter((n) => n >= 2).length}명 포함`} icon="x" tone="error" />
         <Kpi className="hide-m" label="미확인" value={`${all.u}명`} sub={`미완료 ${pending.length}개 반`} icon="info" tone="warm" />
       </div>
@@ -463,9 +462,8 @@ export function TeacherAttendance() {
   const exportCsv = () => download(`교사_출결현황_${date}.csv`, toCSV([["교사", "소속", "담당", ...cols.map(fmtMD), `${m}월 출석`, "연간 출석률"], ...rows.map((u) => { const mo = personRate(d.teacherMarks, u.id, monthDates); return [u.name, `${u.group}부`, teacherDuty(d, u, false), ...cols.map((dt) => markText(d.teacherMarks[`${dt}|${u.id}`])), `${mo.p}/${mo.total}`, pctText(personRate(d.teacherMarks, u.id, all).rate)]; })]));
   return (
     <Page title="교사 출결현황" sub="1부·2부 교사의 주일 출석 현황을 확인합니다">
-      <div className="grid cols-4 kpis-attend">
-        <Kpi className="hide-m" label="전체 교사" value={`${sum.total}명`} sub={`1부 ${staff.filter((u) => u.group === 1).length}명 · 2부 ${staff.filter((u) => u.group === 2).length}명 (부장교사 포함)`} icon="badge" />
-        <Kpi label="출석" value={<>{sum.p}명<span className="kpi-of"> / {sum.total}명</span></>} sub={`출석률 ${pctText(sum.rate)}`} icon="check" tone="success" />
+      <div className="grid kpis-3 kpis-attend">
+        <Kpi label="출석" value={`${sum.p}명`} sub={`출석률 ${pctText(sum.rate)} (${sum.p} / ${sum.total}명)`} icon="check" tone="success" />
         <Kpi className="hide-m" label="결석" value={`${sum.a}명`} sub={`${fmtDot(date)} 기준`} icon="x" tone="error" />
         <Kpi className="hide-m" label="미확인" value={`${sum.u}명`} sub={pendingGroups.length ? `${pendingGroups.join("·")}부 교사 출석 미완료` : "모든 부서 완료"} icon="info" tone="warm" />
       </div>
