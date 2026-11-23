@@ -712,9 +712,10 @@ export function Classes() {
                       <strong className="cc-name">{classShort(c)}</strong>
                       <div className="cc-meta">
                         <p className="cc-teachers">
-                          <span className="cc-main">{teacherName(c.id, "담임")}</span>{names(c.id, "보조") === "미배정" ? <span className="cc-none">/ 보조교사 미배정</span> : <span className="cc-sub">/ {names(c.id, "보조")}</span>}
+                          <span className="cc-main">{teacherName(c.id, "담임")}</span>
+                          <span className="cc-count">현재 {n}명{c.grade === 0 && readyHere(c.id) > 0 && <> · <Link to="/admin/students?ready=1" className="sb c-warning">반 배정 대상 {readyHere(c.id)}명</Link></>}</span>
                         </p>
-                        <span className="cc-count">현재 {n}명{c.grade === 0 && readyHere(c.id) > 0 && <> · <Link to="/admin/students?ready=1" className="sb c-warning">반 배정 대상 {readyHere(c.id)}명</Link></>}</span>
+                        {names(c.id, "보조") !== "미배정" && <p className="cc-sub">보조교사 {names(c.id, "보조")}</p>}
                       </div>
                     </div>
                     <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, disabled: c.grade === 0, onSelect: () => removeClass(c) }]} />
