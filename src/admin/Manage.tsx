@@ -708,20 +708,20 @@ export function Classes() {
               return (
                 <div key={c.id} className="class-card">
                   <div className="cc-top">
-                    <div className="cc-head">
+                    <div className="cc-info">
                       <strong className="cc-name">{classShort(c)}</strong>
-                      <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, disabled: c.grade === 0, onSelect: () => removeClass(c) }]} />
+                      <div className="cc-meta">
+                        <p className="cc-teachers">
+                          <span className="cc-main">{teacherName(c.id, "담임")}</span>{names(c.id, "보조") === "미배정" ? <span className="cc-none">/ 보조교사 미배정</span> : <span className="cc-sub">/ {names(c.id, "보조")}</span>}
+                        </p>
+                        <span className="cc-count">현재 {n}명{c.grade === 0 && readyHere(c.id) > 0 && <> · <Link to="/admin/students?ready=1" className="sb c-warning">반 배정 대상 {readyHere(c.id)}명</Link></>}</span>
+                      </div>
                     </div>
-                    <p className="cc-teachers">
-                      {teacherName(c.id, "담임")} {names(c.id, "보조") === "미배정" ? <span className="cc-none">/ 보조교사 미배정</span> : <span className="cc-sub">/ {names(c.id, "보조")}</span>}
-                    </p>
+                    <RowMenu vertical label={`${classShort(c)} 더보기`} items={[{ icon: "trash", label: "반 삭제", danger: true, disabled: c.grade === 0, onSelect: () => removeClass(c) }]} />
                   </div>
-                  <div className="cc-bottom">
-                    <span className="cc-count">현재 {n}명{c.grade === 0 && readyHere(c.id) > 0 && <> · <Link to="/admin/students?ready=1" className="sb c-warning">반 배정 대상 {readyHere(c.id)}명</Link></>}</span>
-                    <div className="row g8 class-actions">
-                      <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
-                      <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
-                    </div>
+                  <div className="row g8 class-actions">
+                    <Button variant="outline" size="s" onClick={() => setAssign(c)}>교사 배정</Button>
+                    <Link to={`/admin/students?class=${c.id}`} className="btn outline s">학생 이동</Link>
                   </div>
                 </div>
               );
