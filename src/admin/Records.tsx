@@ -13,7 +13,8 @@ import { classOf, GroupBar, groupStudents, newFriendStudents, incompleteClasses,
 
 const markText = (m: Mark | undefined) => (m === "P" ? "출석" : m === "A" ? "결석" : "미확인");
 
-function rateOver(marks: Record<string, Mark>, ids: string[], dates: string[]): number | null {
+/** 기간 동안의 출석 수(연인원)와 전체 인원(학생 수 × 주일 수), 출석률(출석 ÷ 출석+결석) */
+function countOver(marks: Record<string, Mark>, ids: string[], dates: string[]) {
   let p = 0;
   let a = 0;
   for (const dt of dates)
@@ -22,8 +23,11 @@ function rateOver(marks: Record<string, Mark>, ids: string[], dates: string[]): 
       if (m === "P") p++;
       else if (m === "A") a++;
     }
-  return pct(p, a);
+  return { p, a, total: ids.length * dates.length, rate: pct(p, a) };
 }
+const num = (n: number) => n.toLocaleString("ko-KR");
+/** "출석 78 / 95명" */
+const countText = (c: { p: number; total: number }) => `${num(c.p)} / ${num(c.total)}명`;
 
 // ───────── A05 학생 전체 출결현황 ─────────
 function ClassSheetModal({ cls, date, onClose }: { cls: ClassRoom; date: string; onClose: () => void }) {
@@ -184,11 +188,11 @@ export function Stats() {
   const sessionDone = (dt: string) => d.classes.every((c) => d.sessions[`${dt}|class:${c.id}`]?.completed);
   const trend =
     tab === "year"
-      ? [...new Set(all.map((x) => ym(x).m))].map((mo) => ({ label: `${mo}월`, rate: rateOver(d.studentMarks, ids(students), all.filter((x) => ym(x).m === mo)), cur: mo === m, done: all.filter((x) => ym(x).m === mo).every(sessionDone) }))
-      : (tab === "month" ? range : all.slice(-8)).map((dt) => ({ label: fmtMD(dt), rate: rateOver(d.studentMarks, ids(students), [dt]), cur: dt === date, done: sessionDone(dt) }));
-  const groupRate = (g: 1 | 2) => rateOver(d.studentMarks, ids(groupStudents(d, g)), range);
-  const gradeRate = (gr: number) => rateOver(d.studentMarks, ids(students.filter((s) => classOf(d, s)?.grade === gr)), range);
-  const classRates = d.classes.map((c) => ({ c, rate: rateOver(d.studentMarks, ids(roster(d, c.id)), range) })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
+      ? [...new Set(all.map((x) => ym(x).m))].map((mo) => ({ label: `${mo}월`, ...countOver(d.studentMarks, ids(students), all.filter((x) => ym(x).m === mo)), cur: mo === m, done: all.filter((x) => ym(x).m === mo).every(sessionDone) }))
+      : (tab === "month" ? range : all.slice(-8)).map((dt) => ({ label: fmtMD(dt), ...countOver(d.studentMarks, ids(students), [dt]), cur: dt === date, done: sessionDone(dt) }));
+  const groupCount = (g: 1 | 2) => countOver(d.studentMarks, ids(groupStudents(d, g)), range);
+  const gradeCount = (gr: number) => countOver(d.studentMarks, ids(students.filter((s) => classOf(d, s)?.grade === gr)), range);
+  const classRates = d.classes.map((c) => ({ c, ...countOver(d.studentMarks, ids(roster(d, c.id)), range) })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
   const streaks = students.map((s) => ({ s, ...consecutiveAbsences(d.studentMarks, s.id, all) })).filter((x) => x.count >= 2).sort((a, b) => b.count - a.count);
   const title = tab === "week" ? fmtDot(date) : tab === "month" ? `${y}년 ${m}월` : `${y}학년도`;
   // 학생별 출결현황: 선택한 기간(주간·월간·연간)의 주일별 출결과 합계
@@ -228,8 +232,9 @@ export function Stats() {
           </div>
           <div className="chart">
             {trend.map((t) => (
-              <div key={t.label}>
+              <div key={t.label} title={`출석 ${countText(t)}`}>
                 <strong className="t-xs sb">{pctText(t.rate)}</strong>
+                <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>
                 <span className={`barv ${t.cur ? "cur" : ""}`} style={{ height: `${Math.max(4, (t.rate ?? 0) * 0.75)}%`, opacity: t.done ? 1 : 0.7 }} />
                 <span className="t-xs muted">{t.label}</span>
               </div>
@@ -239,28 +244,33 @@ export function Stats() {
         <section className="panel">
           <h2>1부 · 2부 비교</h2>
           <div className="grid cols-2" style={{ gap: 12 }}>
-            {([1, 2] as const).map((g) => (
-              <div key={g} className="col g4">
-                <span className="muted">{g}부</span>
-                <strong className="t-3xl b" style={{ color: g === 1 ? "var(--primary)" : "var(--secondary)" }}>{pctText(groupRate(g))}</strong>
-                <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반</span>
-              </div>
-            ))}
+            {([1, 2] as const).map((g) => {
+              const c = groupCount(g);
+              return (
+                <div key={g} className="col g4">
+                  <span className="muted">{g}부</span>
+                  <strong className="t-3xl b" style={{ color: g === 1 ? "var(--primary)" : "var(--secondary)" }}>{pctText(c.rate)}</strong>
+                  <span className="sb num">출석 {countText(c)}</span>
+                  <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반{range.length > 1 ? ` · ${range.length}주 합계` : ""}</span>
+                </div>
+              );
+            })}
           </div>
-          {([1, 2] as const).map((g) => <Progress key={g} value={groupRate(g) ?? 0} color={g === 1 ? "var(--primary)" : "var(--secondary)"} />)}
+          {([1, 2] as const).map((g) => <Progress key={g} value={groupCount(g).rate ?? 0} color={g === 1 ? "var(--primary)" : "var(--secondary)"} />)}
         </section>
       </div>
       <div className="grid cols-2">
         <section className="panel">
           <h2>학년별 출석률</h2>
-          {[4, 5, 6].map((g) => (
-            <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={gradeRate(g) ?? 0} /><strong className="sb num">{pctText(gradeRate(g))}</strong></div>
-          ))}
+          {[4, 5, 6].map((g) => {
+            const c = gradeCount(g);
+            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
+          })}
         </section>
         <section className="panel">
           <div className="row between"><h2>반별 출석률</h2><span className="t-xs muted">낮은 순 6개 반</span></div>
-          {classRates.slice(0, 6).map(({ c, rate }) => (
-            <div key={c.id} className="hbar"><span className="sb">{c.group}부 {classShort(c)}</span><Progress value={rate ?? 0} color={(rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><strong className="sb num">{pctText(rate)}</strong></div>
+          {classRates.slice(0, 6).map((x) => (
+            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong><span className="t-xs muted num">{countText(x)}</span></span></div>
           ))}
         </section>
       </div>
@@ -279,7 +289,7 @@ export function Stats() {
                     <td>{c ? classLabel(c) : "-"}</td><td>{homeroomName(d, s.classId)}</td>
                     <td><Badge tone="error">{count}주 연속</Badge></td>
                     <td>{lastPresent ? fmtMD(lastPresent) : "-"}</td>
-                    <td className="sb num">{pctText(personRate(d.studentMarks, s.id, all).rate)}</td>
+                    <td className="num">{(() => { const r = personRate(d.studentMarks, s.id, all); return <><strong className="sb">{pctText(r.rate)}</strong> <span className="t-xs muted">({r.p}/{r.total}주)</span></>; })()}</td>
                     <td><Badge tone={noted ? "success" : "neutral"}>{noted ? "작성됨" : "미작성"}</Badge></td>
                     <td><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button></td>
                   </tr>

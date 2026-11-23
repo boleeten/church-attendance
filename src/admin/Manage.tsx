@@ -31,7 +31,7 @@ export function GroupBar({ title, sum, provisional }: { title: string; sum: Summ
     <div className="col g8">
       <div className="row between">
         <span><strong className="b">{title}</strong> <span className="muted t-xs">전체 {sum.total}명</span></span>
-        <strong className="sb">출석률 {pctText(sum.rate)}</strong>
+        <span className="row g8"><span className="sb num">출석 {sum.p} / {sum.total}명</span><strong className="sb">출석률 {pctText(sum.rate)}</strong></span>
       </div>
       <div className="stack">
         <i style={{ width: w(sum.p), background: "var(--success)" }} />

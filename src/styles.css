@@ -277,7 +277,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .chart > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; min-width: 0; }
 .chart .barv { width: 100%; max-width: 36px; border-radius: 6px 6px 0 0; background: var(--primary); }
 .chart .barv.cur { background: var(--secondary); }
-.hbar { display: grid; grid-template-columns: 72px 1fr 44px; gap: 12px; align-items: center; }
+.hbar { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center; }
+.hbar-val { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; min-width: 120px; }
+.chart-count { font-size: 10px; white-space: nowrap; }
 .steps { display: flex; gap: 8px; flex-wrap: wrap; }
 .steps span { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 600; }
 .steps b { width: 24px; height: 24px; border-radius: 12px; background: var(--track); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
