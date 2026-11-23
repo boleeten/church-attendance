@@ -10,7 +10,7 @@ import { entryOptions, setTeacherGroup } from "../mobile/Shell";
 import { Avatar, Badge, Button, Icon, Modal, Note } from "../ui";
 import { PasswordForm } from "../mobile/Auth";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
-import { Notes, Stats, StudentAttendance, TeacherAttendance } from "./Records";
+import { Notes, StudentAttendance, TeacherAttendance } from "./Records";
 import { Messages } from "./Messages";
 import { Accounts, NotifySettings, Sheets, YearSettings } from "./Settings";
 
@@ -23,7 +23,6 @@ const MENU = [
   ["classes", "grid", "그룹·반 관리"],
   ["teachers", "badge", "교사·계정 관리"],
   ["attendance", "calendar", "학생 출결현황"],
-  ["stats", "chart", "학생 출석 통계"],
   ["notes", "note", "심방노트 관리"],
   ["sheets", "cloud", "Google Sheets"],
   ["notify", "bell", "알림 설정"],
@@ -305,7 +304,6 @@ export default function AdminApp() {
           <Route path="classes" element={<Classes />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="attendance" element={<StudentAttendance />} />
-          <Route path="stats" element={<Stats />} />
           <Route path="notes" element={<Notes />} />
           <Route path="sheets" element={<Sheets />} />
           <Route path="notify" element={<NotifySettings />} />

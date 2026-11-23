@@ -64,6 +64,7 @@ export function StudentAttendance() {
   const yearWrap = useRef<HTMLDivElement>(null);
   const [pendingOnly, setPendingOnly] = useState(false);
   const [streakOnly, setStreakOnly] = useState(false);
+  const [longOnly, setLongOnly] = useState(false);
   const [sheet, setSheet] = useState<ClassRoom | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const dates = useMemo(() => yearSundays(d).filter((x) => x <= date), [d, date]);
@@ -73,7 +74,34 @@ export function StudentAttendance() {
   const streaks = useMemo(() => new Map(students.map((s) => [s.id, consecutiveAbsences(d.studentMarks, s.id, dates).count])), [d, dates, students]);
   const classes = d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade) && (!pendingOnly || !d.sessions[`${date}|class:${c.id}`]?.completed));
   const classIds = new Set(classes.map((c) => c.id));
-  const rows = students.filter((s) => classIds.has(s.classId) && (!streakOnly || (streaks.get(s.id) ?? 0) >= 2)).sort((a, b) => a.classId.localeCompare(b.classId) || a.name.localeCompare(b.name, "ko"));
+  // 장결자는 평소 출석부에 없으니, 체크했을 때만 장결자만 따로 보여 준다
+  const longAbsent = d.students.filter((s) => s.status === "장결자");
+  const rows = (longOnly ? longAbsent : students)
+    .filter((s) => classIds.has(s.classId) && (!streakOnly || (streaks.get(s.id) ?? consecutiveAbsences(d.studentMarks, s.id, dates).count) >= 2))
+    .sort((a, b) => a.classId.localeCompare(b.classId) || a.name.localeCompare(b.name, "ko"));
+  // 출석률 추세(최근 8주)와 학년별 출석률: 등록 학생 기준
+  const enrolled = activeStudents(d);
+  const enrolledIds = enrolled.map((s) => s.id);
+  const sessionDone = (dt: string) => d.classes.every((c) => d.sessions[`${dt}|class:${c.id}`]?.completed);
+  const trend = dates.slice(-8).map((dt) => ({ label: fmtMD(dt), ...countOver(d.studentMarks, enrolledIds, [dt]), cur: dt === date, done: sessionDone(dt) }));
+  const gradeCount = (gr: number) => countOver(d.studentMarks, enrolled.filter((s) => classOf(d, s)?.grade === gr).map((s) => s.id), [date]);
+  // 연간 학생별 출결 Excel: 올해 1월부터 선택한 주일까지 (지난 출결 올리기 양식으로도 쓴다)
+  const exportCsv = () => {
+    const list = [...enrolled].sort((p, q) => p.classId.localeCompare(q.classId) || p.name.localeCompare(q.name, "ko"));
+    download(
+      `학생별_출결현황_${ym(date).y}학년도_${fmtMD(date).replace("/", "월")}일까지.csv`,
+      toCSV([
+        ["이름", "그룹", "학년", "반", "담임", ...dates.map(fmtMD), "출석", "결석", "미확인", "출석률"],
+        ...list.map((s) => {
+          const c = classOf(d, s);
+          const marks = dates.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
+          const p = marks.filter((x) => x === "P").length;
+          const a = marks.filter((x) => x === "A").length;
+          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
+        }),
+      ]),
+    );
+  };
   // 1년 전체 주일을 보여 주고, 처음에는 가장 최근 주일이 보이도록 오른쪽 끝으로 스크롤한다
   const cols = dates;
   const months = cols.reduce<{ m: number; n: number }[]>((acc, dt) => {
@@ -112,6 +140,31 @@ export function StudentAttendance() {
           );
         })}
       </div>
+      <div className="grid split">
+        <section className="panel">
+          <div className="row between">
+            <h2>출석률 추세</h2>
+            <div className="legend"><span><i style={{ background: "var(--primary)" }} />확정</span><span><i style={{ background: "var(--secondary)" }} />선택한 주일</span></div>
+          </div>
+          <div className="chart">
+            {trend.map((t) => (
+              <div key={t.label} title={`출석 ${countText(t)}`}>
+                <strong className="t-xs sb">{pctText(t.rate)}</strong>
+                <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>
+                <span className={`barv ${t.cur ? "cur" : ""}`} style={{ height: `${Math.max(4, (t.rate ?? 0) * 0.75)}%`, opacity: t.done ? 1 : 0.7 }} />
+                <span className="t-xs muted">{t.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="panel">
+          <h2>학년별 출석률</h2>
+          {[4, 5, 6].map((g) => {
+            const c = gradeCount(g);
+            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
+          })}
+        </section>
+      </div>
       <section className="panel">
         <div className="row between wrap g8">
           <div className="filters">
@@ -120,6 +173,11 @@ export function StudentAttendance() {
             <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
             <label className="row g6 sb"><input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />미완료 반만</label>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
+            {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={longOnly} onChange={(e) => setLongOnly(e.target.checked)} />장결자 ({longAbsent.length})</label>}
+          </div>
+          <div className="row g8 wrap">
+            <ImportMarksButton />
+            <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />연간 학생별 출결 Excel 다운로드</Button>
           </div>
         </div>
         {tab === "student" && <span className="t-xs muted">옆으로 스크롤하면 1월부터 전체 주일을 볼 수 있습니다. 이름과 반은 고정됩니다.</span>}
@@ -151,10 +209,10 @@ export function StudentAttendance() {
               <tbody>
                 {rows.map((s) => {
                   const c = classOf(d, s);
-                  const st = streaks.get(s.id) ?? 0;
+                  const st = streaks.get(s.id) ?? consecutiveAbsences(d.studentMarks, s.id, dates).count;
                   return (
                     <tr key={s.id}>
-                      <td className="stick s1"><span className="col g2"><strong className="sb ellipsis">{s.name}</strong><span className="t-xs muted ellipsis">{c ? `${c.group}부 ${classShort(c)}` : "반 미배정"}</span></span></td>
+                      <td className="stick s1"><span className="col g2"><strong className="sb ellipsis">{s.name}</strong><span className="t-xs muted ellipsis">{c ? `${c.group}부 ${classShort(c)}` : "반 미배정"}{s.status === "장결자" ? " · 장결자" : ""}</span></span></td>
                       {cols.map((dt) => <td key={dt} className={`c wk ${ym(dt).d <= 7 ? "m-start" : ""}`}><MarkDot mark={d.studentMarks[`${dt}|${s.id}`]} /></td>)}
                       <td>{st >= 2 ? <Badge tone="error">{st}주 연속</Badge> : <span className="muted">-</span>}</td>
                       <td className="sb num">{pctText(personRate(d.studentMarks, s.id, dates).rate)}</td>
@@ -169,132 +227,6 @@ export function StudentAttendance() {
         </div>
       </section>
       {sheet && <ClassSheetModal cls={sheet} date={date} onClose={() => setSheet(null)} />}
-      {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
-    </Page>
-  );
-}
-
-// ───────── A06 학생 출석 통계 ─────────
-export function Stats() {
-  const d = useData();
-  const { date } = useAdminDate();
-  const [detail, setDetail] = useState<Student | null>(null);
-  const { y } = ym(date);
-  const all = useMemo(() => yearSundays(d).filter((x) => x <= date), [d, date]);
-  const range = [date];
-  const students = activeStudents(d);
-  const ids = (list: Student[]) => list.map((s) => s.id);
-  const sessionDone = (dt: string) => d.classes.every((c) => d.sessions[`${dt}|class:${c.id}`]?.completed);
-  const trend = all.slice(-8).map((dt) => ({ label: fmtMD(dt), ...countOver(d.studentMarks, ids(students), [dt]), cur: dt === date, done: sessionDone(dt) }));
-  const groupCount = (g: 1 | 2) => countOver(d.studentMarks, ids(groupStudents(d, g)), range);
-  const gradeCount = (gr: number) => countOver(d.studentMarks, ids(students.filter((s) => classOf(d, s)?.grade === gr)), range);
-  const classRates = d.classes.map((c) => ({ c, ...countOver(d.studentMarks, ids(roster(d, c.id)), range) })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
-  const streaks = students.map((s) => ({ s, ...consecutiveAbsences(d.studentMarks, s.id, all) })).filter((x) => x.count >= 2).sort((a, b) => b.count - a.count);
-  const title = fmtDot(date);
-  // 학생별 출결현황 Excel: 올해 1월부터 선택한 주일까지 전체 (지난 출결 올리기 양식으로도 쓴다)
-  const exportCsv = () => {
-    const list = [...students].sort((p, q) => p.classId.localeCompare(q.classId) || p.name.localeCompare(q.name, "ko"));
-    download(
-      `학생별_출결현황_${y}학년도_${fmtMD(date).replace("/", "월")}일까지.csv`,
-      toCSV([
-        ["이름", "그룹", "학년", "반", "담임", ...all.map(fmtMD), "출석", "결석", "미확인", "출석률"],
-        ...list.map((s) => {
-          const c = classOf(d, s);
-          const marks = all.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
-          const p = marks.filter((x) => x === "P").length;
-          const a = marks.filter((x) => x === "A").length;
-          return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
-        }),
-      ]),
-    );
-  };
-  return (
-    <Page title="학생 출석 통계" sub="선택한 주일의 출석 통계와 최근 8주 추세를 확인합니다">
-      <div className="row between wrap g12">
-        <div className="row g16 wrap">
-          <strong className="t-lg b">{title}</strong>
-        </div>
-        <div className="row g8 wrap">
-          <ImportMarksButton />
-          <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />연간 학생별 출결 Excel 다운로드</Button>
-        </div>
-      </div>
-      <div className="grid split">
-        <section className="panel">
-          <div className="row between">
-            <h2>출석률 추세</h2>
-            <div className="legend"><span><i style={{ background: "var(--primary)" }} />확정</span><span><i style={{ background: "var(--secondary)" }} />선택한 기간</span></div>
-          </div>
-          <div className="chart">
-            {trend.map((t) => (
-              <div key={t.label} title={`출석 ${countText(t)}`}>
-                <strong className="t-xs sb">{pctText(t.rate)}</strong>
-                <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>
-                <span className={`barv ${t.cur ? "cur" : ""}`} style={{ height: `${Math.max(4, (t.rate ?? 0) * 0.75)}%`, opacity: t.done ? 1 : 0.7 }} />
-                <span className="t-xs muted">{t.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="panel">
-          <h2>1부 · 2부 비교</h2>
-          <div className="grid cols-2" style={{ gap: 12 }}>
-            {([1, 2] as const).map((g) => {
-              const c = groupCount(g);
-              return (
-                <div key={g} className="col g4">
-                  <span className="muted">{g}부</span>
-                  <strong className="t-3xl b" style={{ color: g === 1 ? "var(--primary)" : "var(--secondary)" }}>{pctText(c.rate)}</strong>
-                  <span className="sb num">출석 {countText(c)}</span>
-                  <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반</span>
-                </div>
-              );
-            })}
-          </div>
-          {([1, 2] as const).map((g) => <Progress key={g} value={groupCount(g).rate ?? 0} color={g === 1 ? "var(--primary)" : "var(--secondary)"} />)}
-        </section>
-      </div>
-      <div className="grid cols-2">
-        <section className="panel">
-          <h2>학년별 출석률</h2>
-          {[4, 5, 6].map((g) => {
-            const c = gradeCount(g);
-            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
-          })}
-        </section>
-        <section className="panel">
-          <div className="row between"><h2>반별 출석률</h2><span className="t-xs muted">낮은 순 6개 반</span></div>
-          {classRates.slice(0, 6).map((x) => (
-            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong><span className="t-xs muted num">{countText(x)}</span></span></div>
-          ))}
-        </section>
-      </div>
-      <section className="panel">
-        <div className="row between"><h2>연속 결석 학생 현황</h2><Badge tone="error">{streaks.length}명</Badge></div>
-        <div className="tablewrap">
-          <table className="tbl">
-            <thead><tr><th>학생</th><th>반</th><th>담임</th><th>연속 결석</th><th>마지막 출석</th><th>출석률</th><th>심방노트</th><th /></tr></thead>
-            <tbody>
-              {streaks.map(({ s, count, lastPresent }) => {
-                const c = classOf(d, s);
-                const noted = d.notes.some((n) => n.studentId === s.id && all.slice(-count).includes(n.date));
-                return (
-                  <tr key={s.id}>
-                    <td><span className="row g8"><PhotoAvatar name={s.name} photo={s.photo} size={40} /><strong className="sb">{s.name}</strong></span></td>
-                    <td>{c ? classLabel(c) : "-"}</td><td>{homeroomName(d, s.classId)}</td>
-                    <td><Badge tone="error">{count}주 연속</Badge></td>
-                    <td>{lastPresent ? fmtMD(lastPresent) : "-"}</td>
-                    <td className="num">{(() => { const r = personRate(d.studentMarks, s.id, all); return <><strong className="sb">{pctText(r.rate)}</strong> <span className="t-xs muted">({r.p}/{r.total}주)</span></>; })()}</td>
-                    <td><Badge tone={noted ? "success" : "neutral"}>{noted ? "작성됨" : "미작성"}</Badge></td>
-                    <td><Button variant="outline" size="s" onClick={() => setDetail(s)}>상세</Button></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!streaks.length && <p className="empty">2주 이상 연속으로 결석한 학생이 없습니다.</p>}
-        </div>
-      </section>
       {detail && <StudentDetailModal student={detail} onClose={() => setDetail(null)} />}
     </Page>
   );
