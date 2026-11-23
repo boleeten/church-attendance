@@ -62,7 +62,6 @@ export function StudentAttendance() {
   const [group, setGroup] = useState("");
   const [grade, setGrade] = useState("");
   const yearWrap = useRef<HTMLDivElement>(null);
-  const [pendingOnly, setPendingOnly] = useState(false);
   const [streakOnly, setStreakOnly] = useState(false);
   const [longOnly, setLongOnly] = useState(false);
   const [sheet, setSheet] = useState<ClassRoom | null>(null);
@@ -72,7 +71,7 @@ export function StudentAttendance() {
   const all = studentsSummary(d, date, students);
   const pending = incompleteClasses(d, date);
   const streaks = useMemo(() => new Map(students.map((s) => [s.id, consecutiveAbsences(d.studentMarks, s.id, dates).count])), [d, dates, students]);
-  const classes = d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade) && (!pendingOnly || !d.sessions[`${date}|class:${c.id}`]?.completed));
+  const classes = d.classes.filter((c) => (!group || String(c.group) === group) && (!grade || String(c.grade) === grade));
   const classIds = new Set(classes.map((c) => c.id));
   // 장결자는 평소 출석부에 없으니, 체크했을 때만 장결자만 따로 보여 준다
   const longAbsent = d.students.filter((s) => s.status === "장결자");
@@ -170,7 +169,6 @@ export function StudentAttendance() {
             <Seg value={tab} options={[["student", "학생별 현황표"], ["class", "반별 현황"]] as const} onChange={setTab} />
             <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
             <SelectBox label="학년" value={grade} onChange={setGrade}><option value="">학년: 전체</option>{[4, 5, 6].map((g) => <option key={g} value={g}>{g}학년</option>)}</SelectBox>
-            <label className="row g6 sb"><input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />미완료 반만</label>
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={streakOnly} onChange={(e) => setStreakOnly(e.target.checked)} />연속 결석 학생</label>}
             {tab === "student" && <label className="row g6 sb"><input type="checkbox" checked={longOnly} onChange={(e) => setLongOnly(e.target.checked)} />장결자 ({longAbsent.length})</label>}
           </div>
