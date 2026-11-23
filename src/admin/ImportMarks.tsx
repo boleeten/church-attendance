@@ -47,7 +47,7 @@ const digits = (v?: string) => (v ?? "").replace(/[^0-9]/g, "");
 
 function buildPreview(d: Data, table: string[][], fileName: string): Preview | string {
   const hi = table.findIndex((r) => r.some((c) => c.replace(/\s/g, "") === "이름"));
-  if (hi < 0) return "첫 줄에 '이름' 칸이 있는 양식이 아닙니다. 학생 출석 통계 → 연간 → 학생별 출결 Excel 다운로드로 받은 파일을 써 주세요.";
+  if (hi < 0) return "첫 줄에 '이름' 칸이 있는 양식이 아닙니다. 학생 출석 통계 → 연간 학생별 출결 Excel 다운로드로 받은 파일을 써 주세요.";
   const head = table[hi].map((h) => h.replace(/\s/g, ""));
   const col = (re: RegExp) => head.findIndex((h) => re.test(h));
   const ci = { name: col(/^이름$/), g: col(/^(그룹|부)$/), gr: col(/^학년$/), no: col(/^반$/) };

@@ -178,33 +178,29 @@ export function StudentAttendance() {
 export function Stats() {
   const d = useData();
   const { date } = useAdminDate();
-  const [tab, setTab] = useState<"week" | "month" | "year">("month");
   const [detail, setDetail] = useState<Student | null>(null);
-  const { y, m } = ym(date);
+  const { y } = ym(date);
   const all = useMemo(() => yearSundays(d).filter((x) => x <= date), [d, date]);
-  const range = tab === "week" ? [date] : tab === "month" ? all.filter((x) => ym(x).m === m) : all;
+  const range = [date];
   const students = activeStudents(d);
   const ids = (list: Student[]) => list.map((s) => s.id);
   const sessionDone = (dt: string) => d.classes.every((c) => d.sessions[`${dt}|class:${c.id}`]?.completed);
-  const trend =
-    tab === "year"
-      ? [...new Set(all.map((x) => ym(x).m))].map((mo) => ({ label: `${mo}월`, ...countOver(d.studentMarks, ids(students), all.filter((x) => ym(x).m === mo)), cur: mo === m, done: all.filter((x) => ym(x).m === mo).every(sessionDone) }))
-      : (tab === "month" ? range : all.slice(-8)).map((dt) => ({ label: fmtMD(dt), ...countOver(d.studentMarks, ids(students), [dt]), cur: dt === date, done: sessionDone(dt) }));
+  const trend = all.slice(-8).map((dt) => ({ label: fmtMD(dt), ...countOver(d.studentMarks, ids(students), [dt]), cur: dt === date, done: sessionDone(dt) }));
   const groupCount = (g: 1 | 2) => countOver(d.studentMarks, ids(groupStudents(d, g)), range);
   const gradeCount = (gr: number) => countOver(d.studentMarks, ids(students.filter((s) => classOf(d, s)?.grade === gr)), range);
   const classRates = d.classes.map((c) => ({ c, ...countOver(d.studentMarks, ids(roster(d, c.id)), range) })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
   const streaks = students.map((s) => ({ s, ...consecutiveAbsences(d.studentMarks, s.id, all) })).filter((x) => x.count >= 2).sort((a, b) => b.count - a.count);
-  const title = tab === "week" ? fmtDot(date) : tab === "month" ? `${y}년 ${m}월` : `${y}학년도`;
-  // 학생별 출결현황: 선택한 기간(주간·월간·연간)의 주일별 출결과 합계
+  const title = fmtDot(date);
+  // 학생별 출결현황 Excel: 올해 1월부터 선택한 주일까지 전체 (지난 출결 올리기 양식으로도 쓴다)
   const exportCsv = () => {
     const list = [...students].sort((p, q) => p.classId.localeCompare(q.classId) || p.name.localeCompare(q.name, "ko"));
     download(
-      `학생별_출결현황_${title.replace(/[\s.()]+/g, "_").replace(/_+$/, "")}.csv`,
+      `학생별_출결현황_${y}학년도_${fmtMD(date).replace("/", "월")}일까지.csv`,
       toCSV([
-        ["이름", "그룹", "학년", "반", "담임", ...range.map(fmtMD), "출석", "결석", "미확인", "출석률"],
+        ["이름", "그룹", "학년", "반", "담임", ...all.map(fmtMD), "출석", "결석", "미확인", "출석률"],
         ...list.map((s) => {
           const c = classOf(d, s);
-          const marks = range.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
+          const marks = all.map((dt) => d.studentMarks[`${dt}|${s.id}`]);
           const p = marks.filter((x) => x === "P").length;
           const a = marks.filter((x) => x === "A").length;
           return [s.name, c ? `${c.group}부` : "", c ? (c.grade ? `${c.grade}학년` : "새친구반") : "", c && c.grade ? `${c.no}반` : "", homeroomName(d, s.classId), ...marks.map(markText), p, a, marks.length - p - a, pctText(pct(p, a, marks.length))];
@@ -213,15 +209,14 @@ export function Stats() {
     );
   };
   return (
-    <Page title="학생 출석 통계" sub="주간·월간·연간 출석 통계와 추세를 확인합니다">
+    <Page title="학생 출석 통계" sub="선택한 주일의 출석 통계와 최근 8주 추세를 확인합니다">
       <div className="row between wrap g12">
         <div className="row g16 wrap">
-          <Seg value={tab} options={[["week", "주간"], ["month", "월간"], ["year", "연간"]] as const} onChange={setTab} />
           <strong className="t-lg b">{title}</strong>
         </div>
         <div className="row g8 wrap">
           <ImportMarksButton />
-          <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />학생별 출결 Excel 다운로드</Button>
+          <Button variant="outline" onClick={exportCsv}><Icon name="download" size={16} />연간 학생별 출결 Excel 다운로드</Button>
         </div>
       </div>
       <div className="grid split">
@@ -232,9 +227,9 @@ export function Stats() {
           </div>
           <div className="chart">
             {trend.map((t) => (
-              <div key={t.label} title={tab === "week" ? `출석 ${countText(t)}` : undefined}>
+              <div key={t.label} title={`출석 ${countText(t)}`}>
                 <strong className="t-xs sb">{pctText(t.rate)}</strong>
-                {tab === "week" && <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>}
+                <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>
                 <span className={`barv ${t.cur ? "cur" : ""}`} style={{ height: `${Math.max(4, (t.rate ?? 0) * 0.75)}%`, opacity: t.done ? 1 : 0.7 }} />
                 <span className="t-xs muted">{t.label}</span>
               </div>
@@ -250,7 +245,7 @@ export function Stats() {
                 <div key={g} className="col g4">
                   <span className="muted">{g}부</span>
                   <strong className="t-3xl b" style={{ color: g === 1 ? "var(--primary)" : "var(--secondary)" }}>{pctText(c.rate)}</strong>
-                  {tab === "week" && <span className="sb num">출석 {countText(c)}</span>}
+                  <span className="sb num">출석 {countText(c)}</span>
                   <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반</span>
                 </div>
               );
@@ -264,13 +259,13 @@ export function Stats() {
           <h2>학년별 출석률</h2>
           {[4, 5, 6].map((g) => {
             const c = gradeCount(g);
-            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong>{tab === "week" && <span className="t-xs muted num">{countText(c)}</span>}</span></div>;
+            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
           })}
         </section>
         <section className="panel">
           <div className="row between"><h2>반별 출석률</h2><span className="t-xs muted">낮은 순 6개 반</span></div>
           {classRates.slice(0, 6).map((x) => (
-            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong>{tab === "week" && <span className="t-xs muted num">{countText(x)}</span>}</span></div>
+            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong><span className="t-xs muted num">{countText(x)}</span></span></div>
           ))}
         </section>
       </div>
@@ -545,8 +540,7 @@ export function TeacherAttendance() {
       <section className="panel">
         <div className="row between wrap g8">
           <div className="filters">
-            <Seg value={tab} options={[["week", "주간"], ["month", "월간"], ["year", "연간"]] as const} onChange={setTab} />
-            <div className="input m" style={{ minWidth: 180 }}><Icon name="search" size={18} /><input placeholder="교사 이름 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 이름 검색" /></div>
+              <div className="input m" style={{ minWidth: 180 }}><Icon name="search" size={18} /><input placeholder="교사 이름 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="교사 이름 검색" /></div>
             <SelectBox label="그룹" value={group} onChange={setGroup}><option value="">그룹: 전체</option><option value="1">1부</option><option value="2">2부</option></SelectBox>
             <SelectBox label="상태" value={status} onChange={setStatus}><option value="">상태: 전체</option><option value="P">출석</option><option value="A">결석</option><option value="U">미확인</option></SelectBox>
           </div>
