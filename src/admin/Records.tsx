@@ -232,9 +232,9 @@ export function Stats() {
           </div>
           <div className="chart">
             {trend.map((t) => (
-              <div key={t.label} title={`출석 ${countText(t)}`}>
+              <div key={t.label} title={tab === "week" ? `출석 ${countText(t)}` : undefined}>
                 <strong className="t-xs sb">{pctText(t.rate)}</strong>
-                <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>
+                {tab === "week" && <span className="t-xs muted num chart-count">{num(t.p)}/{num(t.total)}</span>}
                 <span className={`barv ${t.cur ? "cur" : ""}`} style={{ height: `${Math.max(4, (t.rate ?? 0) * 0.75)}%`, opacity: t.done ? 1 : 0.7 }} />
                 <span className="t-xs muted">{t.label}</span>
               </div>
@@ -250,8 +250,8 @@ export function Stats() {
                 <div key={g} className="col g4">
                   <span className="muted">{g}부</span>
                   <strong className="t-3xl b" style={{ color: g === 1 ? "var(--primary)" : "var(--secondary)" }}>{pctText(c.rate)}</strong>
-                  <span className="sb num">출석 {countText(c)}</span>
-                  <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반{range.length > 1 ? ` · ${range.length}주 합계` : ""}</span>
+                  {tab === "week" && <span className="sb num">출석 {countText(c)}</span>}
+                  <span className="t-xs muted">{groupStudents(d, g).length}명 · {d.classes.filter((c) => c.group === g).length}개 반</span>
                 </div>
               );
             })}
@@ -264,13 +264,13 @@ export function Stats() {
           <h2>학년별 출석률</h2>
           {[4, 5, 6].map((g) => {
             const c = gradeCount(g);
-            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong><span className="t-xs muted num">{countText(c)}</span></span></div>;
+            return <div key={g} className="hbar"><span className="sb">{g}학년</span><Progress value={c.rate ?? 0} /><span className="hbar-val"><strong className="sb num">{pctText(c.rate)}</strong>{tab === "week" && <span className="t-xs muted num">{countText(c)}</span>}</span></div>;
           })}
         </section>
         <section className="panel">
           <div className="row between"><h2>반별 출석률</h2><span className="t-xs muted">낮은 순 6개 반</span></div>
           {classRates.slice(0, 6).map((x) => (
-            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong><span className="t-xs muted num">{countText(x)}</span></span></div>
+            <div key={x.c.id} className="hbar"><span className="sb">{x.c.group}부 {classShort(x.c)}</span><Progress value={x.rate ?? 0} color={(x.rate ?? 100) < 85 ? "var(--secondary)" : undefined} /><span className="hbar-val"><strong className="sb num">{pctText(x.rate)}</strong>{tab === "week" && <span className="t-xs muted num">{countText(x)}</span>}</span></div>
           ))}
         </section>
       </div>
