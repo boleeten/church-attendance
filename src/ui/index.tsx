@@ -192,7 +192,7 @@ export function Modal({ title, onClose, children, wide, footer }: { title: strin
   return (
     <div className="backdrop mid" onClick={onClose}>
       <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <div className="row between">
+        <div className="row between modal-head">
           <h2 className="t-lg b">{title}</h2>
           <button type="button" className="icon-btn" aria-label="닫기" onClick={onClose}><Icon name="x" /></button>
         </div>
