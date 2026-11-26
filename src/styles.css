@@ -1,12 +1,13 @@
 :root {
   --primary: #041c46;
-  --secondary: #fe701d;
+  --secondary: #fe701d; /* 채움(로고·그래프·진행 막대)용 */
+  --secondary-text: #c2410c; /* 주황 글자용: 흰·연한 바탕에서 4.5:1 이상 */
   --info: #2f80ed;
-  --success: #1bb05a;
-  --warning: #e2b93b;
-  --error: #eb5757;
+  --success: #15803d; /* 글자 대비 4.5:1 이상 (이전 #1bb05a) */
+  --warning: #b8860b; /* 진행 중 점 표시 3:1 이상 (이전 #e2b93b) */
+  --error: #cf3535; /* 글자 대비 4.5:1 이상 (이전 #eb5757) */
   --text: #333333;
-  --muted: #828282;
+  --muted: #6b6b6b; /* 보조 글자 대비 4.5:1 이상 (이전 #828282) */
   --border: #e0e0e0;
   --white: #ffffff;
   --canvas: #f5f7fa;
@@ -15,7 +16,7 @@
   --error-soft: #fff0f0;
   --warm: #fff5ea;
   --neutral-soft: #f3f4f6;
-  --neutral: #6d7280;
+  --neutral: #5b6170; /* 회색 배지 글자 대비 4.5:1 이상 (이전 #6d7280) */
   --track: #e5e7eb;
   --subtle: #e5e7eb; /* Figma Color/Border/subtle */
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px 0 rgba(0, 0, 0, 0.05);
@@ -47,7 +48,7 @@ h1, h2, h3, p { margin: 0; }
 .c-primary { color: var(--primary); }
 .c-success { color: var(--success); }
 .c-error { color: var(--error); }
-.c-secondary { color: var(--secondary); }
+.c-secondary { color: var(--secondary-text); }
 .c-neutral { color: var(--neutral); }
 .num { font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
@@ -79,7 +80,7 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn { width: 36px; height: 36px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; background: #fff; flex: none; }
 .icon-btn.bordered { width: 44px; height: 44px; border-radius: 22px; box-shadow: inset 0 0 0 1px var(--border); position: relative; }
 .icon-btn.soft { background: var(--soft); color: var(--primary); width: 40px; height: 40px; border-radius: 20px; }
-.icon-btn.warm { background: var(--warm); color: var(--secondary); width: 40px; height: 40px; border-radius: 20px; }
+.icon-btn.warm { background: var(--warm); color: var(--secondary-text); width: 40px; height: 40px; border-radius: 20px; }
 .dot { position: absolute; top: 9px; right: 9px; width: 10px; height: 10px; border-radius: 5px; background: var(--error); box-shadow: 0 0 0 2px #fff; }
 
 /* ── 배지·아바타 ── */
@@ -87,7 +88,7 @@ h1, h2, h3, p { margin: 0; }
 .badge.success { background: var(--success-soft); color: var(--success); }
 .badge.error { background: var(--error-soft); color: var(--error); }
 .badge.neutral { background: var(--neutral-soft); color: var(--neutral); }
-.badge.warning { background: var(--warm); color: var(--secondary); }
+.badge.warning { background: var(--warm); color: var(--secondary-text); }
 .badge.info { background: var(--soft); color: var(--primary); }
 /* 새친구 상태 */
 .badge.fresh { background: #fce7f3; color: #be185d; }
@@ -109,7 +110,7 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .chip { height: 38px; padding: 0 14px; border-radius: 19px; background: #fff; box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; color: var(--text); }
 .chip.on { background: var(--primary); color: #fff; box-shadow: none; }
 .seg { display: flex; padding: 4px; background: var(--track); border-radius: 12px; }
-.seg button { flex: 1; height: 36px; border-radius: 9px; font-weight: 600; color: var(--muted); padding: 0 14px; white-space: nowrap; }
+.seg button { flex: 1; height: 36px; border-radius: 9px; font-weight: 600; color: var(--neutral); padding: 0 14px; white-space: nowrap; }
 .seg button.on { background: #fff; color: var(--primary); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 .switch { width: 44px; height: 26px; border-radius: 13px; background: var(--track); position: relative; flex: none; transition: background 0.15s; }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 10px; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); }
@@ -145,7 +146,7 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .appbar.sub { padding-left: 12px; }
 .mbody { padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .tabbar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--border); display: flex; padding: 4px 8px calc(12px + env(safe-area-inset-bottom)); flex: none; z-index: 5; }
-.tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0 4px; color: #9ca3af; font-size: 12px; font-weight: 600; }
+.tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0 4px; color: #6b7280; font-size: 12px; font-weight: 600; }
 .tabbar a.active { color: var(--primary); }
 .bottom-actions { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); background: var(--canvas); border-top: 1px solid var(--border); padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; align-items: center; z-index: 5; }
 .stat4 { display: flex; padding: 14px 8px; }
@@ -263,7 +264,7 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .kpi .ico { width: 36px; height: 36px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: var(--soft); color: var(--primary); }
 .kpi .ico.success { background: var(--success-soft); color: var(--success); }
 .kpi .ico.error { background: var(--error-soft); color: var(--error); }
-.kpi .ico.warm { background: var(--warm); color: var(--secondary); }
+.kpi .ico.warm { background: var(--warm); color: var(--secondary-text); }
 .tablewrap { border-radius: 12px; box-shadow: inset 0 0 0 1px var(--border); overflow-x: auto; }
 table.tbl { width: 100%; border-collapse: collapse; }
 .tbl th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; padding: 12px 16px; background: var(--canvas); white-space: nowrap; }
@@ -285,10 +286,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .chart-count { font-size: 10px; white-space: nowrap; }
 .steps { display: flex; gap: 8px; flex-wrap: wrap; }
 .steps span { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 600; }
-.steps b { width: 24px; height: 24px; border-radius: 12px; background: var(--track); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.steps b { width: 24px; height: 24px; border-radius: 12px; background: var(--track); color: var(--neutral); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
 .steps .done b { background: var(--success); color: #fff; }
 .class-card { background: #fff; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-.demo-banner { background: var(--warm); color: var(--secondary); font-weight: 600; font-size: 12px; text-align: center; padding: 6px 12px; }
+.demo-banner { background: var(--warm); color: var(--secondary-text); font-weight: 600; font-size: 12px; text-align: center; padding: 6px 12px; }
 .menu-btn { display: none; }
 
 @media (max-width: 1100px) {
@@ -401,7 +402,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .cc-meta { display: flex; flex-direction: column; gap: 8px; line-height: 1.3; }
 .cc-teachers { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 10px; font-size: 14px; font-weight: 400; line-height: 1.3; color: var(--text); word-break: keep-all; }
 .cc-main { font-weight: 600; }
-.cc-none { color: #9ca3af; font-weight: 400; } /* 담임 미배정 */
+.cc-none { color: #6b7280; font-weight: 400; } /* 담임 미배정 */
 .cc-sub { font-size: 14px; line-height: 1.3; color: var(--muted); word-break: keep-all; }
 .cc-count { font-size: 14px; line-height: 1.3; color: var(--muted); }
 .grp-zone .class-card .class-actions .btn { height: 32px; border-radius: 8px; padding: 0 12px; font-size: 12px; font-weight: 600; }
@@ -433,7 +434,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .login-box .input input::placeholder { color: #9ca3af; }
 .login-box .input:focus-within { box-shadow: none; }
 
-.c-warning { color: #b7791f; }
+.c-warning { color: #946200; }
 .class-card .spacer { flex: 1; }
 .class-card { min-width: 0; }
 .class-actions { flex-wrap: wrap; }
@@ -568,7 +569,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 
 /* 학생 목록 전화 버튼 (상세정보 버튼과 줄을 나눠 잘못 누르지 않게) */
 .call-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 10px; background: var(--soft); color: var(--primary); font-size: 14px; font-weight: 600; text-decoration: none; }
-.call-btn.warm { background: var(--warm); color: var(--secondary); }
+.call-btn.warm { background: var(--warm); color: var(--secondary-text); }
 .call-btn:active { filter: brightness(.95); }
 
 /* 학생 출결현황 · 학생별 현황표: 1년 전체 주일을 옆으로 스크롤, 이름·반은 고정 */
