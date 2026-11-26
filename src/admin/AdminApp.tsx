@@ -10,6 +10,7 @@ import { toast } from "../lib/remote";
 import { entryOptions, setTeacherGroup } from "../mobile/Shell";
 import { Avatar, Badge, Button, Icon, Modal, Note } from "../ui";
 import { PasswordForm } from "../mobile/Auth";
+import { useEdgeSwipe } from "./useEdgeSwipe";
 import { Classes, Dashboard, Students, Teachers } from "./Manage";
 import { Notes, StudentAttendance, TeacherAttendance } from "./Records";
 import { Messages } from "./Messages";
@@ -272,12 +273,15 @@ export default function AdminApp() {
   const [date, setDate] = useState(currentSunday());
   const [open, setOpen] = useState(false);
   openSidebar = () => setOpen(true);
+  const panel = useRef<HTMLElement>(null);
+  const shade = useRef<HTMLDivElement>(null);
+  const dragging = useEdgeSwipe(open, setOpen, panel, shade);
   const others = entryOptions(u).filter((o) => o.path !== "/admin");
   return (
     <DateCtx.Provider value={{ date, setDate }}>
       <div className="admin">
-        {open && <div className="backdrop" style={{ zIndex: 39 }} onClick={() => setOpen(false)} />}
-        <aside className={`sidebar ${open ? "open" : ""}`}>
+        {(open || dragging) && <div ref={shade} className="backdrop" style={{ zIndex: 39 }} onClick={() => setOpen(false)} />}
+        <aside ref={panel} className={`sidebar ${open ? "open" : ""}`}>
           <Link to="/admin" className="brand" title="대시보드로 이동" onClick={() => setOpen(false)}>
             <span className="logo"><img src="/brand-flower.svg" alt="" width={43.4} height={43.4} /></span>
             <div className="col">
