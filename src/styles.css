@@ -613,3 +613,19 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .thread-input { display: flex; gap: 8px; align-items: flex-end; margin-top: 4px; }
 .thread-input .area { flex: 1; min-height: 40px; resize: vertical; }
 .area.s { min-height: 64px; padding: 8px 10px; font-size: 14px; }
+
+/* ───────── 휴대폰 누르는 영역 44px 이상 (UI/UX 점검 2순위) ───────── */
+/* 출석·결석 버튼 */
+.phone .toggle button { height: 44px; }
+/* 주일 앞뒤 이동, 보호자 전화 등 아이콘 버튼 */
+.phone :is(button, a).icon-btn { width: 44px; height: 44px; border-radius: 22px; }
+/* 메세지 넘기기 */
+.phone .msg-roll-btn { width: 44px; height: 44px; border-radius: 22px; }
+/* 보호자 전화 (넓은 버튼) */
+.phone .call-btn { height: 44px; }
+/* '심방노트 작성 >' 글자 링크: 모양은 그대로, 누르는 영역만 위아래로 넓힌다 */
+.phone button.link { min-height: 44px; padding: 0 8px; margin: -14px -8px; }
+/* 작은 버튼(학생 상세정보, 출석부 열기 등) */
+.phone .btn.s { height: 44px; border-radius: 10px; font-size: 13px; }
+/* 글자만 있는 버튼(편집 등): 모양은 그대로, 누르는 영역만 넓힌다 */
+.phone .hit { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin: -13px -8px; }

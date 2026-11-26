@@ -162,7 +162,7 @@ export function Inbox({ base }: { base: Base }) {
   };
   return (
     <Phone tabs={base === "/t" ? TEACHER_TABS : HEAD_TABS}>
-      <AppBar back title="내 메세지함" right={all.length > 0 ? <button type="button" className="sb c-primary" onClick={() => { setEdit(!edit); setSel([]); }}>{edit ? "완료" : "편집"}</button> : un > 0 ? <Badge tone="error">안 읽음 {un}</Badge> : undefined} />
+      <AppBar back title="내 메세지함" right={all.length > 0 ? <button type="button" className="sb c-primary hit" onClick={() => { setEdit(!edit); setSel([]); }}>{edit ? "완료" : "편집"}</button> : un > 0 ? <Badge tone="error">안 읽음 {un}</Badge> : undefined} />
       <div className="mbody" style={{ gap: 12 }}>
         <div className="msg-filter">
           {RANGES.map(([v, l]) => (
