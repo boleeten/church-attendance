@@ -250,17 +250,22 @@ export function buildSeed(): Data {
     audits,
     messages,
     receipts,
-    settings: {
-      year,
-      studentNotifyTime: "15:00",
-      studentNotifyOn: true,
-      teacherNotifyTime: "15:30",
-      teacherNotifyOn: false,
-      sheetLastSuccess: null,
-      sheetLastFail: null,
-      sheetSyncCount: 0,
-      sheetFailCount: 0,
-      lastBackup: null,
-    },
+    settings: defaultSettings(year),
+  };
+}
+
+/** 운영 설정 기본값 (데모 데이터를 만들지 않고도 쓸 수 있게 따로 둔다) */
+export function defaultSettings(year = ym(currentSunday()).y): Data["settings"] {
+  return {
+    year,
+    studentNotifyTime: "15:00",
+    studentNotifyOn: true,
+    teacherNotifyTime: "15:30",
+    teacherNotifyOn: false,
+    sheetLastSuccess: null,
+    sheetLastFail: null,
+    sheetSyncCount: 0,
+    sheetFailCount: 0,
+    lastBackup: null,
   };
 }

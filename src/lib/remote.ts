@@ -1,7 +1,7 @@
 // Supabase 연동. 환경 변수가 없으면 모든 함수가 아무 일도 하지 않고, 앱은 데모 모드로 동작한다.
 // 로그인 아이디는 Supabase Auth의 이메일 `${아이디}@attendance.local` 로 매핑한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { buildSeed } from "./seed";
+import { defaultSettings } from "./seed";
 import type { Data, Mark, MessageReceipt, NoteComment, TeacherMessage, User } from "./types";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -21,16 +21,46 @@ export function toast(message: string, kind: "info" | "error" = "info") {
 
 const fail = (table: string, message: string) => toast(`저장 실패 (${table}): ${message}`, "error");
 
-async function fetchAll<T>(table: string): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb!.from(table).select("*").range(from, from + 999);
-    if (error) throw new Error(`${table}: ${error.message}`);
-    out.push(...(data ?? []).map((r) => mapKeys(r, camel) as T));
-    if (!data || data.length < 1000) break;
+type FetchOpts = {
+  /** 받을 칸 (기본: 전부). 큰 칸(학생 사진 등)을 처음 화면에서 빼고 받을 때 쓴다 */
+  columns?: string;
+  /** 이 시각 이후 줄만 (칸 이름, ISO 시각) */
+  since?: [string, string];
+  /** 최신순으로 이 줄 수까지만 (칸 이름, 줄 수) */
+  latest?: [string, number];
+};
+
+const PAGE = 1000;
+
+/**
+ * 표 하나를 받는다. 1000줄이 넘으면 전체 줄 수를 먼저 알아낸 뒤 나머지 쪽을 동시에 받는다.
+ * (예전에는 1000줄씩 차례로 받아서 출석 기록이 쌓일수록 첫 화면이 느려졌다)
+ */
+async function fetchAll<T>(table: string, opts: FetchOpts = {}): Promise<T[]> {
+  const page = (from: number, count = false) => {
+    let q = sb!.from(table).select(opts.columns ?? "*", count ? { count: "exact" } : undefined);
+    if (opts.since) q = q.gte(opts.since[0], opts.since[1]);
+    if (opts.latest) q = q.order(opts.latest[0], { ascending: false });
+    const to = opts.latest ? Math.min(from + PAGE, opts.latest[1]) - 1 : from + PAGE - 1;
+    return q.range(from, to);
+  };
+  const first = await page(0, true);
+  if (first.error) throw new Error(`${table}: ${first.error.message}`);
+  const rows: unknown[] = [...(first.data ?? [])];
+  const total = Math.min(first.count ?? rows.length, opts.latest ? opts.latest[1] : Infinity);
+  if (rows.length === PAGE && total > PAGE) {
+    const rest = await Promise.all(Array.from({ length: Math.ceil(total / PAGE) - 1 }, (_, i) => page((i + 1) * PAGE)));
+    for (const r of rest) {
+      if (r.error) throw new Error(`${table}: ${r.error.message}`);
+      rows.push(...(r.data ?? []));
+    }
   }
-  return out;
+  return rows.map((r) => mapKeys(r as Record<string, unknown>, camel) as T);
 }
+
+const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+/** 학생 사진(data URL, 한 명당 최대 24KB)은 첫 화면에서 빼고, 화면이 뜬 뒤 따로 받는다 */
+const STUDENT_COLUMNS = "id,name,gender,birth_date,class_id,status,phone,guardian_phone,guardian_rel";
 
 /** 본인이 로그인했을 때만 목록에 보이는 계정(운영·개발용). 다른 계정에는 사용자 목록·배정에서 빠진다. */
 const HIDDEN_LOGIN_IDS = ["boleeten"];
@@ -43,23 +73,24 @@ function hideFor(all: Data, userId: string): Data {
 }
 
 async function loadAll(): Promise<Data> {
-  const base = buildSeed();
-  const [profiles, classes, assignments, students, sMarks, tMarks, sessions, notes, notifications, notifLogs, audits, settings] = await Promise.all([
+  // 표 15개를 한 번에 동시에 요청한다 (예전에는 메세지 표 3개를 나머지가 끝난 뒤에 따로 받았다)
+  const [profiles, classes, assignments, students, sMarks, tMarks, sessions, notes, notifications, notifLogs, audits, settings, messages, receipts, comments] = await Promise.all([
     fetchAll<User>("profiles"),
     fetchAll<Data["classes"][number]>("classes"),
     fetchAll<Data["assignments"][number]>("teacher_assignments"),
-    fetchAll<Data["students"][number]>("students"),
+    fetchAll<Data["students"][number]>("students", { columns: STUDENT_COLUMNS }),
     fetchAll<{ date: string; studentId: string; mark: Mark }>("student_marks"),
     fetchAll<{ date: string; teacherId: string; mark: Mark }>("teacher_marks"),
     fetchAll<{ date: string; target: string; completed: boolean; savedAt: string; savedBy: string }>("sessions"),
     fetchAll<Data["notes"][number]>("visit_notes"),
-    fetchAll<Data["notifications"][number]>("notifications"),
-    fetchAll<Data["notifLogs"][number]>("notification_logs"),
-    fetchAll<Data["audits"][number]>("audit_logs"),
+    // 앱 안 알림은 최근 한 달만 보여 주므로 그 이후 것만 받는다
+    fetchAll<Data["notifications"][number]>("notifications", { since: ["created_at", daysAgo(35)] }),
+    // 발송 기록은 최근 것만 화면에 쓴다
+    fetchAll<Data["notifLogs"][number]>("notification_logs", { since: ["at", daysAgo(120)] }),
+    // 변경 이력은 화면에 최근 100건만 보여 주므로 넉넉히 최근 1000건만
+    fetchAll<Data["audits"][number]>("audit_logs", { latest: ["at", 1000] }),
     fetchAll<{ id: number; data: Data["settings"] }>("settings"),
-  ]);
-  // 메세지 표가 아직 없으면(SQL 실행 전) 빈 목록으로 두고 나머지 화면은 그대로 쓴다
-  const [messages, receipts, comments] = await Promise.all([
+    // 메세지 표가 아직 없으면(SQL 실행 전) 빈 목록으로 두고 나머지 화면은 그대로 쓴다
     fetchAll<TeacherMessage>("teacher_messages").catch(() => [] as TeacherMessage[]),
     fetchAll<MessageReceipt>("teacher_message_recipients").catch(() => [] as MessageReceipt[]),
     fetchAll<NoteComment>("note_comments").catch(() => [] as NoteComment[]),
@@ -81,7 +112,7 @@ async function loadAll(): Promise<Data> {
     messages: desc(messages, "createdAt").map((m) => ({ ...m, images: m.images ?? [], links: m.links ?? [] })),
     receipts,
     comments: comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    settings: { ...base.settings, ...(settings[0]?.data ?? {}) },
+    settings: { ...defaultSettings(), ...(settings[0]?.data ?? {}) },
   };
 }
 
@@ -167,6 +198,16 @@ export const remote = {
       return { userId: data.user.id, data: hideFor(all, data.user.id) };
     } catch (e) {
       return `데이터를 불러오지 못했습니다. ${(e as Error).message}`;
+    }
+  },
+  /** 학생 사진만 따로 받는다 (첫 화면이 뜬 뒤에 호출) */
+  async studentPhotos(): Promise<Record<string, string>> {
+    if (!sb) return {};
+    try {
+      const rows = await fetchAll<{ id: string; photo: string | null }>("students", { columns: "id,photo" });
+      return Object.fromEntries(rows.filter((r) => r.photo).map((r) => [r.id, r.photo!]));
+    } catch {
+      return {};
     }
   },
   async restore(): Promise<{ userId: string; data: Data } | null> {

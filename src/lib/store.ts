@@ -115,6 +115,7 @@ export async function login(loginId: string, password: string): Promise<string |
     userId = res.userId;
     localStorage.setItem(SESSION_KEY, userId);
     emit();
+    void loadPhotosLater();
     return null;
   }
   const u = data.users.find((x) => x.loginId === loginId.trim());
@@ -126,6 +127,18 @@ export async function login(loginId: string, password: string): Promise<string |
   return null;
 }
 
+/** 학생 사진은 첫 화면이 뜬 뒤 받아서 채운다 (그동안은 이름 첫 글자 아바타) */
+async function loadPhotosLater() {
+  await new Promise((r) => setTimeout(r, 0));
+  const photos = await remote.studentPhotos();
+  let changed = false;
+  for (const s of data.students) {
+    // 그사이 사용자가 사진을 바꾸거나 지운 학생('photo' 칸이 이미 있음)은 건드리지 않는다
+    if (!("photo" in s) && photos[s.id]) { s.photo = photos[s.id]; changed = true; }
+  }
+  if (changed) { data = { ...data, students: [...data.students] }; emit(); }
+}
+
 /** Supabase 모드에서 새로고침 후 세션 복구 */
 export async function restoreSession(): Promise<void> {
   if (!remoteEnabled) return;
@@ -133,6 +146,7 @@ export async function restoreSession(): Promise<void> {
   if (res) {
     data = pruneNotifications(res.data);
     userId = res.userId;
+    void loadPhotosLater();
   } else {
     userId = null;
     localStorage.removeItem(SESSION_KEY);

@@ -1,7 +1,6 @@
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Inbox, MessageDetail } from "./mobile/Messages";
-import AdminApp from "./admin/AdminApp";
 import { remoteEnabled } from "./lib/remote";
 import { syncAppBadge } from "./lib/push";
 import { useData, useMe } from "./lib/store";
@@ -13,6 +12,15 @@ import { afterLoginPath, homePath } from "./mobile/Shell";
 import { HeadHome, MyInfo, Notifications, StudentDetail, StudentList, TeacherHome } from "./mobile/Teacher";
 import { Toasts } from "./ui";
 import { UpdateBanner } from "./lib/update";
+
+// 관리자 화면 코드는 관리자 화면을 열 때만 따로 받는다 (교사 앱 첫 화면이 가벼워진다)
+export const loadAdmin = () => import("./admin/AdminApp");
+const AdminApp = lazy(loadAdmin);
+
+/** 화면 코드를 받는 동안 보여 줄 자리 (index.html 의 첫 로딩 화면과 같은 모양) */
+function Splash() {
+  return <div className="boot"><img src="/logo.png" alt="" width={72} height={72} /><span className="boot-dot" /></div>;
+}
 
 /** 로그인·비밀번호 변경·역할을 확인한 뒤에만 화면을 보여 준다. */
 function Guard({ roles, children }: { roles: Role[]; children: ReactNode }) {
@@ -69,7 +77,7 @@ export default function App() {
         <Route path="/h/me" element={H(<MyInfo base="/h" />)} />
         <Route path="/h/messages" element={H(<Inbox base="/h" />)} />
         <Route path="/h/messages/:id" element={H(<MessageDetail base="/h" />)} />
-        <Route path="/admin/*" element={<Guard roles={["admin", "super"]}><AdminApp /></Guard>} />
+        <Route path="/admin/*" element={<Guard roles={["admin", "super"]}><Suspense fallback={<Splash />}><AdminApp /></Suspense></Guard>} />
         <Route path="*" element={<Root />} />
       </Routes>
       <Toasts />
