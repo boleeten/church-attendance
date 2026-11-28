@@ -530,13 +530,9 @@ export function MyInfo({ base }: { base: "/t" | "/h" }) {
           <button type="button" className="menu-row" onClick={askPush}><Icon name="bell" /><span className="grow sb">푸시 알림</span><Badge tone={pushOn ? "success" : "neutral"}>{pushOn ? "허용됨" : "미허용"}</Badge></button>
           {pushOn && <button type="button" className="menu-row" onClick={testPush}><Icon name="check" /><span className="grow sb">테스트 알림 받아 보기</span><Icon name="right" size={16} /></button>}
           <button type="button" className="menu-row" onClick={() => setSheet("install")}><Icon name="download" /><span className="grow sb">홈 화면에 앱 설치</span><Icon name="right" size={16} /></button>
-          <div className="menu-row"><Icon name="info" /><span className="grow sb">앱 버전</span><span className="muted">1.0.0</span></div>
+          <button type="button" className="menu-row" onClick={async () => { if (!(await checkAndReload())) toast("최신 버전입니다."); }}><Icon name="info" /><span className="grow sb" style={{ textAlign: "left" }}>앱 버전</span><span className="muted">{BUILD_TIME}</span><span className="sb c-primary t-sm">업데이트 확인</span></button>
         </div>
         <Note icon="bell">매주 일요일 오후 3시, 출석이 완료되지 않으면 알림을 보내드립니다. 아이폰은 홈 화면에 설치한 앱에서 알림을 허용해야 합니다.</Note>
-        <div className="row between t-sm" style={{ padding: "0 4px" }}>
-          <span className="muted">앱 버전 {BUILD_TIME}</span>
-          <button type="button" className="sb c-primary hit" onClick={async () => { if (!(await checkAndReload())) toast("최신 버전입니다."); }}>업데이트 확인</button>
-        </div>
         <Button variant="danger" size="l" block onClick={() => { logout(); nav("/login", { replace: true }); }}>로그아웃</Button>
       </div>
       {sheet === "pw" && (
