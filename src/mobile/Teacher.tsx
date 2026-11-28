@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { currentSunday, todayISO, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
+import { addWeeks, currentSunday, todayISO, fmtBirth, fmtDateTimeKo, fmtDot, fmtKo, fmtMD, fmtStamp, sundaysOfMonth, ym } from "../lib/date";
 import { enablePush, pushPermission, sendTestNotification } from "../lib/push";
 import { toast } from "../lib/remote";
 import { classSummary, consecutiveAbsences, monthBirthdays, newFriendsReady, NEW_FRIEND_WEEKS, groupTeachers, personRate, pctText, roster, teacherDuty, teacherSummary, yearSundays } from "../lib/stats";
@@ -15,6 +15,7 @@ import { visibleNotifications } from "../lib/messages";
 import { formatPhone } from "../lib/phone";
 import { noteStatus } from "../lib/notes";
 import { NoteThread } from "../ui/NoteThread";
+import { DateDial, type DateDialHandle } from "../ui/DateDial";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
@@ -29,28 +30,32 @@ function Bell({ base }: { base: string }) {
   );
 }
 
-function Hero({ tone, label, date, sum, unit, cta, to }: { tone: "teacher" | "head"; label: string; date: string; sum: ReturnType<typeof classSummary>; unit: string; cta: string; to: string }) {
+/** 홈 카드: 위쪽 날짜 다이얼로 지난 주일을 돌려 볼 수 있다 (Figma 199:2349, 113:896) */
+function Hero({ tone, date, dates, onDate, sum, unit, cta, to }: { tone: "teacher" | "head"; date: string; dates: string[]; onDate: (d: string) => void; sum: ReturnType<typeof classSummary>; unit: string; cta: string; to: string }) {
   const done = sum.total ? Math.round(((sum.p + sum.a) / sum.total) * 100) : 0;
+  const dial = useRef<DateDialHandle>(null);
+  const cur = currentSunday();
+  const isCur = date === cur;
   return (
     <section className={`hero ${tone}`}>
-      <div className="row between">
-        <div className="col g2">
-          <span className="t-sm hero-label">{label}</span>
-          <strong className="t-2xl b">{fmtKo(date)}</strong>
+      <div className="hero-dial">
+        <DateDial ref={dial} dates={[...dates, addWeeks(dates[dates.length - 1] ?? cur, 1)]} selectable={dates.length} value={date} onChange={onDate} label={(iso) => `${ym(iso).m}월 ${ym(iso).d}일`} />
+        {/* 다른 주일을 볼 때만 보임. 자리는 늘 있어서 카드가 들썩이지 않는다 */}
+        <button type="button" className={`hero-today ${isCur ? "off" : ""}`} tabIndex={isCur ? -1 : 0} aria-hidden={isCur} onClick={() => dial.current?.goTo(cur)}>오늘 날짜로</button>
+      </div>
+      <div className="hero-body">
+        <div className="stat4">
+          <div><strong>{sum.total}</strong><span>{unit}</span></div>
+          <div><strong className="c-success">{sum.p}</strong><span>출석</span></div>
+          <div><strong className="c-error">{sum.a}</strong><span>결석</span></div>
+          <div><strong className="c-neutral">{sum.u}</strong><span>미확인</span></div>
         </div>
-        <Badge tone={sum.completed ? "success" : "warning"}>{sum.completed ? "출석 완료" : sum.started ? "출석 진행 중" : "출석 전"}</Badge>
+        <div className="col g8">
+          <div className="row between t-xs"><span className="hero-label">완료율</span><strong>{done}%</strong></div>
+          <Progress value={done} />
+        </div>
+        <Link to={isCur ? to : `${to}?date=${date}`} className="btn secondary l block">{cta}</Link>
       </div>
-      <div className="stat4">
-        <div><strong>{sum.total}</strong><span>{unit}</span></div>
-        <div><strong className="c-success">{sum.p}</strong><span>출석</span></div>
-        <div><strong className="c-error">{sum.a}</strong><span>결석</span></div>
-        <div><strong className="c-neutral">{sum.u}</strong><span>미확인</span></div>
-      </div>
-      <div className="col g8">
-        <div className="row between t-xs"><span>완료율</span><strong>{done}%</strong></div>
-        <Progress value={done} />
-      </div>
-      <Link to={to} className="btn secondary l block">{cta}</Link>
     </section>
   );
 }
@@ -59,7 +64,7 @@ export function TeacherHome() {
   const d = useData();
   const u = useMe()!;
   const { cls } = useMyClass();
-  const date = currentSunday();
+  const [date, setDate] = useState(currentSunday);
   if (!cls)
     return (
       <Phone tabs={TEACHER_TABS}>
@@ -88,7 +93,7 @@ export function TeacherHome() {
         <Bell base="/t" />
       </header>
       <div className="mbody">
-        <Hero tone="teacher" label="이번 주 주일" date={date} sum={classSummary(d, date, cls.id)} unit="전체" cta="출석체크 하기" to="/t/check" />
+        <Hero tone="teacher" date={date} dates={dates} onDate={setDate} sum={classSummary(d, date, cls.id)} unit="전체" cta="출석체크 하기" to="/t/check" />
         {ready.length > 0 && (
           <div className="nf-alert col" style={{ alignItems: "stretch", gap: 10 }}>
             <strong className="sb">반 배정 대상 {ready.length}명</strong>
@@ -148,7 +153,8 @@ export function HeadHome() {
   const d = useData();
   const u = useMe()!;
   const g = u.group ?? 1;
-  const date = currentSunday();
+  const [date, setDate] = useState(currentSunday);
+  const dates = yearSundays(d);
   const pending = groupTeachers(d, g).filter((t) => !d.teacherMarks[`${date}|${t.id}`]);
   return (
     <Phone tabs={HEAD_TABS}>
@@ -160,7 +166,7 @@ export function HeadHome() {
         <Bell base="/h" />
       </header>
       <div className="mbody">
-        <Hero tone="head" label={`${g}부 교사 출석 · 이번 주 주일`} date={date} sum={teacherSummary(d, date, g)} unit="전체 교사" cta="교사 출석체크 하기" to="/h/check" />
+        <Hero tone="head" date={date} dates={dates} onDate={setDate} sum={teacherSummary(d, date, g)} unit="전체 교사" cta="교사 출석체크 하기" to="/h/check" />
         <Note>부장님 본인과 {g}부 소속 교사의 출석을 체크할 수 있습니다.</Note>
         <div className="row between">
           <h2 className="t-base b">미확인 교사</h2>

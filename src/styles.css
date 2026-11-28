@@ -153,13 +153,14 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .stat4 > div { flex: 1; text-align: center; }
 .stat4 strong { display: block; font-size: 24px; line-height: 1.5; font-weight: 700; }
 .stat4 span { font-size: 12px; color: var(--muted); }
-.hero { background: var(--primary); border-radius: 20px; padding: 20px; color: #fff; display: flex; flex-direction: column; gap: 16px; }
+.hero { background: var(--primary); border-radius: 20px; padding: 24px 0 20px; color: #fff; display: flex; flex-direction: column; gap: 24px; overflow: hidden; }
+.hero-body { display: flex; flex-direction: column; gap: 16px; padding: 0 20px; }
 .hero .stat4 { background: #fff; border-radius: 14px; color: var(--text); }
 .hero .progress { background: rgba(255, 255, 255, 0.25); }
 .hero .progress > i { background: var(--secondary); }
 .hero .hero-label { opacity: 0.7; }
 /* 교사 홈: 밝은 파랑 */
-.hero.teacher { background: linear-gradient(180deg, rgba(42, 255, 0, 0.2), rgba(0, 47, 65, 0.2)), #0055ff; }
+.hero.teacher { background: linear-gradient(180deg, #0a5ebd 21%, #00209f 100%); } /* Figma 199:2360 */
 .hero.teacher .progress { background: rgba(249, 250, 251, 0.5); }
 /* 부장교사 홈: 남색 위에 오른쪽 아래 보라 그라디언트 */
 .hero.head { background: linear-gradient(324deg, rgba(92, 18, 177, 0.43) 5%, rgba(5, 6, 55, 0.29) 25%, rgba(0, 14, 206, 0.36) 49%), #162d57; }
@@ -629,3 +630,33 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .phone .btn.s { height: 44px; border-radius: 10px; font-size: 13px; }
 /* 글자만 있는 버튼(편집 등): 모양은 그대로, 누르는 영역만 넓힌다 */
 .phone .hit { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin: -13px -8px; }
+
+/* ───────── 홈 카드 날짜 다이얼 (Figma 199:2461 · 주빛 다이얼과 같은 효과) — 칸 폭은 DateDial.tsx 의 ITEM(112px)과 같게 ───────── */
+.hero-dial { display: flex; flex-direction: column; align-items: center; }
+.date-dial {
+  position: relative; width: 100%; height: 60px; overflow: hidden;
+  touch-action: pan-y; /* 좌우는 다이얼이, 위아래는 화면 스크롤이 */
+  user-select: none; -webkit-user-select: none; cursor: grab; outline: none;
+  /* 양 끝이 자연스럽게 사라지게 (Figma 가장자리 91px 그라데이션) */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, transparent 8px, #000 91px, #000 calc(100% - 91px), transparent calc(100% - 8px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, transparent 8px, #000 91px, #000 calc(100% - 91px), transparent calc(100% - 8px), transparent 100%);
+}
+.date-dial:active { cursor: grabbing; }
+.date-dial:focus-visible { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7); border-radius: 12px; }
+.date-dial-track { display: flex; height: 100%; will-change: transform; }
+.date-dial-item {
+  flex: none; width: 112px; height: 100%; padding: 0; border: 0; background: none;
+  font-size: 24px; font-weight: 700; line-height: 1.5; color: #fff; white-space: nowrap;
+  cursor: inherit; transform-origin: center; will-change: transform, opacity;
+  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+}
+/* 다른 주일을 볼 때만: 이번 주일로 돌아가기 (Figma 199:2468) */
+.hero-today {
+  margin-top: -6px; min-height: 32px; padding: 0 12px; border-radius: 16px;
+  font-size: 12px; font-weight: 500; line-height: 1.5; color: #fff;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.hero-today:active { background: rgba(255, 255, 255, 0.12); }
+.hero-today.off { opacity: 0; transform: translateY(-4px); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .hero-today { transition: none; } }
+.date-dial-item:disabled { pointer-events: none; } /* 미래 주일: 보이기만 (끌기는 다이얼 전체가 받음) */
