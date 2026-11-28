@@ -40,8 +40,12 @@ function Hero({ tone, date, dates, onDate, sum, unit, cta, to }: { tone: "teache
     <section className={`hero ${tone}`}>
       <div className="hero-dial">
         <DateDial ref={dial} dates={[...dates, addWeeks(dates[dates.length - 1] ?? cur, 1)]} selectable={dates.length} value={date} onChange={onDate} label={(iso) => `${ym(iso).m}월 ${ym(iso).d}일`} />
-        {/* 다른 주일을 볼 때만 보임. 자리는 늘 있어서 카드가 들썩이지 않는다 */}
-        <button type="button" className={`hero-today ${isCur ? "off" : ""}`} tabIndex={isCur ? -1 : 0} aria-hidden={isCur} onClick={() => dial.current?.goTo(cur)}>오늘 날짜로</button>
+        {/* 지난 주일을 볼 때만 나타난다. 최근 주일에서는 자리까지 접혀 아래 카드가 올라온다 */}
+        <div className={`hero-today-wrap ${isCur ? "" : "on"}`} aria-hidden={isCur}>
+          <div>
+            <button type="button" className="hero-today" tabIndex={isCur ? -1 : 0} onClick={() => dial.current?.goTo(cur)}>최근 주일로</button>
+          </div>
+        </div>
       </div>
       <div className="hero-body">
         <div className="stat4">

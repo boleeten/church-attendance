@@ -192,7 +192,7 @@ select.sel { height: 40px; border-radius: 10px; border: 0; box-shadow: inset 0 0
 .cropper-mask { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 9999px rgba(4, 28, 70, 0.5), inset 0 0 0 2px #fff; pointer-events: none; }
 .toasts { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 99; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 /* 새 버전 안내: 화면 위쪽 가운데, 눌러야 사라진다 */
-.update-bar { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 18px; border-radius: 14px; background: var(--text); color: #fff; font-size: 14px; font-weight: 600; box-shadow: var(--shadow-lg); white-space: nowrap; }
+.update-bar { position: fixed; bottom: calc(96px + env(safe-area-inset-bottom)); /* 하단 메뉴 위 */ left: 50%; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 18px; border-radius: 14px; background: #031261; color: #fff; font-size: 14px; font-weight: 600; box-shadow: var(--shadow-lg); white-space: nowrap; }
 .update-bar button { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: #fff; color: var(--text); font-size: 14px; font-weight: 700; cursor: pointer; }
 .toast { background: var(--text); color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: var(--shadow-lg); max-width: 86vw; }
 .toast.error { background: var(--error); }
@@ -650,13 +650,14 @@ table.tbl { width: 100%; border-collapse: collapse; }
   cursor: inherit; transform-origin: center; will-change: transform, opacity;
   -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
 }
-/* 다른 주일을 볼 때만: 이번 주일로 돌아가기 (Figma 199:2468) */
+/* 지난 주일을 볼 때만: 최근 주일로 돌아가기 (Figma 199:2468). 숨길 때는 높이까지 접는다 */
+.hero-today-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.22s ease, opacity 0.18s; }
+.hero-today-wrap > div { overflow: hidden; min-height: 0; display: flex; justify-content: center; }
+.hero-today-wrap.on { grid-template-rows: 1fr; opacity: 1; }
 .hero-today {
-  margin-top: -6px; min-height: 32px; padding: 0 12px; border-radius: 16px;
+  min-height: 32px; padding: 0 12px; border-radius: 16px;
   font-size: 12px; font-weight: 500; line-height: 1.5; color: #fff;
-  transition: opacity 0.18s, transform 0.18s;
 }
 .hero-today:active { background: rgba(255, 255, 255, 0.12); }
-.hero-today.off { opacity: 0; transform: translateY(-4px); pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .hero-today { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hero-today-wrap { transition: none; } }
 .date-dial-item:disabled { pointer-events: none; } /* 미래 주일: 보이기만 (끌기는 다이얼 전체가 받음) */
