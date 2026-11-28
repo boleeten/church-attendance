@@ -15,7 +15,7 @@ import { visibleNotifications } from "../lib/messages";
 import { formatPhone } from "../lib/phone";
 import { noteStatus } from "../lib/notes";
 import { NoteThread } from "../ui/NoteThread";
-import { DateDial, type DateDialHandle } from "../ui/DateDial";
+import { DateDial } from "../ui/DateDial";
 import { AppBar, ClassPicker, currentTeacherGroup, HEAD_TABS, isAdmin, Phone, setTeacherGroup, TEACHER_TABS, teacherGroups, useMyClass } from "./Shell";
 
 function Bell({ base }: { base: string }) {
@@ -33,19 +33,12 @@ function Bell({ base }: { base: string }) {
 /** 홈 카드: 위쪽 날짜 다이얼로 지난 주일을 돌려 볼 수 있다 (Figma 199:2349, 113:896) */
 function Hero({ tone, date, dates, onDate, sum, unit, cta, to }: { tone: "teacher" | "head"; date: string; dates: string[]; onDate: (d: string) => void; sum: ReturnType<typeof classSummary>; unit: string; cta: string; to: string }) {
   const done = sum.total ? Math.round(((sum.p + sum.a) / sum.total) * 100) : 0;
-  const dial = useRef<DateDialHandle>(null);
   const cur = currentSunday();
   const isCur = date === cur;
   return (
     <section className={`hero ${tone}`}>
       <div className="hero-dial">
-        <DateDial ref={dial} dates={[...dates, addWeeks(dates[dates.length - 1] ?? cur, 1)]} selectable={dates.length} value={date} onChange={onDate} label={(iso) => `${ym(iso).m}월 ${ym(iso).d}일`} />
-        {/* 지난 주일을 볼 때만 나타난다. 최근 주일에서는 자리까지 접혀 아래 카드가 올라온다 */}
-        <div className={`hero-today-wrap ${isCur ? "" : "on"}`} aria-hidden={isCur}>
-          <div>
-            <button type="button" className="hero-today" tabIndex={isCur ? -1 : 0} onClick={() => dial.current?.goTo(cur)}>최근 주일로</button>
-          </div>
-        </div>
+        <DateDial dates={[...dates, addWeeks(dates[dates.length - 1] ?? cur, 1)]} selectable={dates.length} value={date} onChange={onDate} label={(iso) => `${ym(iso).m}월 ${ym(iso).d}일`} />
       </div>
       <div className="hero-body">
         <div className="stat4">

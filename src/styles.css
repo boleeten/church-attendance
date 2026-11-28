@@ -650,14 +650,4 @@ table.tbl { width: 100%; border-collapse: collapse; }
   cursor: inherit; transform-origin: center; will-change: transform, opacity;
   -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
 }
-/* 지난 주일을 볼 때만: 최근 주일로 돌아가기 (Figma 199:2468). 숨길 때는 높이까지 접는다 */
-.hero-today-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.22s ease, opacity 0.18s; }
-.hero-today-wrap > div { overflow: hidden; min-height: 0; display: flex; justify-content: center; }
-.hero-today-wrap.on { grid-template-rows: 1fr; opacity: 1; }
-.hero-today {
-  min-height: 32px; padding: 0 12px; border-radius: 16px;
-  font-size: 12px; font-weight: 500; line-height: 1.5; color: #fff;
-}
-.hero-today:active { background: rgba(255, 255, 255, 0.12); }
-@media (prefers-reduced-motion: reduce) { .hero-today-wrap { transition: none; } }
 .date-dial-item:disabled { pointer-events: none; } /* 미래 주일: 보이기만 (끌기는 다이얼 전체가 받음) */
