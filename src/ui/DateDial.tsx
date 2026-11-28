@@ -102,6 +102,11 @@ export const DateDial = forwardRef<DateDialHandle, Props>(function DateDial({ da
     };
     anim.current = requestAnimationFrame(step);
   };
+  /** 날짜 사이에 멈춰 있으면 가장 가까운 날짜를 가운데로 */
+  const snap = () => {
+    const near = Math.min(Math.max(Math.round(offset.current / ITEM), 0), last) * ITEM;
+    if (Math.abs(offset.current - near) > 0.5) animateTo(near);
+  };
   const goIndex = (i: number) => animateTo(Math.min(Math.max(i, 0), last) * ITEM);
 
   useImperativeHandle(handle, () => ({ goTo: (date: string) => goIndex(dates.indexOf(date)) }));
@@ -116,7 +121,7 @@ export const DateDial = forwardRef<DateDialHandle, Props>(function DateDial({ da
   }, [dates.length]);
 
   useEffect(() => {
-    const onResize = () => paint();
+    const onResize = () => { offset.current = current.current * ITEM; paint(); };
     window.addEventListener("resize", onResize);
     return () => { window.removeEventListener("resize", onResize); stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,7 +159,8 @@ export const DateDial = forwardRef<DateDialHandle, Props>(function DateDial({ da
     const g = drag.current;
     if (!g || g.id !== e.pointerId) return;
     drag.current = null;
-    if (!g.moved) return; // 그냥 누른 것: 날짜 버튼 클릭으로 처리
+    // 그냥 누른 것: 날짜 버튼 클릭으로 처리. 다만 굴러가던 중에 눌러 멈췄으면 가장 가까운 날짜로 맞춘다
+    if (!g.moved) { snap(); return; }
     const s = g.samples;
     const a = s[0];
     const b = s[s.length - 1];
@@ -181,6 +187,7 @@ export const DateDial = forwardRef<DateDialHandle, Props>(function DateDial({ da
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onUp}
+      onLostPointerCapture={() => { if (!drag.current) snap(); }}
     >
       <div ref={track} className="date-dial-track">
         {dates.map((iso, i) => (
